@@ -1,12 +1,27 @@
-# ZHI · First Agent (Manager)
+# ZHI 世界｜智能人聊天系统优先
 
-本仓库实现 ZHI 世界第一阶段的本地 Python 原型：管理型智能人、私有 SQLite 记忆、任务审批、虚拟 ZHI 账本、审计日志和数据库备份/恢复。
+本项目的产品方向是：**保留并优化现有智能人聊天系统，不重做聊天功能，不再建设独立的智能人观察台。**
 
-## Requirements
-- Python 3.10+
-- No third-party dependencies (SQLite is included with Python)
+## 产品原则
+- 以现有聊天 UI、聊天历史和消息流为主入口；先复用、审计，再补缺口。
+- 第一位智能人是管理型智能人，通过聊天接收目标、提出计划、请求审批并反馈结果。
+- 每个智能人有固定身份和独立私有记忆；跨 Agent 记忆默认禁止共享。
+- 自主性采用监督模式：计划可以提出，带副作用的行动必须经过授权。
+- 不需要的旧模块先从主导航和部署流程排除；确认无引用、无数据依赖并通过回归测试后再物理删除。
 
-## Run
+## 现有资产复用
+优先评估 `agent-talk.html`、必要时的 `mia-chat.html`，以及 `zhi-agent-chat-history`、`zhi-agent-chat-feed` 等已有聊天能力。自主聊天和广播功能须先完成权限、预算、循环触发与审计检查，不应未经审计直接启用。
+
+详细决策见：
+- [产品范围与优先级](docs/PRODUCT_SCOPE.md)
+- [ZEE 现有资产复用清单](docs/REUSE_MAP.md)
+
+## 本地 Python MVP 的定位
+本仓库的 `main.py` 是本地验证工具，用于检查管理型 Agent 的身份、任务审批、私有记忆、虚拟 ZHI 账本、审计和备份流程。当前任务计划是确定性的，执行结果是模拟记录，不会调用外部系统；它不是生产聊天后端。
+
+### 运行
+需要 Python 3.10+，无需第三方依赖。
+
 ```bash
 python main.py init
 python main.py status
@@ -19,36 +34,21 @@ python main.py memories
 python main.py audit
 ```
 
-Database defaults to `./data/zhi.db`. Override with `ZHI_DB=/path/to/zhi.db`.
-The database is local, but not automatically encrypted. Keep it out of public repositories and back it up securely.
+数据库默认位于 `./data/zhi.db`，可用环境变量 `ZHI_DB` 指定路径。数据库默认不加密；不要提交数据库文件或存入敏感信息。
 
-## Supervised execution
-Tasks begin as `proposed`. `plan` creates a deterministic proposed plan; `approve` is required before `execute`. Execution in this MVP only records a simulated result and does not run shell commands or access external systems.
-
-## Private memory model
-All memory and task records are scoped to the fixed agent ID `manager-001`. This is an application-level isolation boundary for the single-agent MVP, not a security boundary against a person with access to the local database file. Do not store secrets or sensitive personal data.
-
-## Backup / restore
-```bash
-python main.py backup ./backups/zhi-backup.db
-python main.py restore ./backups/zhi-backup.db
-```
-Restore replaces the current database file. Stop the application first and keep a separate backup before restoring.
-
-## Tests
+### 测试
 ```bash
 python -m unittest discover -s tests -v
 ```
 
-## Stage 1 acceptance checklist
-- [ ] Agent identity and fixed traits can be initialized and inspected.
-- [ ] Tasks require approval before execution.
-- [ ] Task outcomes and memory survive restarts.
-- [ ] Each write creates an audit event.
-- [ ] Database can be backed up and restored.
-- [ ] Tests cover approval gating and persistence.
+## 安全注意
+- SQLite 的单 Agent 隔离是应用层边界，不防止有数据库文件访问权的人直接读取文件。
+- Supabase 的私有记忆必须由服务端鉴权和数据库 RLS/权限共同保护；不能只靠前端隐藏。
+- 不要将 service-role key 放在浏览器代码中；不要一次性执行旧项目全部 SQL migrations。
+- 真实资金、外部工具、自动广播和无人值守自主循环不在当前 MVP 范围内。
 
-## Roadmap
-1. Local deterministic core (this version).
-2. Optional LLM adapter for plan proposals; validate all model output before execution.
-3. Explicitly authorized agent-to-agent result exchange.
+## 开发顺序
+1. 核对实际 Supabase 项目、表、RLS、Edge Functions 与前端调用关系。
+2. 以现有聊天系统为唯一主入口，确认身份、会话和消息数据路径。
+3. 补齐任务审批、审计与私有记忆隔离。
+4. 再加入经验反思、模拟账本、聊天内管理简报等加分项。
