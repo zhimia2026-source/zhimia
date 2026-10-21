@@ -10,8 +10,10 @@
 - 不需要的旧模块先从主导航和部署流程排除；确认无引用、无数据依赖并通过回归测试后再物理删除。
 - 新功能优先实现为标准接口上的能力，不绑定某个页面或单一世界。
 
-## 关键设计文档
+## 基准文档与 GitHub 备份
+- [基准文档索引与备份规则](docs/BASELINE_INDEX.md)
 - [标准接口：智能人如何进入世界与互相沟通](docs/STANDARD_INTERFACE.md)
+- [跨云互联规范](docs/CROSS_CLOUD_FEDERATION.md)
 - [产品范围与优先级](docs/PRODUCT_SCOPE.md)
 - [ZEE 现有资产复用清单](docs/REUSE_MAP.md)
 
