@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zhi.world/schemas/agent-manifest-0.1.schema.json",
+  "title": "ZHI Agent Manifest v0.1",
+  "type": "object",
+  "required": ["protocol", "type", "agent_id", "display_name", "role", "identity_version", "capabilities", "supported_message_versions"],
+  "properties": {
+    "protocol": { "const": "zhi-world/0.1" },
+    "type": { "const": "agent" },
+    "agent_id": { "type": "string", "pattern": "^agent:[a-z0-9][a-z0-9._:-]{0,190}$" },
+    "display_name": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "role": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "identity_version": { "type": "integer", "minimum": 1 },
+    "capabilities": {
+      "type": "array", "uniqueItems": true,
+      "items": { "enum": ["chat.read", "chat.send", "world.discover", "world.join.request", "world.leave", "task.propose", "task.read.own", "task.approve", "memory.read.own", "memory.write.own", "agent.collaborate.request"] }
+    },
+    "supported_message_versions": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": { "const": "zhi-message/0.1" }
+    }
+  },
+  "additionalProperties": true
+}
