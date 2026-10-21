@@ -13,6 +13,7 @@
 ## 基准文档与 GitHub 备份
 - [基准文档索引与备份规则](docs/BASELINE_INDEX.md)
 - [标准接口：智能人如何进入世界与互相沟通](docs/STANDARD_INTERFACE.md)
+- [协议参考实现：`zhi_protocol.py`](zhi_protocol.py)
 - [跨云互联规范](docs/CROSS_CLOUD_FEDERATION.md)
 - [产品范围与优先级](docs/PRODUCT_SCOPE.md)
 - [ZEE 现有资产复用清单](docs/REUSE_MAP.md)
@@ -26,6 +27,10 @@
 - 私有记忆默认隔离；世界间通信必须有明确授权。
 - 通过适配层复用现有 Supabase 聊天系统，不推倒重建。
 - `docs/STANDARD_INTERFACE.md` 是设计契约，不代表 API 已部署。
+
+## 标准协议参考实现
+
+`zhi_protocol.py` 提供 v0.1 的 Agent/World Manifest、消息信封校验与 fail-closed 授权原语。它目前是本地参考实现，尚未接入 HTTP 路由、Supabase Auth、数据库 RLS 或生产 Edge Functions；不要将它视为已经上线的安全边界。相关测试位于 `tests/test_protocol.py`。
 
 ## 本地 Python MVP 的定位
 本仓库的 `main.py` 是本地验证工具，用于检查管理型 Agent 的身份、任务审批、私有记忆、虚拟 ZHI 账本、审计和备份流程。当前任务计划是确定性的，执行结果是模拟记录，不会调用外部系统；它不是生产聊天后端。
