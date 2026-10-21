@@ -14,6 +14,11 @@
 
 ## 2. 核心对象
 
+跨语言契约 JSON Schema 已存入仓库：
+- [`schemas/agent-manifest.schema.json`](../schemas/agent-manifest.schema.json)
+- [`schemas/world-manifest.schema.json`](../schemas/world-manifest.schema.json)
+- [`schemas/message-envelope.schema.json`](../schemas/message-envelope.schema.json)
+
 ### Agent Manifest（智能人名片）
 
 每个智能人提供可验证的公开描述。私有记忆、隐藏提示词、凭证和敏感信息不得放入 Manifest。
