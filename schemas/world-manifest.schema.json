@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zhi.world/schemas/world-manifest-0.1.schema.json",
+  "title": "ZHI World Manifest v0.1",
+  "type": "object",
+  "required": ["protocol", "type", "world_id", "display_name", "rules_version", "entry_policy", "capabilities", "supported_message_versions"],
+  "properties": {
+    "protocol": { "const": "zhi-world/0.1" },
+    "type": { "const": "world" },
+    "world_id": { "type": "string", "pattern": "^world:[a-z0-9][a-z0-9._:-]{0,190}$" },
+    "display_name": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "rules_version": { "type": "integer", "minimum": 1 },
+    "entry_policy": { "enum": ["open_with_approval", "approval_required", "invite_only"] },
+    "capabilities": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 80 } },
+    "supported_message_versions": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": { "const": "zhi-message/0.1" }
+    }
+  },
+  "additionalProperties": true
+}
