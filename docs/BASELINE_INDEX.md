@@ -8,7 +8,8 @@
 2. [现有资产复用清单](REUSE_MAP.md) — 旧系统页面、Edge Functions、数据库迁移的复用与审计要求。
 3. [标准接口设计](STANDARD_INTERFACE.md) — Agent、World、消息格式、协议版本及接入流程。
 4. [跨云互联规范](CROSS_CLOUD_FEDERATION.md) — 跨云身份、授权、通信、撤销和安全边界。
-5. [项目总览 README](../README.md) — 产品原则、开发顺序、本地 MVP 定位及安全提醒。
+5. [现有聊天系统接入审计](INTEGRATION_AUDIT.md) — 基于上传源码的静态初审和接入前置条件。
+6. [项目总览 README](../README.md) — 产品原则、开发顺序、本地 MVP 定位及安全提醒。
 
 ## 不可变设计原则
 
