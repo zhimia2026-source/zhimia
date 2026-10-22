@@ -76,6 +76,28 @@ def make_app(community: ZHICommunity, authenticate: Authenticator):
                     return _respond(start_response, "201 Created",
                                     {"message": message, "request_id": request_id})
 
+
+            if len(parts) == 4 and parts[:2] == ["v1", "scenes"] and parts[3] == "tasks" and method == "POST":
+                body = _read_json(environ)
+                key = environ.get("HTTP_IDEMPOTENCY_KEY", "").strip()
+                task, created = community.create_task(actor_id, parts[2], body.get("action"), key)
+                return _respond(start_response, "201 Created" if created else "200 OK",
+                                {"task": task, "created": created, "request_id": request_id})
+
+            if len(parts) == 3 and parts[:2] == ["v1", "tasks"] and method == "GET":
+                task = community.get_task(actor_id, parts[2])
+                return _respond(start_response, "200 OK", {"task": task, "request_id": request_id})
+
+            if len(parts) == 4 and parts[:2] == ["v1", "tasks"] and parts[3] == "cancel" and method == "POST":
+                task = community.cancel_task(actor_id, parts[2])
+                return _respond(start_response, "200 OK", {"task": task, "request_id": request_id})
+
+            if len(parts) == 4 and parts[:2] == ["v1", "tasks"] and parts[3] == "state" and method == "POST":
+                body = _read_json(environ)
+                task = community.transition_task(actor_id, parts[2], body.get("status"),
+                                                 result=body.get("result"), error=body.get("error"))
+                return _respond(start_response, "200 OK", {"task": task, "request_id": request_id})
+
             return _respond(start_response, "404 Not Found",
                             {"error": "ZHI_RESOURCE_NOT_FOUND", "request_id": request_id})
         except PermissionDenied:
