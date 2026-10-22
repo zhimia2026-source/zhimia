@@ -46,6 +46,12 @@ def make_app(community: ZHICommunity, authenticate: Authenticator):
                                 {"scene": scene, "request_id": request_id})
 
             parts = [p for p in path.split("/") if p]
+            if len(parts) == 4 and parts[:2] == ["v1", "scenes"] and parts[3] == "state" and method == "POST":
+                body = _read_json(environ)
+                scene = community.transition_scene(actor_id, parts[2], body.get("state"))
+                return _respond(start_response, "200 OK",
+                                {"scene": scene, "request_id": request_id})
+
             if len(parts) == 4 and parts[:2] == ["v1", "scenes"] and parts[3] == "join" and method == "POST":
                 body = _read_json(environ)
                 community.join_scene(actor_id, parts[2], body.get("invitation_token"))
