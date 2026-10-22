@@ -167,7 +167,7 @@ paths:
               properties:
                 status:
                   type: string
-                  enum: [QUEUED, RUNNING, COMPLETING, COMPLETED, CANCELLED, FAILED, EXPIRED, BLOCKED, RECOVERY_REQUIRED]
+                  enum: [QUEUED, RUNNING, COMPLETING, COMPLETED, CANCEL_REQUESTED, CANCELLED, FAILED, EXPIRED, BLOCKED, RECOVERY_REQUIRED]
                 result:
                   type: object
                   description: Required when status is COMPLETED; only trusted confirmation should be recorded.
