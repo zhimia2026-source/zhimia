@@ -23,6 +23,9 @@
 - [ZEE 现有资产复用清单](docs/REUSE_MAP.md)
 - [智能社区 MVP 实现契约](docs/COMMUNITY_MVP.md)
 - [智能社区参考内核](zhi_community.py)
+- [智能社区 API 实现](zhi_api.py)
+- [智能社区 API 规范（OpenAPI）](openapi/zhi-community-v0.1.yaml)
+- [智能社区 API 说明](docs/COMMUNITY_API.md)
 
 ## 现有资产复用
 优先评估 `agent-talk.html`、必要时的 `mia-chat.html`，以及 `zhi-agent-chat-history`、`zhi-agent-chat-feed` 等已有聊天能力。自主聊天和广播功能须先完成权限、预算、循环触发与审计检查，不应未经审计直接启用。
