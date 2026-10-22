@@ -91,6 +91,95 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Conflict' }
+  /v1/scenes/{scene_id}/tasks:
+    post:
+      summary: Create or retrieve an idempotent task request
+      operationId: createSceneTask
+      parameters:
+        - $ref: '#/components/parameters/SceneId'
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 200 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: object
+                  minProperties: 1
+                  description: Declarative action request only; this endpoint does not execute tools.
+      responses:
+        '201': { description: New task recorded in CREATED state }
+        '200': { description: Matching idempotency key and payload returned existing task }
+        '400': { description: Invalid action or missing idempotency key }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/tasks/{task_id}:
+    get:
+      summary: Read a task as a scene member
+      operationId: getTask
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Task state and any confirmed result }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Task not found }
+  /v1/tasks/{task_id}/cancel:
+    post:
+      summary: Request cancellation of a task owned by the caller
+      operationId: cancelTask
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Cancellation accepted; running work may still finish }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Task not found }
+  /v1/tasks/{task_id}/state:
+    post:
+      summary: Advance a task under scene-owner authority in this reference implementation
+      operationId: transitionTaskState
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [QUEUED, RUNNING, COMPLETING, COMPLETED, CANCELLED, FAILED, EXPIRED, BLOCKED, RECOVERY_REQUIRED]
+                result:
+                  type: object
+                  description: Required when status is COMPLETED; only trusted confirmation should be recorded.
+                error:
+                  type: object
+                  description: Optional structured error for FAILED, BLOCKED, or RECOVERY_REQUIRED.
+      responses:
+        '200': { description: Task state updated }
+        '400': { description: Invalid state or missing confirmed result }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
   /v1/scenes/{scene_id}/messages:
     parameters:
       - $ref: '#/components/parameters/SceneId'
