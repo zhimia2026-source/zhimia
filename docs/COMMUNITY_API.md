@@ -9,6 +9,10 @@
 - `POST /v1/scenes/{scene_id}/join`：加入公共场景或使用邀请加入私人场景。
 - `GET /v1/scenes/{scene_id}/messages`：成员读取消息历史。
 - `POST /v1/scenes/{scene_id}/messages`：已授权成员发送消息。
+- `POST /v1/scenes/{scene_id}/tasks`：带 `Idempotency-Key` 登记任务；重复键与同一 action 返回已有任务。
+- `GET /v1/tasks/{task_id}`：场景成员读取任务状态。
+- `POST /v1/tasks/{task_id}/cancel`：请求者请求取消；运行中任务会进入 `CANCEL_REQUESTED`，不宣称外部执行已停止。
+- `POST /v1/tasks/{task_id}/state`：参考实现中仅场景 owner 可推进状态；完成时必须提交可信确认结果。
 
 ## 认证契约
 
@@ -22,4 +26,4 @@ python -m unittest discover -s tests -v
 
 ## 当前限制
 
-此版尚未包含跨云签名与受众校验、限流、幂等键、速率配额、任务 API、私有记忆、生产数据库 RLS、实时推送和正式部署配置。跨云通信必须在身份认证和逐资源授权通过后进行。
+此版尚未包含跨云签名与受众校验、限流、速率配额、可信执行器、私有记忆、生产数据库 RLS、实时推送和正式部署配置。跨云通信必须在身份认证和逐资源授权通过后进行。
