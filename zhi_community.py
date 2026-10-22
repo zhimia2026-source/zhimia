@@ -17,6 +17,20 @@ from typing import Any
 
 VISIBILITIES = {"public", "private"}
 SCENE_STATES = {"open", "paused", "closed"}
+TASK_STATES = {
+    "CREATED", "QUEUED", "RUNNING", "COMPLETING", "COMPLETED",
+    "CANCEL_REQUESTED", "CANCELLED", "FAILED", "EXPIRED", "BLOCKED",
+    "RECOVERY_REQUIRED",
+}
+TASK_TRANSITIONS = {
+    "CREATED": {"QUEUED", "CANCELLED", "EXPIRED", "BLOCKED"},
+    "QUEUED": {"RUNNING", "CANCEL_REQUESTED", "CANCELLED", "EXPIRED", "BLOCKED"},
+    "RUNNING": {"COMPLETING", "CANCEL_REQUESTED", "FAILED", "RECOVERY_REQUIRED"},
+    "COMPLETING": {"COMPLETED", "CANCEL_REQUESTED", "FAILED", "RECOVERY_REQUIRED"},
+    "CANCEL_REQUESTED": {"CANCELLED", "COMPLETED", "RECOVERY_REQUIRED"},
+    "COMPLETED": set(), "CANCELLED": set(), "FAILED": set(),
+    "EXPIRED": set(), "BLOCKED": set(), "RECOVERY_REQUIRED": set(),
+}
 
 
 def now() -> str:
@@ -98,6 +112,17 @@ class ZHICommunity:
           event_id TEXT PRIMARY KEY, scene_id TEXT NOT NULL REFERENCES scenes(scene_id),
           event_type TEXT NOT NULL, actor_agent_id TEXT NOT NULL REFERENCES agents(agent_id),
           payload_json TEXT NOT NULL, created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS tasks (
+          task_id TEXT PRIMARY KEY, scene_id TEXT NOT NULL REFERENCES scenes(scene_id),
+          requester_agent_id TEXT NOT NULL REFERENCES agents(agent_id),
+          action_json TEXT NOT NULL, request_hash TEXT NOT NULL,
+          idempotency_key TEXT NOT NULL, status TEXT NOT NULL
+            CHECK(status IN ('CREATED','QUEUED','RUNNING','COMPLETING','COMPLETED',
+              'CANCEL_REQUESTED','CANCELLED','FAILED','EXPIRED','BLOCKED','RECOVERY_REQUIRED')),
+          result_json TEXT, error_json TEXT,
+          created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+          UNIQUE(requester_agent_id, scene_id, idempotency_key)
         );
         """)
         self.db.commit()
@@ -284,6 +309,120 @@ class ZHICommunity:
             )
             self._event(scene_id, actor_id, "message.created", {"message_id": message["message_id"]})
         return message
+
+
+    def create_task(self, actor_id: str, scene_id: str, action: dict[str, Any],
+                    idempotency_key: str) -> tuple[dict[str, Any], bool]:
+        """Record a task request only; this method never executes tools or external actions."""
+        import json
+        self._require_active_agent(actor_id)
+        scene = self._scene(scene_id)
+        member = self._member(scene_id, actor_id)
+        if scene["state"] != "open":
+            raise StateConflict("scene does not accept new tasks in its current state")
+        if not member["can_interact"]:
+            raise PermissionDenied("interaction permission is disabled")
+        if not isinstance(action, dict) or not action:
+            raise ValueError("action must be a non-empty JSON object")
+        if not isinstance(idempotency_key, str) or not idempotency_key.strip() or len(idempotency_key) > 200:
+            raise ValueError("idempotency_key must contain 1-200 characters")
+        action_json = json.dumps(action, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        request_hash = hashlib.sha256(action_json.encode("utf-8")).hexdigest()
+        existing = self.db.execute(
+            "SELECT * FROM tasks WHERE requester_agent_id=? AND scene_id=? AND idempotency_key=?",
+            (actor_id, scene_id, idempotency_key),
+        ).fetchone()
+        if existing:
+            if existing["request_hash"] != request_hash:
+                raise StateConflict("idempotency key was already used with a different action")
+            return self._task_dict(existing), False
+        stamp, task_id = now(), new_id("task")
+        with self.db:
+            self.db.execute(
+                "INSERT INTO tasks(task_id,scene_id,requester_agent_id,action_json,request_hash,"
+                "idempotency_key,status,created_at,updated_at) VALUES(?,?,?,?,?,?,'CREATED',?,?)",
+                (task_id, scene_id, actor_id, action_json, request_hash, idempotency_key, stamp, stamp),
+            )
+            self._event(scene_id, actor_id, "task.created", {"task_id": task_id, "status": "CREATED"})
+        return self.get_task(actor_id, task_id), True
+
+    def _task_dict(self, row: sqlite3.Row) -> dict[str, Any]:
+        import json
+        task = dict(row)
+        task["action"] = json.loads(task.pop("action_json"))
+        task["result"] = json.loads(task.pop("result_json")) if task.get("result_json") else None
+        task["error"] = json.loads(task.pop("error_json")) if task.get("error_json") else None
+        task.pop("request_hash", None)
+        task.pop("idempotency_key", None)
+        return task
+
+    def get_task(self, actor_id: str, task_id: str) -> dict[str, Any]:
+        self._require_active_agent(actor_id)
+        row = self.db.execute("SELECT * FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+        if not row:
+            raise NotFound("task not found")
+        self._member(row["scene_id"], actor_id)
+        return self._task_dict(row)
+
+    def transition_task(self, actor_id: str, task_id: str, new_status: str,
+                        result: dict[str, Any] | None = None,
+                        error: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Advance task state under scene-owner authority; this does not execute the action."""
+        import json
+        self._require_active_agent(actor_id)
+        if new_status not in TASK_STATES:
+            raise ValueError("unknown task status")
+        row = self.db.execute("SELECT * FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+        if not row:
+            raise NotFound("task not found")
+        scene = self._scene(row["scene_id"])
+        if scene["owner_agent_id"] != actor_id:
+            raise PermissionDenied("only the scene owner may advance task state in this MVP")
+        old_status = row["status"]
+        if new_status == old_status:
+            if result is not None or error is not None:
+                raise StateConflict("same-state update cannot change task result or error")
+            return self._task_dict(row)
+        if new_status not in TASK_TRANSITIONS[old_status]:
+            raise StateConflict(f"invalid task transition: {old_status} -> {new_status}")
+        if result is not None and new_status != "COMPLETED":
+            raise ValueError("result is only accepted for COMPLETED tasks")
+        if new_status == "COMPLETED" and result is None:
+            raise ValueError("a confirmed result is required to complete a task")
+        if error is not None and new_status not in {"FAILED", "BLOCKED", "RECOVERY_REQUIRED"}:
+            raise ValueError("error is only accepted for FAILED, BLOCKED, or RECOVERY_REQUIRED")
+        stamp = now()
+        result_json = json.dumps(result, ensure_ascii=False, sort_keys=True) if result is not None else None
+        error_json = json.dumps(error, ensure_ascii=False, sort_keys=True) if error is not None else None
+        with self.db:
+            self.db.execute(
+                "UPDATE tasks SET status=?,result_json=COALESCE(?,result_json),"
+                "error_json=COALESCE(?,error_json),updated_at=? WHERE task_id=?",
+                (new_status, result_json, error_json, stamp, task_id),
+            )
+            self._event(row["scene_id"], actor_id, "task.state_changed",
+                        {"task_id": task_id, "previous_status": old_status, "new_status": new_status})
+        return self.get_task(actor_id, task_id)
+
+    def cancel_task(self, actor_id: str, task_id: str) -> dict[str, Any]:
+        """Requester may request cancellation; running work is not claimed to be stopped."""
+        self._require_active_agent(actor_id)
+        row = self.db.execute("SELECT * FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+        if not row:
+            raise NotFound("task not found")
+        if row["requester_agent_id"] != actor_id:
+            raise PermissionDenied("only the task requester may request cancellation")
+        status = row["status"]
+        if status in {"COMPLETED", "CANCELLED", "FAILED", "EXPIRED", "BLOCKED", "RECOVERY_REQUIRED"}:
+            return self._task_dict(row)
+        target = "CANCELLED" if status in {"CREATED", "QUEUED"} else "CANCEL_REQUESTED"
+        stamp = now()
+        with self.db:
+            self.db.execute("UPDATE tasks SET status=?,updated_at=? WHERE task_id=?",
+                            (target, stamp, row["task_id"]))
+            self._event(row["scene_id"], actor_id, "task.cancellation_requested",
+                        {"task_id": row["task_id"], "previous_status": status, "new_status": target})
+        return self.get_task(actor_id, task_id)
 
     def list_messages(self, actor_id: str, scene_id: str, limit: int = 50) -> list[dict[str, str]]:
         self._require_active_agent(actor_id)
