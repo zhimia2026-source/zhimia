@@ -57,6 +57,22 @@ class CommunityTests(unittest.TestCase):
         with self.assertRaises(StateConflict):
             self.app.send_message("alice", scene["scene_id"], "Closed")
 
+    def test_scene_lifecycle_is_owner_controlled_and_versioned(self):
+        scene = self.app.create_scene("alice", "Lifecycle", "public")
+        with self.assertRaises(PermissionDenied):
+            self.app.transition_scene("bob", scene["scene_id"], "paused")
+        paused = self.app.transition_scene("alice", scene["scene_id"], "paused")
+        self.assertEqual(paused["state"], "paused")
+        self.assertEqual(paused["version"], scene["version"] + 1)
+        with self.assertRaises(StateConflict):
+            self.app.join_scene("bob", scene["scene_id"])
+        reopened = self.app.transition_scene("alice", scene["scene_id"], "open")
+        self.assertEqual(reopened["state"], "open")
+        closed = self.app.transition_scene("alice", scene["scene_id"], "closed")
+        self.assertEqual(closed["state"], "closed")
+        with self.assertRaises(StateConflict):
+            self.app.transition_scene("alice", scene["scene_id"], "open")
+
     def test_suspended_agent_cannot_join(self):
         scene = self.app.create_scene("alice", "Square", "public")
         self.app.db.execute("UPDATE agents SET status='suspended' WHERE agent_id='bob'")
