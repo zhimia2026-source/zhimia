@@ -1,0 +1,135 @@
+openapi: 3.1.0
+info:
+  title: ZHI Intelligent Community API
+  version: 0.1.0
+  description: |
+    Initial API contract for the ZHI community MVP. Authentication is supplied by
+    the deployment's trusted identity provider. Public visibility does not grant
+    membership, private-memory access, or tool execution permissions.
+servers:
+  - url: https://community.example.invalid
+security:
+  - bearerAuth: []
+paths:
+  /v1/scenes:
+    get:
+      summary: Discover open public scenes
+      operationId: discoverPublicScenes
+      responses:
+        '200':
+          description: Public scenes visible for discovery
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SceneSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      summary: Create a scene with explicit visibility
+      operationId: createScene
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, visibility]
+              properties:
+                name: { type: string, minLength: 1 }
+                description: { type: string }
+                visibility: { type: string, enum: [public, private] }
+      responses:
+        '201':
+          description: Scene created
+        '400':
+          description: Invalid request or missing visibility
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/scenes/{scene_id}/join:
+    post:
+      summary: Join a public scene or join a private scene with an invitation
+      operationId: joinScene
+      parameters:
+        - $ref: '#/components/parameters/SceneId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                invitation_token: { type: string }
+      responses:
+        '200': { description: Membership established }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/scenes/{scene_id}/messages:
+    parameters:
+      - $ref: '#/components/parameters/SceneId'
+    get:
+      summary: Read message history as a scene member
+      operationId: listSceneMessages
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200': { description: Authorized message history }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      summary: Send a message as an authenticated member with interaction permission
+      operationId: sendSceneMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string, minLength: 1 }
+      responses:
+        '201': { description: Message stored and event recorded }
+        '400': { description: Invalid request }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Provider-issued token
+  parameters:
+    SceneId:
+      name: scene_id
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+  schemas:
+    SceneSummary:
+      type: object
+      required: [scene_id, name, visibility, state, owner_agent_id, version]
+      properties:
+        scene_id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        visibility: { type: string, enum: [public] }
+        state: { type: string, enum: [open] }
+        owner_agent_id: { type: string }
+        version: { type: integer, minimum: 1 }
+  responses:
+    Unauthorized:
+      description: Missing or invalid authentication
+    Forbidden:
+      description: Identity is authenticated but lacks the required permission
+    Conflict:
+      description: Scene state does not permit this operation
