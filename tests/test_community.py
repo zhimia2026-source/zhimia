@@ -73,6 +73,57 @@ class CommunityTests(unittest.TestCase):
         with self.assertRaises(StateConflict):
             self.app.transition_scene("alice", scene["scene_id"], "open")
 
+    def test_task_idempotency_and_payload_conflict(self):
+        scene = self.app.create_scene("alice", "Task room", "public")
+        self.app.join_scene("bob", scene["scene_id"])
+        first, created = self.app.create_task("bob", scene["scene_id"], {"type": "summarize", "text": "hello"}, "req-1")
+        self.assertTrue(created)
+        same, created_again = self.app.create_task("bob", scene["scene_id"], {"text": "hello", "type": "summarize"}, "req-1")
+        self.assertFalse(created_again)
+        self.assertEqual(first["task_id"], same["task_id"])
+        self.assertEqual(first["status"], "CREATED")
+        with self.assertRaises(StateConflict):
+            self.app.create_task("bob", scene["scene_id"], {"type": "delete"}, "req-1")
+
+    def test_task_state_machine_permissions_result_and_cancel(self):
+        scene = self.app.create_scene("alice", "Task room", "public")
+        self.app.join_scene("bob", scene["scene_id"])
+        task, _ = self.app.create_task("bob", scene["scene_id"], {"type": "draft"}, "draft-1")
+        with self.assertRaises(PermissionDenied):
+            self.app.transition_task("bob", task["task_id"], "QUEUED")
+        queued = self.app.transition_task("alice", task["task_id"], "QUEUED")
+        running = self.app.transition_task("alice", task["task_id"], "RUNNING")
+        requested = self.app.cancel_task("bob", task["task_id"])
+        self.assertEqual(requested["status"], "CANCEL_REQUESTED")
+        cancelled = self.app.transition_task("alice", task["task_id"], "CANCELLED")
+        self.assertEqual(cancelled["status"], "CANCELLED")
+        with self.assertRaises(StateConflict):
+            self.app.transition_task("alice", task["task_id"], "RUNNING")
+
+    def test_task_completion_requires_confirmed_result(self):
+        scene = self.app.create_scene("alice", "Task room", "public")
+        self.app.join_scene("bob", scene["scene_id"])
+        task, _ = self.app.create_task("bob", scene["scene_id"], {"type": "report"}, "report-1")
+        self.app.transition_task("alice", task["task_id"], "QUEUED")
+        self.app.transition_task("alice", task["task_id"], "RUNNING")
+        self.app.transition_task("alice", task["task_id"], "COMPLETING")
+        with self.assertRaises(ValueError):
+            self.app.transition_task("alice", task["task_id"], "COMPLETED")
+        completed = self.app.transition_task("alice", task["task_id"], "COMPLETED",
+                                             result={"confirmed": True, "summary": "done"})
+        self.assertEqual(completed["result"]["confirmed"], True)
+
+    def test_task_requires_interaction_permission_and_open_scene(self):
+        scene = self.app.create_scene("alice", "Task room", "public")
+        self.app.join_scene("bob", scene["scene_id"])
+        self.app.set_interaction_permission("alice", scene["scene_id"], "bob", False)
+        with self.assertRaises(PermissionDenied):
+            self.app.create_task("bob", scene["scene_id"], {"type": "draft"}, "no-interaction")
+        self.app.set_interaction_permission("alice", scene["scene_id"], "bob", True)
+        self.app.transition_scene("alice", scene["scene_id"], "paused")
+        with self.assertRaises(StateConflict):
+            self.app.create_task("bob", scene["scene_id"], {"type": "draft"}, "paused-scene")
+
     def test_suspended_agent_cannot_join(self):
         scene = self.app.create_scene("alice", "Square", "public")
         self.app.db.execute("UPDATE agents SET status='suspended' WHERE agent_id='bob'")
