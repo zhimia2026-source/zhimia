@@ -70,6 +70,27 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Conflict' }
+  /v1/scenes/{scene_id}/state:
+    post:
+      summary: Change scene lifecycle state as its owner
+      operationId: transitionSceneState
+      parameters:
+        - $ref: '#/components/parameters/SceneId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [state]
+              properties:
+                state: { type: string, enum: [open, paused, closed] }
+      responses:
+        '200': { description: Scene state changed and version incremented }
+        '400': { description: Invalid state }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
   /v1/scenes/{scene_id}/messages:
     parameters:
       - $ref: '#/components/parameters/SceneId'
