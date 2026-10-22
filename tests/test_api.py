@@ -70,6 +70,44 @@ class ApiTests(unittest.TestCase):
                                 token="mallory-token")
         self.assertEqual(response["status"], "403 Forbidden")
 
+    def test_task_api_requires_idempotency_key_and_is_idempotent(self):
+        path = f"/v1/scenes/{self.scene['scene_id']}/tasks"
+        missing = self.request("POST", path, "bob-token", {"action": {"type": "draft"}})
+        self.assertEqual(missing["status"], "400 Bad Request")
+        def request_with_key(key, action):
+            raw = json.dumps({"action": action}).encode()
+            environ = {
+                "REQUEST_METHOD": "POST", "PATH_INFO": path, "QUERY_STRING": "",
+                "CONTENT_LENGTH": str(len(raw)), "wsgi.input": io.BytesIO(raw),
+                "HTTP_AUTHORIZATION": "Bearer bob-token", "HTTP_IDEMPOTENCY_KEY": key,
+            }
+            result = {}
+            def start_response(status, headers):
+                result["status"] = status
+            result["body"] = b"".join(self.app(environ, start_response))
+            result["json"] = json.loads(result["body"])
+            return result
+        first = request_with_key("api-key-1", {"type": "draft"})
+        second = request_with_key("api-key-1", {"type": "draft"})
+        self.assertEqual(first["status"], "201 Created")
+        self.assertEqual(second["status"], "200 OK")
+        self.assertEqual(first["json"]["task"]["task_id"], second["json"]["task"]["task_id"])
+
+    def test_task_api_owner_can_advance_and_requester_can_cancel(self):
+        path = f"/v1/scenes/{self.scene['scene_id']}/tasks"
+        raw = json.dumps({"action": {"type": "draft"}}).encode()
+        env = {"REQUEST_METHOD":"POST","PATH_INFO":path,"QUERY_STRING":"",
+               "CONTENT_LENGTH":str(len(raw)),"wsgi.input":io.BytesIO(raw),
+               "HTTP_AUTHORIZATION":"Bearer bob-token","HTTP_IDEMPOTENCY_KEY":"api-key-2"}
+        result = {}
+        def start(status, headers): result["status"] = status
+        result["body"] = b"".join(self.app(env, start))
+        task_id = json.loads(result["body"])["task"]["task_id"]
+        queued = self.request("POST", f"/v1/tasks/{task_id}/state", "alice-token", {"status":"QUEUED"})
+        self.assertEqual(queued["status"], "200 OK")
+        cancelled = self.request("POST", f"/v1/tasks/{task_id}/cancel", "bob-token", {})
+        self.assertEqual(cancelled["json"]["task"]["status"], "CANCELLED")
+
     def test_unknown_route_is_not_found(self):
         response = self.request("GET", "/not-a-route", "alice-token")
         self.assertEqual(response["status"], "404 Not Found")
