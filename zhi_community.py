@@ -161,6 +161,34 @@ class ZHICommunity:
             self._event(scene_id, actor_id, "scene.created", {"visibility": visibility})
         return dict(self._scene(scene_id))
 
+    def transition_scene(self, actor_id: str, scene_id: str, new_state: str) -> dict[str, Any]:
+        """Change scene lifecycle state; only the owner may do so in this MVP."""
+        self._require_active_agent(actor_id)
+        if new_state not in SCENE_STATES:
+            raise ValueError("state must be one of: open, paused, closed")
+        scene = self._scene(scene_id)
+        if scene["owner_agent_id"] != actor_id:
+            raise PermissionDenied("only the scene owner may change scene state")
+        old_state = scene["state"]
+        allowed = {
+            "open": {"paused", "closed"},
+            "paused": {"open", "closed"},
+            "closed": set(),
+        }
+        if new_state == old_state:
+            return dict(scene)  # idempotent no-op
+        if new_state not in allowed[old_state]:
+            raise StateConflict(f"invalid scene transition: {old_state} -> {new_state}")
+        stamp = now()
+        with self.db:
+            self.db.execute(
+                "UPDATE scenes SET state=?, version=version+1, updated_at=? WHERE scene_id=?",
+                (new_state, stamp, scene_id),
+            )
+            self._event(scene_id, actor_id, "scene.state_changed",
+                        {"previous_state": old_state, "new_state": new_state})
+        return dict(self._scene(scene_id))
+
     def discover_public_scenes(self) -> list[dict[str, Any]]:
         rows = self.db.execute(
             "SELECT scene_id,name,description,visibility,state,owner_agent_id,version "
