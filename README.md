@@ -22,6 +22,7 @@
 - [产品范围与优先级](docs/PRODUCT_SCOPE.md)
 - [ZEE 现有资产复用清单](docs/REUSE_MAP.md)
 - [健康生活顾问智能人部署与验收记录](docs/HEALTH_ADVISOR_DEPLOYMENT.md)
+- [健康顾问接入现有聊天系统的身份门禁](docs/HEALTH_ADVISOR_INTEGRATION_GATE.md)
 - [健康顾问现有聊天客户端适配器](web/zhi-health-advisor-client.js)
 - [健康顾问 Supabase 迁移与 Edge Function](supabase/functions/zhi-health-advisor/index.ts)
 
