@@ -55,7 +55,7 @@ const result = await healthAdvisor.sendMessage({
 - 已部署函数：`https://lvxmygrgqtmzqgailmyl.supabase.co/functions/v1/zhi-health-advisor`
 - 当前函数版本：4，JWT 校验开启。
 - 数据库：6 张新表均启用 RLS，当前记录数为 0。
-- Security Advisor 最近一次检查发现 1 项 RLS 无策略提示（服务端专用的 rate-events 表）；已增加仅授予 `service_role` 的显式策略，需再次检查确认告警消失。
+- Security Advisor 最新复查为 0 项提示；rate-events 表仅允许 `service_role` 访问，匿名及普通登录角色没有表权限。
 - Performance Advisor 在空表上报告多个尚未使用的索引；暂不移除，待真实查询负载后评估。
 - 普通问答还需要在 Supabase Function Secrets 中配置 `OPENAI_API_KEY`。没有该密钥时普通问答会返回 503；关键词触发的 S 安全响应不依赖模型 API。
 - 浏览器调用还需要配置 `ZHI_ALLOWED_ORIGINS` 为实际前端的精确 Origin。未配置的浏览器 Origin 会被拒绝。
