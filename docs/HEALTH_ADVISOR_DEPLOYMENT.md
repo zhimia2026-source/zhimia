@@ -40,6 +40,14 @@ const result = await healthAdvisor.sendMessage({
 
 浏览器 origin 必须加入 `ZHI_ALLOWED_ORIGINS`，否则浏览器跨域请求将被拒绝。
 
+## 独立个人登录前端
+
+- 新增独立页面 `web/zhi-health-advisor.html`，使用 ZHIMIA 项目的 Supabase Auth 邮箱/密码注册与登录；不使用旧站点共享管理员令牌。
+- 页面只使用公开 publishable key，并将会话限定在浏览器 `sessionStorage`；退出登录后调用 Supabase Auth signOut。
+- 前端和适配器必须一起部署在同一 origin。将实际 origin 加入 `ZHI_ALLOWED_ORIGINS`，并将实际页面地址加入 Supabase Auth Redirect URLs。
+- 页面提供明确的聊天存储授权、撤销、历史浏览和逐会话删除；未授权时只进行临时问答。撤销授权不会自动删除旧记录。
+- 逐项执行 `docs/HEALTH_ADVISOR_E2E_ACCEPTANCE.md`。页面提交到 GitHub 不等于已经发布到公网，也不等于端到端验收通过。
+
 ## 当前实现的明确限制
 
 - 关键词安全筛查是保护性第一道筛查，不是完整临床分诊；没有触发也不能排除急症。
