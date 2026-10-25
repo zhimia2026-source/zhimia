@@ -10,11 +10,11 @@
 
 ## 已知部署条件
 
-Supabase 项目 `ZHIMIA`（ref `lvxmygrgqtmzqgailmyl`，region `ap-southeast-1`）初始为空。迁移只创建新的 `zhi_health_*` 表，不删除现有数据。
+Supabase 项目 `ZHIMIA`（ref `lvxmygrgqtmzqgailmyl`，region `ap-southeast-1`）初始为空。已应用 5 个仅新增对象的迁移；6 张 `zhi_health_*` 表已存在且启用 RLS。Edge Function `zhi-health-advisor` 已部署，当前 version 3，`verify_jwt=true`。这证明资源已部署，不等于端到端验收已完成。
 
 ## 部署顺序
 
-1. 先应用 `supabase/migrations/202610250001_zhi_health_advisor_base.sql`。
+1. 数据库迁移按序为 `202610250001_zhi_health_advisor_base.sql`、`202610250002_zhi_health_advisor_indexes.sql`、`202610250003_zhi_health_rate_limit.sql`、`202610250004_count_rate_retries.sql`、`202610250005_rate_events_service_only.sql`。目标项目已经应用。
 2. 部署 `zhi-health-advisor` Edge Function，保持 `verify_jwt=true`。
 3. 在 Supabase Function Secrets 中配置 `OPENAI_API_KEY`，可选 `ZHI_MODEL_NAME`，以及浏览器接入需要的 `ZHI_ALLOWED_ORIGINS`（逗号分隔的精确 origin）。不在仓库或客户端保存密钥。
 4. 用已登录用户 JWT 做认证、跨用户隔离、急症关键词、幂等、速率限制、模型不可用和 CORS 测试。
@@ -26,10 +26,21 @@ Supabase 项目 `ZHIMIA`（ref `lvxmygrgqtmzqgailmyl`，region `ap-southeast-1`�
 - 关键词安全筛查是保护性第一道筛查，不是完整临床分诊；没有触发也不能排除急症。
 - 模型生成内容没有独立医学核验，故普通模型回答的确定性字段暂定为 L0。未来需设计逐条主张的证据解析和等级判定，不可把模型自信当作证据。
 - 长期记忆表默认没有客户端写入策略；当前接口不写长期记忆，响应明确返回 `memory_written=false`。
-- 速率限制目前是试点级的审计计数检查，不是严格原子限流器。
+- 速率限制为试点级的数据库计数器；高并发下并非严格原子限流器，扩大试运行前应换成原子配额/RPC 或专用限流服务。
 - CORS 默认拒绝未配置的浏览器 origin；没有 origin 的服务端请求仍可按 JWT 认证调用。
 - 如果 Supabase Data API 尚未向 PostgREST 暴露这些表，必须在项目 API 设置中仅为必要的表开启访问；不要为解决接入问题而开放 anon 角色或关闭 RLS。
 - 部署前须确认模型服务商、地区数据处理、保留政策和用户告知满足实际合规要求。
+
+## 当前运行状态
+
+- 已部署函数：`https://lvxmygrgqtmzqgailmyl.supabase.co/functions/v1/zhi-health-advisor`
+- 当前函数版本：3，JWT 校验开启。
+- 数据库：6 张新表均启用 RLS，当前记录数为 0。
+- Security Advisor 最近一次检查发现 1 项 RLS 无策略提示（服务端专用的 rate-events 表）；已增加仅授予 `service_role` 的显式策略，需再次检查确认告警消失。
+- Performance Advisor 在空表上报告多个尚未使用的索引；暂不移除，待真实查询负载后评估。
+- 普通问答还需要在 Supabase Function Secrets 中配置 `OPENAI_API_KEY`。没有该密钥时普通问答会返回 503；关键词触发的 S 安全响应不依赖模型 API。
+- 浏览器调用还需要配置 `ZHI_ALLOWED_ORIGINS` 为实际前端的精确 Origin。未配置的浏览器 Origin 会被拒绝。
+- 现有仓库 CI 中包含 Deno 安全筛查测试；当前尚未取得成功运行的 CI 结果，因此不能标记为测试通过。
 
 ## 回滚
 
