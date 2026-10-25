@@ -90,6 +90,15 @@ async function setConsent(user, granted) {
   }
   if (!write.ok) throw new Error("Cannot set test account consent (HTTP " + write.status + ").");
 }
+async function invokeNormal(user, origin = allowedOrigin) {
+  return request("/functions/v1/zhi-health-advisor", {
+    token: user.token, method: "POST", origin,
+    body: {
+      request_id: uuid(),
+      message: "E2E 合成测试：请用一句话给出一个一般性的规律作息建议。",
+    },
+  });
+}
 async function invokeSafety(user, origin = allowedOrigin) {
   return request("/functions/v1/zhi-health-advisor", {
     token: user.token, method: "POST", origin,
