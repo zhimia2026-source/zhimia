@@ -117,7 +117,7 @@ Deno.serve(async (req: Request) => {
   const user = authData?.user;
   if (authError || !user) return json({ error: "invalid_session" }, 401, cors);
 
-  let db;
+  let db: any;
   try {
     db = serviceClient();
   } catch {
@@ -162,6 +162,19 @@ Deno.serve(async (req: Request) => {
     if (error || !conversation) return json({ error: "conversation_not_found" }, 404, cors);
   }
 
+  // Persisted chat history is opt-in. Without an active consent, answer using only this message and do not write chat content.
+  const { data: storageConsent, error: consentError } = await db
+    .from("zhi_health_consents")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("purpose", "chat_storage")
+    .eq("granted", true)
+    .is("revoked_at", null)
+    .order("granted_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const canPersist = !consentError && Boolean(storageConsent);
+
   const safety = detectSafetyOverride(message);
   let answer: string;
   let certainty: "L0" | "L1" | "L2" | "L3" = "L0";
@@ -181,19 +194,20 @@ Deno.serve(async (req: Request) => {
         message: "安全底座已部署，但尚未配置模型提供方密钥；普通健康问答暂不可用。紧急情况请直接联系当地急救服务。",
       }, 503, cors);
     }
-    const { data: previousMessages, error: historyError } = await db
-      .from("zhi_health_messages")
-      .select("role, content")
-      .eq("user_id", user.id)
-      .eq("conversation_id", existingConversationId ?? "00000000-0000-0000-0000-000000000000")
-      .order("created_at", { ascending: false })
-      .limit(MAX_HISTORY);
-    if (historyError && existingConversationId) {
-      return json({ error: "conversation_history_unavailable" }, 503, cors);
+    let history: Array<{ role: "user" | "assistant"; content: string }> = [];
+    if (canPersist && existingConversationId) {
+      const { data: previousMessages, error: historyError } = await db
+        .from("zhi_health_messages")
+        .select("role, content")
+        .eq("user_id", user.id)
+        .eq("conversation_id", existingConversationId)
+        .order("created_at", { ascending: false })
+        .limit(MAX_HISTORY);
+      if (historyError) return json({ error: "conversation_history_unavailable" }, 503, cors);
+      history = (previousMessages ?? []).reverse()
+        .filter((item: { role: string; content: string }) => item.role === "user" || item.role === "assistant")
+        .map((item: { role: "user" | "assistant"; content: string }) => ({ role: item.role, content: item.content }));
     }
-    const history = (previousMessages ?? []).reverse()
-      .filter((item: { role: string; content: string }) => item.role === "user" || item.role === "assistant")
-      .map((item: { role: "user" | "assistant"; content: string }) => ({ role: item.role, content: item.content }));
     history.push({ role: "user", content: message });
     try {
       answer = await callModel(history);
@@ -209,6 +223,23 @@ Deno.serve(async (req: Request) => {
         : "模型服务暂时不可用；本次内容未保存。";
       return json({ error: code, message: publicMessage }, 503, cors);
     }
+  }
+
+  // No explicit chat-storage consent: answer transiently and do not save health content.
+  if (!canPersist) {
+    return json({
+      agent_id: "zhi-health-advisor-v1",
+      conversation_id: null,
+      request_id: requestId,
+      answer,
+      certainty_level: certainty,
+      evidence_basis: evidenceBasis,
+      limitations,
+      safety_override: safetyOverride,
+      memory_written: false,
+      persisted: false,
+      consent_required: "chat_storage",
+    }, 200, cors);
   }
 
   // Persist only after a complete answer exists. The service-role client is server-only;
