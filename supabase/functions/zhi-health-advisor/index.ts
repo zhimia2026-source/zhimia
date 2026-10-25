@@ -125,10 +125,10 @@ Deno.serve(async (req: Request) => {
   }
 
   // Rate limiting uses minimal request metadata and does not depend on chat-storage consent.
-  const { error: rateInsertError } = await db.from("zhi_health_rate_events").upsert({
+  const { error: rateInsertError } = await db.from("zhi_health_rate_events").insert({
     user_id: user.id,
     request_id: requestId,
-  }, { onConflict: "user_id,request_id", ignoreDuplicates: true });
+  });
   if (rateInsertError) return json({ error: "rate_limit_unavailable" }, 503, cors);
 
   const windowStart = new Date(Date.now() - 10 * 60 * 1000).toISOString();
