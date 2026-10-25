@@ -5,8 +5,9 @@ import { detectSafetyOverride } from "./safety.ts";
 const PROJECT_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
-const OPENAI_MODEL = Deno.env.get("ZHI_MODEL_NAME") ?? "gpt-4.1-mini";
+const AGNES_API_KEY = Deno.env.get("AGNES_API_KEY") ?? "";
+const AGNES_BASE_URL = (Deno.env.get("AGNES_BASE_URL") ?? "https://apihub.agnes-ai.com/v1").replace(/\/+$/, "");
+const AGNES_MODEL = Deno.env.get("ZHI_MODEL_NAME") ?? "agnes-2.5-flash";
 const MAX_MESSAGE_CHARS = 6000;
 const MAX_HISTORY = 12;
 const RATE_LIMIT = 20;
@@ -43,19 +44,19 @@ function serviceClient() {
 }
 
 async function callModel(history: Array<{ role: "user" | "assistant"; content: string }>) {
-  if (!OPENAI_API_KEY) throw new Error("model_not_configured");
+  if (!AGNES_API_KEY) throw new Error("model_not_configured");
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 25000);
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch(`${AGNES_BASE_URL}/chat/completions`, {
       method: "POST",
       signal: controller.signal,
       headers: {
-        "authorization": `Bearer ${OPENAI_API_KEY}`,
+        "authorization": `Bearer ${AGNES_API_KEY}`,
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: OPENAI_MODEL,
+        model: AGNES_MODEL,
         temperature: 0.2,
         max_tokens: 900,
         messages: [
@@ -190,7 +191,7 @@ Deno.serve(async (req: Request) => {
     evidenceBasis = safety.evidenceBasis;
     limitations = safety.limitations;
   } else {
-    if (!OPENAI_API_KEY) {
+    if (!AGNES_API_KEY) {
       return json({
         error: "model_not_configured",
         message: "安全底座已部署，但尚未配置模型提供方密钥；普通健康问答暂不可用。紧急情况请直接联系当地急救服务。",
