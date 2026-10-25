@@ -9,7 +9,8 @@
 3. [标准接口设计](STANDARD_INTERFACE.md) — Agent、World、消息格式、协议版本及接入流程。
 4. [跨云互联规范](CROSS_CLOUD_FEDERATION.md) — 跨云身份、授权、通信、撤销和安全边界。
 5. [现有聊天系统接入审计](INTEGRATION_AUDIT.md) — 基于上传源码的静态初审和接入前置条件。
-6. [项目总览 README](../README.md) — 产品原则、开发顺序、本地 MVP 定位及安全提醒。
+6. [健康生活顾问智能人部署与验收记录](HEALTH_ADVISOR_DEPLOYMENT.md) — Supabase 迁移、Edge Function、已知限制和上线门禁。
+7. [项目总览 README](../README.md) — 产品原则、开发顺序、本地 MVP 定位及安全提醒。
 
 ## 不可变设计原则
 
