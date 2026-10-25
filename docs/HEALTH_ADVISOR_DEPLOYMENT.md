@@ -16,7 +16,7 @@ Supabase 项目 `ZHIMIA`（ref `lvxmygrgqtmzqgailmyl`，region `ap-southeast-1`�
 
 1. 数据库迁移按序为 `202610250001_zhi_health_advisor_base.sql`、`202610250002_zhi_health_advisor_indexes.sql`、`202610250003_zhi_health_rate_limit.sql`、`202610250004_count_rate_retries.sql`、`202610250005_rate_events_service_only.sql`。目标项目已经应用。
 2. 部署 `zhi-health-advisor` Edge Function，保持 `verify_jwt=true`。
-3. 在 Supabase Function Secrets 中配置 `OPENAI_API_KEY`，可选 `ZHI_MODEL_NAME`，以及浏览器接入需要的 `ZHI_ALLOWED_ORIGINS`（逗号分隔的精确 origin）。不在仓库或客户端保存密钥。
+3. 在 Supabase Function Secrets 中配置 `AGNES_API_KEY`、可选 `AGNES_BASE_URL`（默认 `https://apihub.agnes-ai.com/v1`）、`ZHI_MODEL_NAME`（默认 `agnes-2.5-flash`，须确认账号可用），以及浏览器接入需要的 `ZHI_ALLOWED_ORIGINS`（逗号分隔的精确 origin）。模型密钥只保存在服务端 Secrets，不在仓库或客户端保存。
 4. 用已登录用户 JWT 做认证、跨用户隔离、急症关键词、幂等、速率限制、模型不可用和 CORS 测试。
 5. 检查 Security/Performance Advisors 与函数日志。日志不得包含原始健康文本。
 6. 只有 Critical 测试通过并完成医学/隐私审核后，才扩大试运行范围。
@@ -73,7 +73,7 @@ const result = await healthAdvisor.sendMessage({
 - Security Advisor 最新复查为 0 项提示；rate-events 表仅允许 `service_role` 访问，匿名及普通登录角色没有表权限。
 - 2026-10-25 再次在线复核：6 张健康表均启用 RLS；数据库内 Auth 用户数与健康数据行数均为 0，且日志中未发现该函数的请求。因此尚无真实注册或端到端验收证据。
 - Performance Advisor 在空表上报告多个尚未使用的索引；暂不移除，待真实查询负载后评估。
-- 普通问答还需要在 Supabase Function Secrets 中配置 `OPENAI_API_KEY`。没有该密钥时普通问答会返回 503；关键词触发的 S 安全响应不依赖模型 API。
+- 普通问答需要在 Supabase Function Secrets 中配置 `AGNES_API_KEY`；`AGNES_BASE_URL` 默认为 `https://apihub.agnes-ai.com/v1`，`ZHI_MODEL_NAME` 默认为 `agnes-2.5-flash`，但必须以该 Agnes AI 账号实际可用模型为准。缺少密钥时普通问答会返回 503；关键词触发的 S 安全响应不依赖模型 API。
 - 浏览器调用还需要配置 `ZHI_ALLOWED_ORIGINS` 为实际前端的精确 Origin。未配置的浏览器 Origin 会被拒绝。
 - 2026-10-25 GitHub Pages 部署记录：构建与 artifact 上传成功，但 deploy 阶段返回 HTTP 404，日志明确提示需要先在仓库 Settings → Pages 启用 GitHub Pages。页面尚不能据此视为已发布。
 - 2026-10-25：GitHub Actions 的 Health Advisor Static Checks 与 Python and Edge Function tests 均已成功完成；这只验证自动化静态/仓库测试，不代表真实用户 E2E 已通过。
