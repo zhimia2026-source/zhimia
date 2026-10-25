@@ -128,6 +128,16 @@ try {
   });
   check("PRIV-04 client cannot directly insert conversation", [401, 403].includes(directInsert.status), "HTTP " + directInsert.status);
 
+  const directAssistantInsert = await request("/rest/v1/zhi_health_messages", {
+    token: userA.token, method: "POST",
+    body: {
+      user_id: userA.id, conversation_id: uuid(), request_id: uuid(),
+      role: "assistant", content: "synthetic E2E assistant forgery must be blocked",
+    },
+    prefer: "return=minimal",
+  });
+  check("PRIV-05 client cannot forge assistant message", [401, 403].includes(directAssistantInsert.status), "HTTP " + directAssistantInsert.status);
+
   // No consent: even the emergency override must be transient and leave no chat row.
   await setConsent(userA, false);
   const transient = await invokeSafety(userA);
