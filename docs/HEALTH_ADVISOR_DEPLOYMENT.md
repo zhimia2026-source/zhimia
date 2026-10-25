@@ -42,6 +42,12 @@ const result = await healthAdvisor.sendMessage({
 
 ## 独立个人登录前端
 
+### 推荐静态托管：GitHub Pages
+
+仓库新增 `.github/workflows/health-advisor-pages.yml`，合并到 `main` 后会将健康顾问页面发布到 GitHub Pages 根路径。预计页面地址为 `https://zhimia2026-source.github.io/zhimia/`，**只有 Pages 已启用且部署工作流成功后才算实际可访问**。若仓库尚未启用 Pages，在 GitHub 仓库 Settings → Pages 中选择 GitHub Actions 作为部署来源。
+
+部署成功后，在 Supabase Auth 的 Redirect URLs 中加入实际页面地址，并在 Edge Function Secret `ZHI_ALLOWED_ORIGINS` 中配置精确 origin：`https://zhimia2026-source.github.io`（只填 origin，不带 `/zhimia/` 路径）。不要在 GitHub Pages 或浏览器端设置模型密钥。
+
 - 新增独立页面 `web/zhi-health-advisor.html`，使用 ZHIMIA 项目的 Supabase Auth 邮箱/密码注册与登录；不使用旧站点共享管理员令牌。
 - 页面只使用公开 publishable key，并将会话限定在浏览器 `sessionStorage`；退出登录后调用 Supabase Auth signOut。
 - 前端和适配器必须一起部署在同一 origin。将实际 origin 加入 `ZHI_ALLOWED_ORIGINS`，并将实际页面地址加入 Supabase Auth Redirect URLs。
