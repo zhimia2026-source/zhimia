@@ -31,5 +31,7 @@ jobs:
         uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+      - name: Type-check health advisor Edge Function
+        run: deno check supabase/functions/zhi-health-advisor/index.ts
       - name: Run health advisor safety tests
-        run: deno test --allow-read supabase/functions/zhi-health-advisor/safety_test.ts
+        run: deno test supabase/functions/zhi-health-advisor/safety_test.ts
