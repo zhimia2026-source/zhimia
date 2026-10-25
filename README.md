@@ -26,7 +26,7 @@
 - [健康顾问独立个人登录前端](web/zhi-health-advisor.html)
 - [GitHub Pages 静态部署工作流](.github/workflows/health-advisor-pages.yml)
 - [健康顾问现有聊天客户端适配器](web/zhi-health-advisor-client.js)
-- [健康顾问端到端验收矩阵](docs/HEALTH_ADVISOR_E2E_ACCEPTANCE.md)
+- [健康顾问端到端验收矩阵](docs/HEALTH_ADVISOR_E2E_ACCEPTANCE.md)\n- [健康顾问在线双账号隔离验收脚本](scripts/health-advisor-e2e.mjs)\n- [健康顾问客户端写入权限收紧迁移](supabase/migrations/202610250006_restrict_client_chat_writes.sql)
 - [健康顾问 Supabase 迁移与 Edge Function](supabase/functions/zhi-health-advisor/index.ts)
 
 ## 现有资产复用
