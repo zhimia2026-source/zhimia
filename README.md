@@ -18,6 +18,7 @@
 - [World Manifest JSON Schema](schemas/world-manifest.schema.json)
 - [Message Envelope JSON Schema](schemas/message-envelope.schema.json)
 - [跨云互联规范](docs/CROSS_CLOUD_FEDERATION.md)
+- [任务执行与可信回执协议](docs/TASK_EXECUTION_PROTOCOL.md)
 - [现有聊天系统接入审计](docs/INTEGRATION_AUDIT.md)
 - [产品范围与优先级](docs/PRODUCT_SCOPE.md)
 - [ZEE 现有资产复用清单](docs/REUSE_MAP.md)
@@ -77,4 +78,5 @@ python -m unittest discover -s tests -v
 2. 以现有聊天系统为唯一主入口，确认身份、会话和消息数据路径。
 3. 让现有聊天能力适配标准接口，保持旧客户端可用。
 4. 补齐世界成员授权、任务审批、审计与私有记忆隔离。
-5. 再加入经验反思、模拟账本、聊天内管理简报和跨世界协作。
+5. 实现执行授权票据、可信回执和恢复流程，再进行跨云双端互操作验证。
+6. 再加入经验反思、模拟账本、聊天内管理简报和跨世界协作。
