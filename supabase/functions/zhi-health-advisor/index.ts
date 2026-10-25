@@ -124,25 +124,22 @@ Deno.serve(async (req: Request) => {
     return json({ error: "server_configuration_missing" }, 503, cors);
   }
 
-  // A small pilot guard. For strict concurrent rate limiting, replace this read/count with an atomic server-side limiter.
+  // Rate limiting uses minimal request metadata and does not depend on chat-storage consent.
+  const { error: rateInsertError } = await db.from("zhi_health_rate_events").upsert({
+    user_id: user.id,
+    request_id: requestId,
+  }, { onConflict: "user_id,request_id", ignoreDuplicates: true });
+  if (rateInsertError) return json({ error: "rate_limit_unavailable" }, 503, cors);
+
   const windowStart = new Date(Date.now() - 10 * 60 * 1000).toISOString();
   const { count, error: rateError } = await db
-    .from("zhi_health_audit_events")
+    .from("zhi_health_rate_events")
     .select("id", { count: "exact", head: true })
     .eq("user_id", user.id)
-    .in("event_type", ["chat_completed", "safety_override"])
     .gte("created_at", windowStart);
-  if (!rateError && (count ?? 0) >= RATE_LIMIT) {
+  if (rateError) return json({ error: "rate_limit_unavailable" }, 503, cors);
+  if ((count ?? 0) > RATE_LIMIT) {
     return json({ error: "rate_limit_exceeded", retry_after_seconds: 600 }, 429, cors);
-  }
-
-
-  let existingConversationId = conversationId;
-  if (existingConversationId) {
-    const { data: conversation, error } = await db
-      .from("zhi_health_conversations").select("id")
-      .eq("id", existingConversationId).eq("user_id", user.id).maybeSingle();
-    if (error || !conversation) return json({ error: "conversation_not_found" }, 404, cors);
   }
 
   // Persisted chat history is opt-in. Without an active consent, answer using only this message and do not write chat content.
