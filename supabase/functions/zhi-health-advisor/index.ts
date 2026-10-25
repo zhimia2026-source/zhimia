@@ -136,23 +136,6 @@ Deno.serve(async (req: Request) => {
     return json({ error: "rate_limit_exceeded", retry_after_seconds: 600 }, 429, cors);
   }
 
-  // Idempotent replay: if this request already completed, return the saved assistant answer.
-  const { data: previousAnswer, error: previousError } = await db
-    .from("zhi_health_messages")
-    .select("content, certainty_level, evidence_basis, limitations, safety_override, conversation_id")
-    .eq("user_id", user.id).eq("request_id", requestId).eq("role", "assistant").maybeSingle();
-  if (!previousError && previousAnswer) {
-    return json({
-      conversation_id: previousAnswer.conversation_id,
-      request_id: requestId,
-      answer: previousAnswer.content,
-      certainty_level: previousAnswer.certainty_level,
-      evidence_basis: previousAnswer.evidence_basis,
-      limitations: previousAnswer.limitations,
-      safety_override: previousAnswer.safety_override,
-      replayed: true,
-    }, 200, cors);
-  }
 
   let existingConversationId = conversationId;
   if (existingConversationId) {
@@ -174,6 +157,26 @@ Deno.serve(async (req: Request) => {
     .limit(1)
     .maybeSingle();
   const canPersist = !consentError && Boolean(storageConsent);
+
+  // Idempotent replay is allowed only when the user currently consents to chat storage.
+  if (canPersist) {
+    const { data: previousAnswer, error: previousError } = await db
+      .from("zhi_health_messages")
+      .select("content, certainty_level, evidence_basis, limitations, safety_override, conversation_id")
+      .eq("user_id", user.id).eq("request_id", requestId).eq("role", "assistant").maybeSingle();
+    if (!previousError && previousAnswer) {
+      return json({
+        conversation_id: previousAnswer.conversation_id,
+        request_id: requestId,
+        answer: previousAnswer.content,
+        certainty_level: previousAnswer.certainty_level,
+        evidence_basis: previousAnswer.evidence_basis,
+        limitations: previousAnswer.limitations,
+        safety_override: previousAnswer.safety_override,
+        replayed: true,
+      }, 200, cors);
+    }
+  }
 
   const safety = detectSafetyOverride(message);
   let answer: string;
