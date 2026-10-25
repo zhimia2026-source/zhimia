@@ -10,7 +10,7 @@
 
 ## 已知部署条件
 
-Supabase 项目 `ZHIMIA`（ref `lvxmygrgqtmzqgailmyl`，region `ap-southeast-1`）初始为空。已应用 5 个仅新增对象的迁移；6 张 `zhi_health_*` 表已存在且启用 RLS。Edge Function `zhi-health-advisor` 已部署，当前 version 3，`verify_jwt=true`。这证明资源已部署，不等于端到端验收已完成。
+Supabase 项目 `ZHIMIA`（ref `lvxmygrgqtmzqgailmyl`，region `ap-southeast-1`）初始为空。已应用 5 个仅新增对象的迁移；6 张 `zhi_health_*` 表已存在且启用 RLS。Edge Function `zhi-health-advisor` 已部署，当前 version 4，`verify_jwt=true`。这证明资源已部署，不等于端到端验收已完成。
 
 ## 部署顺序
 
@@ -20,6 +20,25 @@ Supabase 项目 `ZHIMIA`（ref `lvxmygrgqtmzqgailmyl`，region `ap-southeast-1`�
 4. 用已登录用户 JWT 做认证、跨用户隔离、急症关键词、幂等、速率限制、模型不可用和 CORS 测试。
 5. 检查 Security/Performance Advisors 与函数日志。日志不得包含原始健康文本。
 6. 只有 Critical 测试通过并完成医学/隐私审核后，才扩大试运行范围。
+
+## 现有聊天系统接入
+
+仓库提供 `web/zhi-health-advisor-client.js` 作为适配器，复用已有的、已登录的 Supabase 客户端；它不创建新身份体系，也不包含任何服务端密钥。前端应在用户明确选择后调用 `setChatStorageConsent(true)`，并提供撤销入口 `setChatStorageConsent(false)`。用户不同意保存时，仍可进行临时问答，但服务端不读取或保存聊天历史。
+
+示例：
+
+```js
+import { createHealthAdvisorClient } from "./zhi-health-advisor-client.js";
+const healthAdvisor = createHealthAdvisorClient({ supabase });
+const consent = await healthAdvisor.getChatStorageConsent();
+// UI must ask the user explicitly before calling setChatStorageConsent(true).
+const result = await healthAdvisor.sendMessage({
+  message: inputText,
+  conversationId: activeConversationId,
+});
+```
+
+浏览器 origin 必须加入 `ZHI_ALLOWED_ORIGINS`，否则浏览器跨域请求将被拒绝。
 
 ## 当前实现的明确限制
 
@@ -34,7 +53,7 @@ Supabase 项目 `ZHIMIA`（ref `lvxmygrgqtmzqgailmyl`，region `ap-southeast-1`�
 ## 当前运行状态
 
 - 已部署函数：`https://lvxmygrgqtmzqgailmyl.supabase.co/functions/v1/zhi-health-advisor`
-- 当前函数版本：3，JWT 校验开启。
+- 当前函数版本：4，JWT 校验开启。
 - 数据库：6 张新表均启用 RLS，当前记录数为 0。
 - Security Advisor 最近一次检查发现 1 项 RLS 无策略提示（服务端专用的 rate-events 表）；已增加仅授予 `service_role` 的显式策略，需再次检查确认告警消失。
 - Performance Advisor 在空表上报告多个尚未使用的索引；暂不移除，待真实查询负载后评估。
