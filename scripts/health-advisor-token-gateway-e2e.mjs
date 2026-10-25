@@ -91,6 +91,7 @@ try {
       "HTTP " + persistedResponse.status);
 
     if (conversationId) {
+      await call(B, "consent_set", { granted: true });
       const listBResponse = await call(B, "conversations");
       const listB = await parse(listBResponse);
       const visibleToB = (listB.items || []).some(item => item.id === conversationId);
@@ -133,6 +134,7 @@ try {
   try {
     if (conversationId) await call(A, "delete_conversation", { conversation_id: conversationId });
     await call(A, "consent_set", { granted: false });
+    await call(B, "consent_set", { granted: false });
   } catch {
     console.error("Cleanup warning: manually review the disposable test identity for synthetic test data.");
   }
