@@ -9,11 +9,20 @@
 <section id="revokePanel" class="card hidden"><h2>撤销令牌</h2><label for="tokenId">令牌 ID（token_id）</label><input id="tokenId" spellcheck="false" placeholder="粘贴签发时保存的 token_id"><p class="muted">撤销后，令牌后续请求将被拒绝。撤销不会自动删除此身份已保存的历史记录。</p><button id="revoke" class="danger">撤销此令牌</button><p id="revokeStatus" class="status muted" role="status" aria-live="polite"></p></section>
 <p class="muted"><a href="./">返回 ZHI 健康生活顾问</a></p></main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script><script>
-const URL="https://lvxmygrgqtmzqgailmyl.supabase.co",KEY="sb_publishable_VUdhz93MURXgJgT10_SJ_A_oZe4QmWE",API=URL+"/functions/v1/zhi-token-admin";
-const client=window.supabase.createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+const SUPABASE_URL="https://lvxmygrgqtmzqgailmyl.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY="sb_publishable_VUdhz93MURXgJgT10_SJ_A_oZe4QmWE";
+const API=SUPABASE_URL+"/functions/v1/zhi-token-admin";
+const authStatusEl=document.getElementById("authStatus");
+if(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(SUPABASE_URL)) throw new Error("ZHI 配置错误：Supabase 项目 URL 格式无效。");
+if(!window.supabase || typeof window.supabase.createClient!=="function") {
+  authStatusEl.textContent="登录组件加载失败，请刷新页面；若仍失败请检查网络是否拦截 jsDelivr。";
+  document.getElementById("login").disabled=true;
+  throw new Error("Supabase JS SDK 未正确加载。");
+}
+const client=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 const $=id=>document.getElementById(id);let session=null,lastToken="";
 function panels(ok){$("createPanel").classList.toggle("hidden",!ok);$("revokePanel").classList.toggle("hidden",!ok);$("logout").classList.toggle("hidden",!ok);$("login").classList.toggle("hidden",ok);}
-async function call(body){if(!session?.access_token)throw Error("请先使用 GitHub 登录。");const r=await fetch(API,{method:"POST",headers:{"content-type":"application/json","apikey":KEY,"authorization":"Bearer "+session.access_token},body:JSON.stringify(body),cache:"no-store",credentials:"omit"});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error==="admin_access_required"?"此 GitHub 账号没有令牌管理员权限。":d.error||"请求失败（HTTP "+r.status+"）");return d;}
+async function call(body){if(!session?.access_token)throw Error("请先使用 GitHub 登录。");const r=await fetch(API,{method:"POST",headers:{"content-type":"application/json","apikey":SUPABASE_PUBLISHABLE_KEY,"authorization":"Bearer "+session.access_token},body:JSON.stringify(body),cache:"no-store",credentials:"omit"});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error==="admin_access_required"?"此 GitHub 账号没有令牌管理员权限。":d.error||"请求失败（HTTP "+r.status+"）");return d;}
 $("login").onclick=async()=>{const {error}=await client.auth.signInWithOAuth({provider:"github",options:{redirectTo:location.origin+location.pathname,scopes:"read:user"}});if(error)$("authStatus").textContent="登录启动失败："+error.message;};
 $("logout").onclick=async()=>{await client.auth.signOut();session=null;panels(false);$("authStatus").textContent="已退出登录。";};
 client.auth.onAuthStateChange((_event,s)=>{session=s;if(!s){panels(false);$("authStatus").textContent="请先使用 GitHub 登录。";return;}panels(false);$("authStatus").textContent="正在验证管理员身份…";setTimeout(async()=>{try{await call({action:"verify"});panels(true);$("authStatus").textContent="管理员身份已验证。";}catch(e){panels(false);$("authStatus").textContent=e.message;await client.auth.signOut();session=null;}},0);});
