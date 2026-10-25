@@ -58,7 +58,7 @@ const result = await healthAdvisor.sendMessage({
 
 - 关键词安全筛查是保护性第一道筛查，不是完整临床分诊；没有触发也不能排除急症。
 - 模型生成内容没有独立医学核验，故普通模型回答的确定性字段暂定为 L0。未来需设计逐条主张的证据解析和等级判定，不可把模型自信当作证据。
-- 长期记忆表默认没有客户端写入策略；当前接口不写长期记忆，响应明确返回 `memory_written=false`。
+- 长期记忆表默认没有客户端写入策略；当前接口不写长期记忆，响应明确返回 `memory_written=false`。\n- 迁移 `202610250006_restrict_client_chat_writes.sql` 已应用：撤销 `anon` 与 `authenticated` 对会话、消息表的直接 INSERT 权限，确保聊天文本写入经过服务端函数的身份验证与存储授权检查。实时权限复核确认两类客户端角色的 INSERT 均为 false，`service_role` 仍可写入。
 - 速率限制为试点级的数据库计数器；高并发下并非严格原子限流器，扩大试运行前应换成原子配额/RPC 或专用限流服务。
 - CORS 默认拒绝未配置的浏览器 origin；没有 origin 的服务端请求仍可按 JWT 认证调用。
 - 如果 Supabase Data API 尚未向 PostgREST 暴露这些表，必须在项目 API 设置中仅为必要的表开启访问；不要为解决接入问题而开放 anon 角色或关闭 RLS。
@@ -69,7 +69,7 @@ const result = await healthAdvisor.sendMessage({
 - 已部署函数：`https://lvxmygrgqtmzqgailmyl.supabase.co/functions/v1/zhi-health-advisor`
 - 当前函数版本：5，JWT 校验开启。
 - 数据库：6 张新表均启用 RLS，当前记录数为 0。
-- Security Advisor 最新复查为 0 项提示；rate-events 表仅允许 `service_role` 访问，匿名及普通登录角色没有表权限。
+- Security Advisor 最新复查为 0 项提示；rate-events 表仅允许 `service_role` 访问，匿名及普通登录角色没有表权限。\n- 2026-10-25 再次在线复核：6 张健康表均启用 RLS；数据库内 Auth 用户数与健康数据行数均为 0，且日志中未发现该函数的请求。因此尚无真实注册或端到端验收证据。
 - Performance Advisor 在空表上报告多个尚未使用的索引；暂不移除，待真实查询负载后评估。
 - 普通问答还需要在 Supabase Function Secrets 中配置 `OPENAI_API_KEY`。没有该密钥时普通问答会返回 503；关键词触发的 S 安全响应不依赖模型 API。
 - 浏览器调用还需要配置 `ZHI_ALLOWED_ORIGINS` 为实际前端的精确 Origin。未配置的浏览器 Origin 会被拒绝。
@@ -81,7 +81,7 @@ const result = await healthAdvisor.sendMessage({
 - 数据库：本迁移仅新增对象。回滚前先确认没有需要保留的会话数据；生产环境不要直接 DROP 表。优先禁用新入口并保留数据，另行审批数据删除。
 - 模型异常时：普通问答返回服务不可用，不猜测或伪造回答；S 安全响应仍可独立触发。
 
-## 验收清单
+## 自动化在线验收\n\n请使用两个专用测试账号运行 [在线验收脚本](../scripts/health-advisor-e2e.mjs)，步骤与环境变量见 [端到端验收记录](HEALTH_ADVISOR_E2E_ACCEPTANCE.md)。不要使用真实用户账号或提交账号凭证。\n\n## 验收清单
 
 - [ ] 未登录请求被拒绝。
 - [ ] `deno check` 对 Edge Function 类型检查通过。
