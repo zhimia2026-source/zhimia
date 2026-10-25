@@ -186,7 +186,26 @@ try {
     check("PRIV-01/02/03 cross-account isolation", false, "No persisted conversation ID returned.");
   }
 
-  await setConsent(userB, false);\n  const allowedOriginResponse = await invokeSafety(userB, allowedOrigin);
+  // Revocation must immediately stop persistence, even after a conversation exists.
+  await setConsent(userA, false);
+  const afterRevocation = await invokeSafety(userA);
+  const revokedBody = await afterRevocation.json().catch(() => ({}));
+  check("CONSENT-01 revoked storage consent stops persistence",
+    afterRevocation.ok && revokedBody.persisted === false && revokedBody.conversation_id === null,
+    "HTTP " + afterRevocation.status);
+
+  // A normal model answer is required for full acceptance; a missing provider key must fail the E2E run.
+  await setConsent(userA, true);
+  const modelResponse = await invokeNormal(userA);
+  const modelBody = await modelResponse.json().catch(() => ({}));
+  if (modelBody.conversation_id) createdConversationIds.push(modelBody.conversation_id);
+  check("MODEL-01 normal question returns a persisted answer",
+    modelResponse.ok && typeof modelBody.answer === "string" && modelBody.answer.length > 0 &&
+    modelBody.certainty_level === "L0" && Boolean(modelBody.conversation_id),
+    "HTTP " + modelResponse.status + (modelBody.error ? " " + modelBody.error : ""));
+
+  await setConsent(userB, false);
+  const allowedOriginResponse = await invokeSafety(userB, allowedOrigin);
   const allowHeader = allowedOriginResponse.headers.get("access-control-allow-origin");
   check("NET-02 allowed Origin is echoed exactly", allowHeader === allowedOrigin, "header " + String(allowHeader));
   await allowedOriginResponse.body?.cancel();
