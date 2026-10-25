@@ -165,7 +165,7 @@ try {
     check("PRIV-01/02/03 cross-account isolation", false, "No persisted conversation ID returned.");
   }
 
-  const allowedOriginResponse = await invokeSafety(userB, allowedOrigin);
+  await setConsent(userB, false);\n  const allowedOriginResponse = await invokeSafety(userB, allowedOrigin);
   const allowHeader = allowedOriginResponse.headers.get("access-control-allow-origin");
   check("NET-02 allowed Origin is echoed exactly", allowHeader === allowedOrigin, "header " + String(allowHeader));
   await allowedOriginResponse.body?.cancel();
