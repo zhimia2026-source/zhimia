@@ -10,7 +10,7 @@
 
 ## 已知部署条件
 
-Supabase 项目 `ZHIMIA`（ref `lvxmygrgqtmzqgailmyl`，region `ap-southeast-1`）初始为空。已应用 5 个仅新增对象的迁移；6 张 `zhi_health_*` 表已存在且启用 RLS。Edge Function `zhi-health-advisor` 已部署，当前 version 4，`verify_jwt=true`。这证明资源已部署，不等于端到端验收已完成。
+Supabase 项目 `ZHIMIA`（ref `lvxmygrgqtmzqgailmyl`，region `ap-southeast-1`）初始为空。已应用 5 个仅新增对象的迁移；6 张 `zhi_health_*` 表已存在且启用 RLS。Edge Function `zhi-health-advisor` 已部署，当前 version 5，`verify_jwt=true`。这证明资源已部署，不等于端到端验收已完成。
 
 ## 部署顺序
 
@@ -23,7 +23,7 @@ Supabase 项目 `ZHIMIA`（ref `lvxmygrgqtmzqgailmyl`，region `ap-southeast-1`�
 
 ## 现有聊天系统接入
 
-仓库提供 `web/zhi-health-advisor-client.js` 作为适配器，复用已有的、已登录的 Supabase 客户端；它不创建新身份体系，也不包含任何服务端密钥。前端应在用户明确选择后调用 `setChatStorageConsent(true)`，并提供撤销入口 `setChatStorageConsent(false)`。用户不同意保存时，仍可进行临时问答，但服务端不读取或保存聊天历史。
+仓库提供 `web/zhi-health-advisor-client.js` 作为适配器，复用已有的、已登录的 Supabase 客户端；它不创建新身份体系，也不包含任何服务端密钥。历史列表和消息读取要求当前版本 `v1.0` 的聊天存储授权有效；另提供 `deleteConversation` 显式删除单个会话。撤销存储授权会停止后续服务端历史读取与保存，但不会自动删除既有记录，用户可逐个删除；正式前端应明确展示这一点。前端应在用户明确选择后调用 `setChatStorageConsent(true)`，并提供撤销入口 `setChatStorageConsent(false)`。用户不同意保存时，仍可进行临时问答，但服务端不读取或保存聊天历史。
 
 示例：
 
@@ -53,7 +53,7 @@ const result = await healthAdvisor.sendMessage({
 ## 当前运行状态
 
 - 已部署函数：`https://lvxmygrgqtmzqgailmyl.supabase.co/functions/v1/zhi-health-advisor`
-- 当前函数版本：4，JWT 校验开启。
+- 当前函数版本：5，JWT 校验开启。
 - 数据库：6 张新表均启用 RLS，当前记录数为 0。
 - Security Advisor 最新复查为 0 项提示；rate-events 表仅允许 `service_role` 访问，匿名及普通登录角色没有表权限。
 - Performance Advisor 在空表上报告多个尚未使用的索引；暂不移除，待真实查询负载后评估。
@@ -70,6 +70,8 @@ const result = await healthAdvisor.sendMessage({
 ## 验收清单
 
 - [ ] 未登录请求被拒绝。
+- [ ] `deno check` 对 Edge Function 类型检查通过。
+- [ ] 撤销聊天存储授权后，服务端不再读取/写入聊天历史，客户端历史列表也拒绝读取；明确告知既有记录不会自动删除。
 - [ ] 用户 A 无法读取用户 B 的会话、消息、记忆和审计记录。
 - [ ] 客户端不能直接伪造 assistant 消息。
 - [ ] 严重呼吸困难/严重胸痛和即时自伤/伤人线索触发 S。
