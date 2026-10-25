@@ -267,6 +267,11 @@ Deno.serve(async (req: Request) => {
   }, { onConflict: "user_id,request_id,role", ignoreDuplicates: true });
   if (assistantMessageError) return json({ error: "answer_save_failed" }, 503, cors);
 
+  await db.from("zhi_health_conversations")
+    .update({ updated_at: new Date().toISOString() })
+    .eq("id", existingConversationId)
+    .eq("user_id", user.id);
+
   // Audit metadata only; never write message text or medical details into this table.
   await db.from("zhi_health_audit_events").insert({
     user_id: user.id,
