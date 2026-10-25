@@ -175,6 +175,8 @@ Deno.serve(async (req: Request) => {
     }
   }
 
+  let existingConversationId = conversationId;
+
   const safety = detectSafetyOverride(message);
   let answer: string;
   let certainty: "L0" | "L1" | "L2" | "L3" = "L0";
