@@ -26,6 +26,7 @@ export function createHealthAdvisorClient({ supabase }) {
       .select("id, granted, granted_at, revoked_at, policy_version")
       .eq("user_id", user.id)
       .eq("purpose", "chat_storage")
+      .eq("policy_version", "v1.0")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -84,8 +85,15 @@ export function createHealthAdvisorClient({ supabase }) {
     return data;
   }
 
+  async function requireStorageConsent() {
+    if (!await getChatStorageConsent()) {
+      throw new Error("尚未授权保存聊天记录，因此不会读取历史会话。");
+    }
+  }
+
   async function listConversations({ limit = 30 } = {}) {
     const user = await requireUser();
+    await requireStorageConsent();
     const { data, error } = await supabase
       .from("zhi_health_conversations")
       .select("id, title, created_at, updated_at")
@@ -98,6 +106,7 @@ export function createHealthAdvisorClient({ supabase }) {
 
   async function listMessages({ conversationId, limit = 100 }) {
     const user = await requireUser();
+    await requireStorageConsent();
     if (!conversationId) throw new Error("需要指定会话。");
     const { data, error } = await supabase
       .from("zhi_health_messages")
@@ -110,11 +119,24 @@ export function createHealthAdvisorClient({ supabase }) {
     return data || [];
   }
 
+  async function deleteConversation({ conversationId }) {
+    const user = await requireUser();
+    if (!conversationId) throw new Error("需要指定要删除的会话。");
+    const { error } = await supabase
+      .from("zhi_health_conversations")
+      .delete()
+      .eq("id", conversationId)
+      .eq("user_id", user.id);
+    if (error) throw new Error("会话删除失败，请稍后重试。");
+    return { deleted: true };
+  }
+
   return {
     getChatStorageConsent,
     setChatStorageConsent,
     sendMessage,
     listConversations,
     listMessages,
+    deleteConversation,
   };
 }
