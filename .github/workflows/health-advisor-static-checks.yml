@@ -1,0 +1,33 @@
+name: Health Advisor Static Checks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/health-advisor-e2e.mjs"
+      - "web/zhi-health-advisor.html"
+      - "web/zhi-health-advisor-client.js"
+      - ".github/workflows/health-advisor-static-checks.yml"
+  pull_request:
+    paths:
+      - "scripts/health-advisor-e2e.mjs"
+      - "web/zhi-health-advisor.html"
+      - "web/zhi-health-advisor-client.js"
+      - ".github/workflows/health-advisor-static-checks.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check E2E script syntax
+        run: node --check scripts/health-advisor-e2e.mjs
+      - name: Reject server secrets in browser files
+        run: |
+          ! grep -Eiq '(service_role|OPENAI_API_KEY|sk-[A-Za-z0-9]{20,})' web/zhi-health-advisor.html web/zhi-health-advisor-client.js
