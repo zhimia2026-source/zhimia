@@ -13,6 +13,8 @@
  * Optional:
  *   HEALTH_ADVISOR_ALLOWED_ORIGIN (defaults to GitHub Pages origin)
  */
+import { randomUUID } from "node:crypto";
+
 const required = [
   "SUPABASE_ANON_KEY",
   "HEALTH_TEST_A_EMAIL",
@@ -40,7 +42,7 @@ function check(name, ok, detail = "") {
   console.log((ok ? "PASS " : "FAIL ") + name + (detail ? " — " + detail : ""));
 }
 function uuid() {
-  return crypto.randomUUID();
+  return randomUUID();
 }
 async function request(path, { token, method = "GET", body, origin, prefer } = {}) {
   const headers = { apikey: anon, "content-type": "application/json" };
