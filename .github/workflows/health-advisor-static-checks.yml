@@ -7,6 +7,8 @@ on:
       - "scripts/health-advisor-e2e.mjs"
       - "scripts/health-advisor-token-gateway-e2e.mjs"
       - "supabase/functions/zhi-token-gateway/prompt.ts"
+      - "supabase/functions/zhi-token-gateway/safety.ts"
+      - "supabase/functions/zhi-token-gateway/safety_test.ts"
       - "supabase/functions/zhi-token-gateway/personality.ts"
       - "config/zee-persona-config.json"
       - "scripts/check-zee-persona-config.mjs"
@@ -40,6 +42,8 @@ jobs:
           deno-version: v2.x
       - name: Check token gateway prompt types
         run: deno check supabase/functions/zhi-token-gateway/prompt.ts
+      - name: Run safety override regression tests
+        run: deno test --allow-read supabase/functions/zhi-token-gateway/safety_test.ts
       - name: Check canonical persona config matches runtime prompt
         run: node scripts/check-zee-persona-config.mjs
       - name: Check legacy E2E script syntax
