@@ -10,7 +10,7 @@
 4. [跨云互联规范](CROSS_CLOUD_FEDERATION.md) — 跨云身份、授权、通信、撤销和安全边界。
 5. [现有聊天系统接入审计](INTEGRATION_AUDIT.md) — 基于上传源码的静态初审和接入前置条件。
 6. [健康生活顾问智能人部署与验收记录](HEALTH_ADVISOR_DEPLOYMENT.md) — Supabase 迁移、Edge Function、已知限制和上线门禁。
-7. [项目总览 README](../README.md) — 产品原则、开发顺序、本地 MVP 定位及安全提醒。
+7. [智能人生命体设计原则与工程规范 V1.0](agent-standard/intelligent-person-lifeform-design-principles-v1.0.md) — 身份、记忆、决策、自主权、进化治理与验收原则。\n8. [智能人部署验收总表](agent-standard/deployment-acceptance-registry.md) — 按智能人登记测试证据、阻塞项、版本和发布决定。\n9. [项目总览 README](../README.md) — 产品原则、开发顺序、本地 MVP 定位及安全提醒。
 
 ## 不可变设计原则
 
