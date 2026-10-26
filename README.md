@@ -12,6 +12,8 @@
 
 ## 基准文档与 GitHub 备份
 - [基准文档索引与备份规则](docs/BASELINE_INDEX.md)
+- [智能人生命体设计原则与工程规范 V1.0](docs/agent-standard/intelligent-person-lifeform-design-principles-v1.0.md)
+- [智能人部署验收总表（当前状态含未验证项）](docs/agent-standard/deployment-acceptance-registry.md)
 - [标准接口：智能人如何进入世界与互相沟通](docs/STANDARD_INTERFACE.md)
 - [协议参考实现：`zhi_protocol.py`](zhi_protocol.py)
 - [Agent Manifest JSON Schema](schemas/agent-manifest.schema.json)
