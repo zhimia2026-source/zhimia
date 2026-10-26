@@ -34,7 +34,7 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - name: Check token gateway prompt types and JSON import
+      - name: Check token gateway prompt types
         run: deno check supabase/functions/zhi-token-gateway/prompt.ts
       - name: Check legacy E2E script syntax
         run: node --check scripts/health-advisor-e2e.mjs
