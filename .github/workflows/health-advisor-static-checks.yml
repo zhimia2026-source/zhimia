@@ -6,6 +6,9 @@ on:
     paths:
       - "scripts/health-advisor-e2e.mjs"
       - "scripts/health-advisor-token-gateway-e2e.mjs"
+      - "supabase/functions/zhi-token-gateway/prompt.ts"
+      - "supabase/functions/zhi-token-gateway/personality.ts"
+      - "config/zee-persona-config.json"
       - "web/zhi-health-advisor.html"
       - "web/zhi-health-advisor-client.js"
       - ".github/workflows/health-advisor-static-checks.yml"
@@ -28,6 +31,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check token gateway prompt types and JSON import
+        run: deno check supabase/functions/zhi-token-gateway/prompt.ts
       - name: Check legacy E2E script syntax
         run: node --check scripts/health-advisor-e2e.mjs
       - name: Check personal-token gateway E2E script syntax
