@@ -1,6 +1,10 @@
 import { detectSafetyOverride } from "./safety.ts";
 
-function assertEquals(actual: unknown, expected: unknown, message = "values differ") {\n  if (actual !== expected) throw new Error(`${message}: expected ${String(expected)}, got ${String(actual)}`);\n}\n\nDeno.test("Chinese immediate self-harm language triggers protective response", () => {
+function assertEquals(actual: unknown, expected: unknown, message = "values differ") {
+  if (actual !== expected) throw new Error(`${message}: expected ${String(expected)}, got ${String(actual)}`);
+}
+
+Deno.test("Chinese immediate self-harm language triggers protective response", () => {
   const result = detectSafetyOverride("我不想活了，准备自杀");
   assertEquals(result.triggered, true);
   assertEquals(result.kind, "immediate_harm");
