@@ -28,7 +28,9 @@
 - [健康顾问现有聊天客户端适配器](web/zhi-health-advisor-client.js)
 - [健康顾问端到端验收矩阵](docs/HEALTH_ADVISOR_E2E_ACCEPTANCE.md)
 - [ZEE 人格参数行为验收基准](docs/ZEE_PERSONA_ACCEPTANCE.md)
-- [ZEE 家庭陪伴人格规范 v1.0](docs/HEALTH_COMPANION_PERSONA.md)\n- [健康顾问在线双账号隔离验收脚本](scripts/health-advisor-e2e.mjs)
+- [ZEE 家庭陪伴人格规范 v1.0](docs/HEALTH_COMPANION_PERSONA.md)
+- [ZEE 多维人格行为验收矩阵 v1.0](docs/ZEE_PERSONALITY_ACCEPTANCE_MATRIX.md)
+- [健康顾问在线双账号隔离验收脚本](scripts/health-advisor-e2e.mjs)
 - [当前个人令牌网关线上验收脚本](scripts/health-advisor-token-gateway-e2e.mjs)\n- [健康顾问客户端写入权限收紧迁移](supabase/migrations/202610250006_restrict_client_chat_writes.sql)
 - [健康顾问 Supabase 迁移与 Edge Function](supabase/functions/zhi-health-advisor/index.ts)
 
