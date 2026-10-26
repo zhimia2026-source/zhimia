@@ -23,7 +23,7 @@
 - [ZEE 现有资产复用清单](docs/REUSE_MAP.md)
 - [健康生活顾问智能人部署与验收记录](docs/HEALTH_ADVISOR_DEPLOYMENT.md)
 - [健康顾问接入现有聊天系统的身份门禁](docs/HEALTH_ADVISOR_INTEGRATION_GATE.md)
-- [健康顾问独立个人登录前端](web/zhi-health-advisor.html)
+- [关心｜家庭陪伴智能人网页](web/zhi-health-advisor.html)
 - [GitHub Pages 静态部署工作流](.github/workflows/health-advisor-pages.yml)
 - [健康顾问现有聊天客户端适配器](web/zhi-health-advisor-client.js)
 - [健康顾问端到端验收矩阵](docs/HEALTH_ADVISOR_E2E_ACCEPTANCE.md)
