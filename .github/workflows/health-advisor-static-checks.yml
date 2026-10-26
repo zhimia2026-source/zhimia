@@ -22,6 +22,8 @@ on:
       - "scripts/check-zee-persona-config.mjs"
       - "config/zee-persona-config.json"
       - "supabase/functions/zhi-token-gateway/prompt.ts"
+      - "supabase/functions/zhi-token-gateway/safety.ts"
+      - "supabase/functions/zhi-token-gateway/safety_test.ts"
       - "web/zhi-health-advisor.html"
       - "web/zhi-health-advisor-client.js"
       - ".github/workflows/health-advisor-static-checks.yml"
