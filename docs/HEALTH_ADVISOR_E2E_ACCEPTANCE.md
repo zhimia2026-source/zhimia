@@ -46,3 +46,21 @@
 - GitHub Pages 构建和 artifact 上传成功，但部署阶段因仓库 Pages 尚未启用而返回 HTTP 404。需在仓库 Settings → Pages 中选择 GitHub Actions 作为部署来源，然后确认部署 workflow 成功。
 - 真实 E2E 尚未完成：仍需配置 `OPENAI_API_KEY` 与 `ZHI_ALLOWED_ORIGINS`，设置 Supabase Auth Redirect URL，创建两个专用测试账号并运行脚本。
 - 不得将未执行的矩阵项目标记为通过。
+## 个人令牌续签专项（2026-10-27）
+
+| ID | 测试 | 通过条件 | 当前状态 |
+|---|---|---|---|
+| TOKEN-01 | 管理员签发凭证组 | 创建独立 Auth UID；仅保存 access/refresh 哈希；返回 access 与 refresh 原文一次 | 代码已部署，待真实管理员登录签发验证 |
+| TOKEN-02 | 自动续签 | access 令牌 15 分钟过期后，客户端用 refresh 凭证换取新 access + refresh，并重试原请求一次 | 客户端代码已提交，待浏览器验证 |
+| TOKEN-03 | 连续续签 | 每次续签生成新的 refresh，90 天滚动有效期从续签时重新计算 | 代码路径已部署，待线上验证 |
+| TOKEN-04 | 旧 refresh 重放 | 重用已轮换的 refresh 后，同一 family 的 access 与 refresh 均被撤销 | 已加入服务端防重放处理，待并发/重放测试 |
+| TOKEN-05 | 管理员撤销 | 撤销 token_id 对应 family 的 access 与 refresh 凭证 | 代码已部署，待线上验证 |
+| TOKEN-06 | 部分失败恢复 | 任一签发步骤失败时清理已创建记录，续签部分失败时撤销该 family，避免留下可用孤儿凭证 | 有补偿清理逻辑；非单事务，仍需故障注入验证 |
+| TOKEN-07 | 跨用户隔离 | 两个不同凭证组不能访问对方会话/消息；撤销 A 不影响 B | 待双用户线上验证 |
+
+### 当前凭证策略
+- access token：15 分钟有效；refresh token：每次续签后滚动 90 天有效。用户需在 refresh 到期前至少成功续签一次，不能把它描述为无期限永不失效。
+- 浏览器客户端把 access 与 refresh 凭证放在 sessionStorage；退出登录会同时清除两项。避免把 refresh 凭证放进 URL、日志或分析事件。
+- 服务端仅保存 SHA-256 哈希。刷新凭证只在签发/轮换响应中返回原文。
+- 轮换由 Edge Function 的条件更新与补偿撤销保护；当前不是单个数据库事务，仍需进一步做故障注入和并发测试。
+- 以上代码部署/提交不等于端到端验收通过；未实际执行的项目仍标记为待验证。
