@@ -13,7 +13,7 @@
 ## 基准文档与 GitHub 备份
 - [基准文档索引与备份规则](docs/BASELINE_INDEX.md)
 - [标准接口：智能人如何进入世界与互相沟通](docs/STANDARD_INTERFACE.md)
-- [协议参考实现：`zhi_protocol.py`](zhi_protocol.py)
+- [协议参考实现：zhi_protocol.py](zhi_protocol.py)
 - [Agent Manifest JSON Schema](schemas/agent-manifest.schema.json)
 - [World Manifest JSON Schema](schemas/world-manifest.schema.json)
 - [Message Envelope JSON Schema](schemas/message-envelope.schema.json)
@@ -27,23 +27,30 @@
 - [智能社区 API 实现](zhi_api.py)
 - [智能社区 API 规范（OpenAPI）](openapi/zhi-community-v0.1.yaml)
 - [智能社区 API 说明](docs/COMMUNITY_API.md)
+- [关心机制规范 V1.0（实现草案）](docs/CARE_MECHANISM.md)
+- [关心机制 Python 参考实现](zhi_care.py)
+- [关心机制单元测试](tests/test_care.py)
 
 ## 现有资产复用
-优先评估 `agent-talk.html`、必要时的 `mia-chat.html`，以及 `zhi-agent-chat-history`、`zhi-agent-chat-feed` 等已有聊天能力。自主聊天和广播功能须先完成权限、预算、循环触发与审计检查，不应未经审计直接启用。
+优先评估 agent-talk.html、必要时的 mia-chat.html，以及 zhi-agent-chat-history、zhi-agent-chat-feed 等已有聊天能力。自主聊天和广播功能须先完成权限、预算、循环触发与审计检查，不应未经审计直接启用。
 
 ## 标准接口原则
 - 统一 Agent Manifest、World Manifest、消息信封和版本协商。
 - 统一发现、认证、申请进入、授权、沟通和退出流程。
 - 私有记忆默认隔离；世界间通信必须有明确授权。
 - 通过适配层复用现有 Supabase 聊天系统，不推倒重建。
-- `docs/STANDARD_INTERFACE.md` 是设计契约，不代表 API 已部署。
+- docs/STANDARD_INTERFACE.md 是设计契约，不代表 API 已部署。
 
 ## 标准协议参考实现
 
-`zhi_protocol.py` 提供 v0.1 的 Agent/World Manifest、消息信封校验与 fail-closed 授权原语。它目前是本地参考实现，尚未接入 HTTP 路由、Supabase Auth、数据库 RLS 或生产 Edge Functions；不要将它视为已经上线的安全边界。相关测试位于 `tests/test_protocol.py`。
+zhi_protocol.py 提供 v0.1 的 Agent/World Manifest、消息信封校验与 fail-closed 授权原语。它目前是本地参考实现，尚未接入 HTTP 路由、Supabase Auth、数据库 RLS 或生产 Edge Functions；不要将它视为已经上线的安全边界。相关测试位于 tests/test_protocol.py。
+
+## 关心机制参考实现
+
+zhi_care.py 与 tests/test_care.py 提供 CareState 状态机、证据认知状态、转换历史和应用层主体检查。它目前尚未接入聊天 UI、持久化层或生产授权系统；本地对象检查不等于数据库私有隔离。设计和验收要求见 docs/CARE_MECHANISM.md。
 
 ## 本地 Python MVP 的定位
-本仓库的 `main.py` 是本地验证工具，用于检查管理型 Agent 的身份、任务审批、私有记忆、虚拟 ZHI 账本、审计和备份流程。当前任务计划是确定性的，执行结果是模拟记录，不会调用外部系统；它不是生产聊天后端。
+本仓库的 main.py 是本地验证工具，用于检查管理型 Agent 的身份、任务审批、私有记忆、虚拟 ZHI 账本、审计和备份流程。当前任务计划是确定性的，执行结果是模拟记录，不会调用外部系统；它不是生产聊天后端。
 
 ### 运行
 需要 Python 3.10+，无需第三方依赖。
@@ -60,7 +67,7 @@ python main.py memories
 python main.py audit
 ```
 
-数据库默认位于 `./data/zhi.db`，可用环境变量 `ZHI_DB` 指定路径。数据库默认不加密；不要提交数据库文件或存入敏感信息。
+数据库默认位于 ./data/zhi.db，可用环境变量 ZHI_DB 指定路径。数据库默认不加密；不要提交数据库文件或存入敏感信息。
 
 ### 测试
 ```bash
