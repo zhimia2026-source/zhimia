@@ -264,6 +264,11 @@ Deno.serve(async (req: Request) => {
       const sceneId = parts[2];
       const body = await readBody(req);
       if (!isText(body.body, 8000)) return reply({ error: "invalid_argument" }, 400);
+      // Validate idempotency before any database reads/writes that could create a conversation.
+      const requestId = req.headers.get("idempotency-key")?.trim();
+      if (!requestId || requestId.length > 200) {
+        return reply({ error: "invalid_argument", detail: "idempotency_key_required" }, 400);
+      }
       const { data: membership, error: membershipError } = await db.from("zhi_world_memberships")
         .select("id,principal_user_id,status,revoked_at,agent_id,expires_at,capabilities").eq("world_id", sceneId).eq("principal_user_id", actor.userId)
         .eq("status", "active").is("revoked_at", null).is("agent_id", null).maybeSingle();
@@ -296,8 +301,6 @@ Deno.serve(async (req: Request) => {
           throw new Error("database_error");
         }
       }
-      const requestId = req.headers.get("idempotency-key")?.trim();
-      if (!requestId || requestId.length > 200) return reply({ error: "invalid_argument", detail: "idempotency_key_required" }, 400);
       const requestHash = await sha256(actor.userId + ":" + conversation.id + ":" + requestId);
       const requestUuid = requestHash.slice(0, 8) + "-" + requestHash.slice(8, 12) + "-4" +
         requestHash.slice(13, 16) + "-a" + requestHash.slice(17, 20) + "-" + requestHash.slice(20, 32);
