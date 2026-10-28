@@ -118,24 +118,15 @@ Deno.serve(async (req: Request) => {
           (body.description !== undefined && (typeof body.description !== "string" || body.description.length > 4000))) {
         return reply({ error: "invalid_argument", detail: "unsupported_entry_policy" }, 400);
       }
-      const { data: world, error } = await db.from("zhi_worlds").insert({
-        creator_user_id: actor.userId,
-        name: body.name.trim(),
-        description: typeof body.description === "string" ? body.description : "",
-        visibility,
-        entry_policy: entryPolicy,
-        status: "open",
-      }).select("id,name,description,visibility,entry_policy,status,rules_version,created_at").single();
-      if (error || !world) throw new Error("database_error");
-      const { error: memberError } = await db.from("zhi_world_memberships").insert({
-        world_id: world.id, principal_user_id: actor.userId, agent_id: null,
-        membership_role: "owner", status: "active", capabilities: ["scene:manage", "message:send", "message:read"],
+      const { data: result, error } = await db.rpc("zhi_create_world_with_owner", {
+        p_creator_user_id: actor.userId,
+        p_name: body.name.trim(),
+        p_description: typeof body.description === "string" ? body.description : "",
+        p_visibility: visibility,
+        p_entry_policy: entryPolicy,
       });
-      if (memberError) {
-        await db.from("zhi_worlds").delete().eq("id", world.id).eq("creator_user_id", actor.userId);
-        throw new Error("database_error");
-      }
-      return reply({ scene: world, membership: "owner" }, 201);
+      if (error || !result?.scene || result?.membership !== "owner") throw new Error("database_error");
+      return reply(result, 201);
     }
 
     if (req.method === "POST" && parts.length === 4 && parts[0] === "v1" && parts[1] === "scenes" && parts[3] === "join") {
