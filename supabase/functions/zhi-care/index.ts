@@ -157,22 +157,12 @@ Deno.serve(async (req: Request) => {
       // approval-ticket integration exists, no API call may start an action.
       if (next === "in_progress") return json({ error: "supervised_action_gate_not_integrated" }, 403, cors);
       if (!validText(body.reason_code, 120)) return json({ error: "reason_code_required" }, 400, cors);
-      const updatedAt = new Date().toISOString();
-      const { data: updated, error: updateError } = await db.from("zhi_care_states").update({
-        state: next, revision: row.revision + 1, updated_at: updatedAt,
-      }).eq("user_id", user.id).eq("care_id", row.care_id).eq("revision", row.revision)
-        .select("*").maybeSingle();
+      const { data: updated, error: updateError } = await db.rpc("zhi_care_transition_atomic", {
+        p_user_id: user.id, p_care_id: row.care_id, p_expected_revision: row.revision,
+        p_from_state: row.state, p_to_state: next, p_reason_code: body.reason_code,
+      });
       if (updateError) return json({ error: "care_transition_failed" }, 503, cors);
       if (!updated) return json({ error: "care_revision_conflict" }, 409, cors);
-      const eventResult = await writeEvent(db, updated, {
-        event_type: next === "paused" ? "paused" : next === "terminated" ? "terminated" : "state_transition",
-        from_state: row.state, to_state: next, reason_code: body.reason_code,
-      });
-      if (eventResult.error) {
-        await db.from("zhi_care_states").update({ state: row.state, revision: row.revision, updated_at: row.updated_at })
-          .eq("user_id", user.id).eq("care_id", row.care_id).eq("revision", updated.revision);
-        return json({ error: "care_audit_write_failed" }, 503, cors);
-      }
       return json({ care: updated }, 200, cors);
     }
 
@@ -185,27 +175,15 @@ Deno.serve(async (req: Request) => {
       event_time: validText(body.event_time, 80) ? body.event_time : null,
       observed_at: new Date().toISOString(),
     };
-    const current = Array.isArray(row.evidence_refs) ? row.evidence_refs : [];
-    if (current.length >= 200) return json({ error: "evidence_limit_reached" }, 409, cors);
-    const updatedAt = new Date().toISOString();
-    const { data: updated, error: updateError } = await db.from("zhi_care_states").update({
-      evidence_refs: [...current, evidence], epistemic_status: body.evidence_status,
-      revision: row.revision + 1, updated_at: updatedAt,
-    }).eq("user_id", user.id).eq("care_id", row.care_id).eq("revision", row.revision)
-      .select("*").maybeSingle();
-    if (updateError) return json({ error: "care_evidence_save_failed" }, 503, cors);
-    if (!updated) return json({ error: "care_revision_conflict" }, 409, cors);
-    const eventResult = await writeEvent(db, updated, {
-      event_type: "evidence_added", reason_code: "evidence_reference_added",
-      metadata: { evidence_ref: evidence.ref, epistemic_status: evidence.status },
+    const { data: updated, error: updateError } = await db.rpc("zhi_care_add_evidence_atomic", {
+      p_user_id: user.id, p_care_id: row.care_id, p_expected_revision: row.revision,
+      p_evidence: evidence, p_epistemic_status: String(body.evidence_status),
     });
-    if (eventResult.error) {
-      await db.from("zhi_care_states").update({
-        evidence_refs: row.evidence_refs, epistemic_status: row.epistemic_status,
-        revision: row.revision, updated_at: row.updated_at,
-      }).eq("user_id", user.id).eq("care_id", row.care_id).eq("revision", updated.revision);
-      return json({ error: "care_audit_write_failed" }, 503, cors);
+    if (updateError) {
+      if (updateError.message?.includes("evidence_limit_reached")) return json({ error: "evidence_limit_reached" }, 409, cors);
+      return json({ error: "care_evidence_save_failed" }, 503, cors);
     }
+    if (!updated) return json({ error: "care_revision_conflict" }, 409, cors);
     return json({ care: updated }, 200, cors);
   }
 
