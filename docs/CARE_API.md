@@ -1,6 +1,6 @@
 # ZHI Care API（Supabase Edge Function）
 
-状态：**已部署参考 API v1；尚未接入现有聊天 UI，尚未完成端到端验收。**
+状态：**已部署 Edge Function v4；监督审批票据已落库，但尚未接入现有聊天 UI，尚未完成端到端验收。**
 
 入口函数：`zhi-care`。它要求有效 Supabase JWT，并在服务端调用 Auth `getUser(token)` 确认实际用户。请求体中的 `user_id` 会被忽略；数据范围始终由已验证用户的 `user.id` 确定。
 
@@ -10,7 +10,8 @@
 - 两张表均启用 RLS，不为 `anon` / `authenticated` 建立直连策略；服务端函数使用 service-role 客户端，并在每次读写中显式按已验证的 `user_id` 过滤。
 - 不要为了消除 Supabase Advisor 的 `rls_enabled_no_policy` 提示而开放客户端策略。这两张表与个人令牌、刷新凭据一样，设计为仅经服务端路径访问。
 - 事件 metadata 只存最小化的状态/证据引用信息，不存聊天原文、健康信息或敏感内容。
-- API 当前不允许状态直接转入 `in_progress`。在服务端审批票据和行动授权集成之前，客户端传入的 `approved: true` 等字段都不构成授权。
+- 进入 `in_progress` 必须使用服务端签发、绑定 care_id 与 revision 的一次性审批票据；票据 15 分钟过期，并在状态变更与审计事件同一事务中消费。客户端传入的 `approved: true` 不构成授权。
+- 当前票据由已登录用户通过 `approve_action` 显式确认；这只授权工作流状态进入 `in_progress`，并不代表外部工具或现实世界动作已执行。执行器与细粒度工具权限仍需另行实现。
 - 本函数的用户隔离基于 Supabase Auth 用户 ID。未来若一个登录账号可以控制多个智能人，需要增加服务端 Agent-ownership 映射，不能只信任请求里的 `agent_id`。
 
 ## 调用约定
@@ -75,14 +76,43 @@
 }
 ```
 
-状态转换遵循状态机，使用 revision 条件更新防止旧版本覆盖。当前直接进入 `in_progress` 会返回 `supervised_action_gate_not_integrated`，直到真实审批票据与执行授权路径实现。
+状态转换遵循状态机，使用 revision 条件更新防止旧版本覆盖。进入 `in_progress` 必须先请求并批准票据，且在 transition 请求中提交 `ticket_id`。票据必须匹配同一用户、care_id、当前 revision、动作范围与有效期；票据只能消费一次。
+
+### 监督审批票据
+
+先为处于 `action_review` 的记录申请票据：
+
+```json
+{ "action": "request_approval", "care_id": "care:companion:001" }
+```
+
+用户查看当前计划并明确确认后，批准返回的 `ticket_id`：
+
+```json
+{ "action": "approve_action", "ticket_id": "返回的 UUID" }
+```
+
+最后携带同一票据进入工作流执行阶段：
+
+```json
+{
+  "action": "transition",
+  "care_id": "care:companion:001",
+  "to_state": "in_progress",
+  "ticket_id": "返回的 UUID",
+  "reason_code": "human_approved"
+}
+```
+
+票据仅绑定 `transition:in_progress`，不包含工具调用权限。重复消费、过期、记录 revision 已变化或跨用户使用均不能通过。外部工具执行必须另建按工具、参数和目标资源授权的执行层。
 
 ## 已验证与待验证
 
 - 已验证：迁移已应用；两张表存在且启用 RLS；`anon` 与 `authenticated` 没有 SELECT 权限；`service_role` 有服务端访问权限；没有添加宽泛客户端策略。
-- 已部署：Edge Function `zhi-care` v1，`verify_jwt=true`。
+- 已部署：Edge Function `zhi-care` v4，`verify_jwt=true`。
+- 已验证：审批票据表存在；transition RPC 仅保留带 `ticket_id` 的签名；只有 `service_role` 可执行，`anon` 与 `authenticated` 无执行权限。
 - 已新增 `scripts/smoke_test_zhi_care.py`，用于真实 API 冒烟测试：create/list/get/add_evidence/transition、重复 ID 冲突、监督执行门禁；设置第二个用户令牌后还会测试跨账号隔离。
-- 待验证：实际运行上述脚本、并发冲突、审计失败恢复、聊天 UI 接入。未完成这些步骤前，不视为生产验收通过。
+- 待验证：实际运行真实 token 冒烟测试、票据过期/重放/并发测试、跨账号隔离、聊天 UI 接入。未完成这些步骤前，不视为生产验收通过。
 
 ## 运行冒烟测试
 
