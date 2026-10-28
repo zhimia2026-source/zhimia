@@ -83,6 +83,10 @@ create table if not exists public.zhi_world_conversations (
 );
 create index if not exists zhi_world_conversations_world_time_idx
   on public.zhi_world_conversations (world_id, created_at desc);
+-- One canonical open group conversation per scene prevents concurrent first-message races.
+create unique index if not exists zhi_world_conversations_one_open_group_idx
+  on public.zhi_world_conversations (world_id)
+  where visibility = 'members' and status = 'open';
 
 create table if not exists public.zhi_world_conversation_members (
   id uuid primary key default gen_random_uuid(),
