@@ -15,8 +15,8 @@
 ## 功能分支中的扩展提案
 
 - [聊天主入口接入契约](CHAT_ADAPTER_CONTRACT.md) — 独立身份、跨项目授权桥接、聊天/历史/关心状态权限与验收清单；尚未完成前后端集成。
-- [聊天接入部署审计补充](CHAT_DEPLOYMENT_AUDIT.md) — 基于当前 Supabase 部署元数据、表结构和上传聊天源码的现状审计；桥接和端到端测试仍未完成。
-- [跨项目个人身份断言桥接契约](IDENTITY_ASSERTION_BRIDGE.md) — 一次性挑战、短时签名断言、jti 防重放、Core 资源级授权和分阶段回滚；**实现契约，尚未部署或验收**。
+- [聊天接入部署审计补充](CHAT_DEPLOYMENT_AUDIT.md) — 基于当前 Supabase 部署元数据、表结构和上传聊天源码的现状审计；旧聊天 Core 归并和端到端测试仍未完成。\n- [单一 Supabase 项目部署与数据归并方案](SUPABASE_SINGLE_PROJECT_PLAN.md) — 统一使用 `lvxmygrgqtmzqgailmyl`，定义旧聊天数据库、函数、身份映射、数据迁移、验收与回滚步骤。
+- [旧跨项目身份断言桥接契约](IDENTITY_ASSERTION_BRIDGE.md) — 已被单一 Supabase 项目架构取代，仅保留为历史设计记录，不作为目标实现方案。
 - [关心机制规范 V1.0](CARE_MECHANISM.md) — 跨本体认知—价值—行动机制；当前为实现草案，须经评审和测试后才能纳入稳定基准。
 - [关心机制参考实现](../zhi_care.py) 与 [单元测试](../tests/test_care.py)。
 - [关心机制 SQLite 持久化适配器](../zhi_care_repository.py) 与 [持久化/隔离测试](../tests/test_care_repository.py)。
