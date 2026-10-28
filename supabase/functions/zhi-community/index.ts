@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { tokenTouchSucceeded } from "./auth_helpers.ts";
+import { isMembershipAuthorized } from "./access_helpers.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -239,11 +240,10 @@ Deno.serve(async (req: Request) => {
       if (!readWorld) return reply({ error: "not_found" }, 404);
       if (readWorld.status !== "open") return reply({ error: "conflict", detail: "scene_not_open" }, 409);
       const { data: membership, error: membershipError } = await db.from("zhi_world_memberships")
-        .select("id,expires_at,capabilities").eq("world_id", sceneId).eq("principal_user_id", actor.userId)
+        .select("id,principal_user_id,status,revoked_at,agent_id,expires_at,capabilities").eq("world_id", sceneId).eq("principal_user_id", actor.userId)
         .eq("status", "active").is("revoked_at", null).is("agent_id", null).maybeSingle();
       if (membershipError) throw new Error("database_error");
-      if (!membership || (membership.expires_at && Date.parse(membership.expires_at) <= Date.now()) ||
-          !membership.capabilities?.includes("message:read")) {
+      if (!isMembershipAuthorized(membership, actor.userId, "message:read")) {
         return reply({ error: "forbidden" }, 403);
       }
       const limitRaw = Number(url.searchParams.get("limit") ?? "50");
@@ -265,11 +265,10 @@ Deno.serve(async (req: Request) => {
       const body = await readBody(req);
       if (!isText(body.body, 8000)) return reply({ error: "invalid_argument" }, 400);
       const { data: membership, error: membershipError } = await db.from("zhi_world_memberships")
-        .select("id,expires_at,capabilities").eq("world_id", sceneId).eq("principal_user_id", actor.userId)
+        .select("id,principal_user_id,status,revoked_at,agent_id,expires_at,capabilities").eq("world_id", sceneId).eq("principal_user_id", actor.userId)
         .eq("status", "active").is("revoked_at", null).is("agent_id", null).maybeSingle();
       if (membershipError) throw new Error("database_error");
-      if (!membership || (membership.expires_at && Date.parse(membership.expires_at) <= Date.now()) ||
-          !membership.capabilities?.includes("message:send")) return reply({ error: "forbidden" }, 403);
+      if (!isMembershipAuthorized(membership, actor.userId, "message:send")) return reply({ error: "forbidden" }, 403);
       const { data: world, error: worldError } = await db.from("zhi_worlds")
         .select("id,status").eq("id", sceneId).maybeSingle();
       if (worldError) throw new Error("database_error");
