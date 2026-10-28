@@ -42,7 +42,7 @@ Care 是跨本体认知机制，第一阶段通过新增的 CareState 关联现�
 ## 5. 私有隔离、持久化与授权
 
 - CareState 默认且强制 access_policy=private。
-- zhi_care_repository.py 是本地 SQLite 持久化适配器，支持按 owner 查询、序列化、重启恢复和基于 revision 的乐观并发冲突检测。
+- zhi_care_repository.py 是本地 SQLite 持久化适配器，支持按 owner 查询、序列化、重启恢复和基于 revision 的乐观并发冲突检测。保存时必须推进 revision，且 expected_revision 必须与数据库中的当前 revision 一致。
 - Repository 查询通过 owner_subject 过滤，未授权调用者看不到其他 owner 的记录元数据；此约束只在应用层有效。
 - 生产环境必须由服务端认证上下文确定主体，并通过数据库 RLS / 服务端授权控制读取、写入和跨 Agent 引用。不得信任客户端提交的 subject_ref、actor_id 或权限声明。
 - SQLite 文件本身未加密。任何可直接读取文件的人都可能读取数据；不要将本地适配器误认为生产隔离。
