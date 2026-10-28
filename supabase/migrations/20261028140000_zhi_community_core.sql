@@ -303,8 +303,11 @@ begin
   if found then
     update public.zhi_world_memberships
     set status = 'active', revoked_at = null, expires_at = null,
-        membership_role = case when membership_role = 'owner' then 'owner' else 'member' end,
-        capabilities = array['message:send', 'message:read']::text[],
+        membership_role = membership_role,
+        capabilities = case
+          when membership_role in ('owner', 'moderator') then capabilities
+          else array['message:send', 'message:read']::text[]
+        end,
         joined_at = now()
     where id = v_membership.id;
   else
