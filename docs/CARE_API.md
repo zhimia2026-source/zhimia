@@ -91,6 +91,7 @@
 ```bash
 # Linux/macOS
 export ZHI_ACCESS_TOKEN='你的登录 access token'
+export SUPABASE_PUBLISHABLE_KEY='项目公开 API key' # 或设置 SUPABASE_ANON_KEY
 export ZHI_SECOND_ACCESS_TOKEN='另一个账号的 access token' # 可选，用于隔离测试
 python scripts/smoke_test_zhi_care.py
 ```
@@ -99,6 +100,7 @@ PowerShell：
 
 ```powershell
 $env:ZHI_ACCESS_TOKEN = '你的登录 access token'
+$env:SUPABASE_PUBLISHABLE_KEY = '项目公开 API key' # 或设置 SUPABASE_ANON_KEY
 $env:ZHI_SECOND_ACCESS_TOKEN = '另一个账号的 access token' # 可选
 python scripts/smoke_test_zhi_care.py
 ```
