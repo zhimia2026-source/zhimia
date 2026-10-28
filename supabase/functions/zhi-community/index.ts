@@ -4,7 +4,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const MAX_BODY_BYTES = 64_000;
 
-type Actor = { userId: string; tokenId: string };
+type Actor = { userId: string };
 type JsonObject = Record<string, unknown>;
 
 function json(data: unknown, status = 200, extra: Record<string, string> = {}) {
@@ -59,7 +59,7 @@ async function authenticate(db: SupabaseClient, req: Request): Promise<Actor | n
     .eq("id", data.id)
     .is("revoked_at", null);
   if (touchError) return null;
-  return { userId: data.user_id, tokenId: data.id };
+  return { userId: data.user_id };
 }
 
 async function readBody(req: Request): Promise<JsonObject> {
@@ -76,14 +76,6 @@ function isText(value: unknown, max: number): value is string {
   return typeof value === "string" && value.trim().length > 0 && value.length <= max;
 }
 
-function errorStatus(error: string): number {
-  if (error === "invalid_json" || error === "body_too_large" || error === "invalid_argument") return 400;
-  if (error === "not_found") return 404;
-  if (error === "forbidden") return 403;
-  if (error === "conflict") return 409;
-  if (error === "authentication_required" || error === "invalid_token") return 401;
-  return 500;
-}
 
 Deno.serve(async (req: Request) => {
   const cors = corsHeaders(req);
