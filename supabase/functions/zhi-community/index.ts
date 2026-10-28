@@ -113,10 +113,12 @@ Deno.serve(async (req: Request) => {
       const entryPolicy = body.entry_policy === undefined
         ? (visibility === "public" ? "open" : "invite_only")
         : body.entry_policy;
-      if (!["open", "approval", "invite_only"].includes(String(entryPolicy)) ||
-          (visibility === "public" && entryPolicy === "invite_only") ||
+      // This first API slice implements open public scenes only. Private invitation
+      // redemption and approval queues remain disabled until atomic workflows exist.
+      if ((visibility === "public" && entryPolicy !== "open") ||
+          (visibility === "private" && entryPolicy !== "invite_only") ||
           (body.description !== undefined && (typeof body.description !== "string" || body.description.length > 4000))) {
-        return json({ error: "invalid_argument" }, 400);
+        return json({ error: "invalid_argument", detail: "unsupported_entry_policy" }, 400);
       }
       const { data: world, error } = await db.from("zhi_worlds").insert({
         creator_user_id: actor.userId,
