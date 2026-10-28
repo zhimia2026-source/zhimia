@@ -71,6 +71,17 @@ class CareRepositoryTests(unittest.TestCase):
         with self.assertRaises(CareAccessError):
             self.repo.save("agent:intruder", loaded, expected_revision=1)
 
+    def test_save_must_advance_revision(self):
+        loaded = self.repo.get("agent:owner", self.care.care_id)
+        with self.assertRaisesRegex(ValueError, "revision_must_advance"):
+            self.repo.save("agent:owner", loaded, expected_revision=1)
+
+    def test_boolean_expected_revision_is_rejected(self):
+        loaded = self.repo.get("agent:owner", self.care.care_id)
+        loaded.transition("agent:owner", CareStatus.UNDERSTANDING, reason="valid_change")
+        with self.assertRaisesRegex(ValueError, "invalid_expected_revision"):
+            self.repo.save("agent:owner", loaded, expected_revision=True)
+
     def test_owner_list_returns_metadata_not_evidence_payload(self):
         rows = self.repo.list_for_owner("agent:owner")
         self.assertEqual(len(rows), 1)
