@@ -54,11 +54,14 @@ async function authenticate(db: SupabaseClient, req: Request): Promise<Actor | n
     .maybeSingle();
   if (error || !data || data.revoked_at) return null;
   if (data.expires_at && Date.parse(data.expires_at) <= Date.now()) return null;
-  const { error: touchError } = await db.from("zhi_personal_access_tokens")
+  // Reject tokens revoked after the initial lookup.
+  const { data: touched, error: touchError } = await db.from("zhi_personal_access_tokens")
     .update({ last_used_at: new Date().toISOString() })
     .eq("id", data.id)
-    .is("revoked_at", null);
-  if (touchError) return null;
+    .is("revoked_at", null)
+    .select("id")
+    .maybeSingle();
+  if (touchError || !touched) return null;
   return { userId: data.user_id };
 }
 
