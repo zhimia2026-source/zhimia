@@ -114,3 +114,78 @@ BEGIN
   END IF;
 END;
 $$;
+
+-- Invitation target binding, one-time consumption, and private-scene checks.
+DO $$
+DECLARE
+  v_scene_id uuid;
+  v_result jsonb;
+  v_token_hash text := repeat('a', 64);
+  v_invitation_id uuid;
+BEGIN
+  v_result := public.zhi_create_world_with_owner(
+    '11111111-1111-4111-8111-111111111111',
+    'CI Private Scene',
+    'Private invitation test',
+    'private',
+    'invite_only'
+  );
+  v_scene_id := (v_result #>> '{scene,id}')::uuid;
+
+  v_result := public.zhi_issue_world_invitation(
+    v_scene_id,
+    '11111111-1111-4111-8111-111111111111',
+    '22222222-2222-4222-8222-222222222222',
+    v_token_hash,
+    now() + interval '1 hour'
+  );
+  v_invitation_id := (v_result ->> 'invitation_id')::uuid;
+
+  IF has_function_privilege('anon', 'public.zhi_issue_world_invitation(uuid,uuid,uuid,text,timestamptz)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'anon must not execute invitation issue RPC';
+  END IF;
+  IF has_function_privilege('authenticated', 'public.zhi_redeem_world_invitation(text,uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'authenticated must not execute invitation redeem RPC';
+  END IF;
+  IF NOT has_function_privilege('service_role', 'public.zhi_redeem_world_invitation(text,uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'service_role must execute invitation redeem RPC';
+  END IF;
+
+  BEGIN
+    PERFORM public.zhi_redeem_world_invitation(v_token_hash, '33333333-3333-4333-8333-333333333333');
+    RAISE EXCEPTION 'wrong invitation target was accepted';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM = 'wrong invitation target was accepted' THEN RAISE; END IF;
+    IF SQLERRM <> 'invitation_target_mismatch' THEN RAISE; END IF;
+  END;
+
+  v_result := public.zhi_redeem_world_invitation(v_token_hash, '22222222-2222-4222-8222-222222222222');
+  IF v_result ->> 'membership' <> 'active' THEN
+    RAISE EXCEPTION 'invitation redemption did not create active membership';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.zhi_world_memberships
+    WHERE world_id = v_scene_id
+      AND principal_user_id = '22222222-2222-4222-8222-222222222222'
+      AND agent_id IS NULL AND status = 'active'
+  ) THEN
+    RAISE EXCEPTION 'redeemed invitation did not create membership';
+  END IF;
+
+  BEGIN
+    PERFORM public.zhi_redeem_world_invitation(v_token_hash, '22222222-2222-4222-8222-222222222222');
+    RAISE EXCEPTION 'invitation was redeemed twice';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM = 'invitation was redeemed twice' THEN RAISE; END IF;
+    IF SQLERRM <> 'invitation_unavailable' THEN RAISE; END IF;
+  END;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.zhi_world_invitations
+    WHERE id = v_invitation_id AND used_at IS NOT NULL
+  ) THEN
+    RAISE EXCEPTION 'invitation was not marked consumed';
+  END IF;
+END;
+$$;
+
