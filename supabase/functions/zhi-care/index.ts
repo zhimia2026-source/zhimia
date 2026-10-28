@@ -47,6 +47,10 @@ function corsHeaders(req: Request): Record<string, string> | null {
 function validText(value: unknown, max = MAX_TEXT): value is string {
   return typeof value === "string" && value.trim().length > 0 && value.length <= max;
 }
+function validUuid(value: unknown): value is string {
+  return typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
 function validStringArray(value: unknown, maxItems = 20, maxChars = 80): value is string[] {
   return Array.isArray(value) && value.length <= maxItems &&
     value.every((item) => typeof item === "string" && item.trim().length > 0 && item.length <= maxChars);
@@ -148,7 +152,7 @@ Deno.serve(async (req: Request) => {
     return json({ ticket }, 201, cors);
   }
   if (action === "approve_action") {
-    if (!validText(body.ticket_id, 80)) return json({ error: "ticket_id_required" }, 400, cors);
+    if (!validUuid(body.ticket_id)) return json({ error: "valid_ticket_id_required" }, 400, cors);
     const { data: ticket, error } = await db.from("zhi_care_approval_tickets").select("ticket_id,care_id,expected_revision,action_scope,status,expires_at").eq("user_id", user.id).eq("ticket_id", body.ticket_id).maybeSingle();
     if (error) return json({ error: "approval_ticket_read_failed" }, 503, cors);
     if (!ticket) return json({ error: "approval_ticket_not_found" }, 404, cors);
@@ -184,7 +188,7 @@ Deno.serve(async (req: Request) => {
       if (TERMINAL.has(row.state as Status)) return json({ error: "care_state_terminal" }, 409, cors);
       if (!(ALLOWED[row.state as Status] ?? []).includes(next)) return json({ error: "invalid_state_transition" }, 409, cors);
       if (!validText(body.reason_code, 120)) return json({ error: "reason_code_required" }, 400, cors);
-      if (next === "in_progress" && !validText(body.ticket_id, 80)) return json({ error: "approved_ticket_required" }, 403, cors);
+      if (next === "in_progress" && !validUuid(body.ticket_id)) return json({ error: "approved_ticket_required" }, 403, cors);
       const { data: updated, error: updateError } = await db.rpc("zhi_care_transition_atomic", {
         p_user_id: user.id, p_care_id: row.care_id, p_expected_revision: row.revision,
         p_from_state: row.state, p_to_state: next, p_reason_code: body.reason_code,
