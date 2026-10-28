@@ -17,6 +17,7 @@
 - [跨云互联规范](docs/CROSS_CLOUD_FEDERATION.md)
 - [任务执行与可信回执协议](docs/TASK_EXECUTION_PROTOCOL.md)
 - [智能社区 MVP 实现契约](docs/COMMUNITY_MVP.md)
+- [聊天主入口接入契约](docs/CHAT_ADAPTER_CONTRACT.md)
 - [关心机制规范 V1.0（实现草案）](docs/CARE_MECHANISM.md)
 - [关心机制 Supabase API](docs/CARE_API.md)
 - [真实 API 冒烟测试脚本](scripts/smoke_test_zhi_care.py)
@@ -28,7 +29,7 @@
 - [关心机制持久化与隔离测试](tests/test_care_repository.py)
 
 ## 现有资产复用
-优先评估 agent-talk.html、必要时的 mia-chat.html，以及 zhi-agent-chat-history、zhi-agent-chat-feed 等已有聊天能力。自主聊天和广播功能须先完成权限、预算、循环触发与审计检查，不应未经审计直接启用。
+优先评估 agent-talk.html、必要时的 mia-chat.html，以及 zhi-agent-chat-history、zhi-agent-chat-feed 等已有聊天能力。上传压缩包中的聊天页面仍使用共享页面密码认证，并包含全体广播和管理型主动消息轮询；不能未经改造直接接入独立身份体系。自主聊天和广播功能须先完成权限、预算、循环触发与审计检查，不应未经审计直接启用。
 
 ## 标准接口原则
 - 统一 Agent Manifest、World Manifest、消息信封和版本协商。
