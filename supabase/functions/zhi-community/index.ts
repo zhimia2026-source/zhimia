@@ -279,8 +279,18 @@ Deno.serve(async (req: Request) => {
         const created = await db.from("zhi_world_conversations").insert({
           world_id: sceneId, created_by_user_id: actor.userId, visibility: "members", status: "open",
         }).select("id").single();
-        if (created.error || !created.data) throw new Error("database_error");
-        conversation = created.data;
+        if (!created.error && created.data) {
+          conversation = created.data;
+        } else if (created.error?.code === "23505") {
+          // Another request created the canonical group conversation concurrently.
+          const retry = await db.from("zhi_world_conversations")
+            .select("id").eq("world_id", sceneId).eq("visibility", "members").eq("status", "open")
+            .maybeSingle();
+          if (retry.error || !retry.data) throw new Error("database_error");
+          conversation = retry.data;
+        } else {
+          throw new Error("database_error");
+        }
       }
       const requestId = req.headers.get("idempotency-key")?.trim();
       if (!requestId || requestId.length > 200) return reply({ error: "invalid_argument", detail: "idempotency_key_required" }, 400);
