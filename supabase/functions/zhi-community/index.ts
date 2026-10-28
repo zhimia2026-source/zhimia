@@ -76,6 +76,15 @@ function isText(value: unknown, max: number): value is string {
   return typeof value === "string" && value.trim().length > 0 && value.length <= max;
 }
 
+function isUuid(value: unknown): value is string {
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function randomToken(bytes = 32): string {
+  const value = crypto.getRandomValues(new Uint8Array(bytes));
+  return Array.from(value, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 
 Deno.serve(async (req: Request) => {
   const cors = corsHeaders(req);
@@ -127,6 +136,55 @@ Deno.serve(async (req: Request) => {
       });
       if (error || !result?.scene || result?.membership !== "owner") throw new Error("database_error");
       return reply(result, 201);
+    }
+
+    if (req.method === "POST" && parts.length === 4 && parts[0] === "v1" && parts[1] === "scenes" && parts[3] === "invitations") {
+      const sceneId = parts[2];
+      const body = await readBody(req);
+      if (!isUuid(sceneId) || !isUuid(body.target_user_id)) {
+        return reply({ error: "invalid_argument", detail: "scene_id_and_target_user_id_must_be_uuids" }, 400);
+      }
+      const hours = body.expires_in_hours === undefined ? 72 : Number(body.expires_in_hours);
+      if (!Number.isInteger(hours) || hours < 1 || hours > 168) {
+        return reply({ error: "invalid_argument", detail: "expires_in_hours_must_be_1_to_168" }, 400);
+      }
+      const secret = randomToken();
+      const tokenHash = await sha256(secret);
+      const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+      const { data: invitation, error } = await db.rpc("zhi_issue_world_invitation", {
+        p_world_id: sceneId,
+        p_creator_user_id: actor.userId,
+        p_target_user_id: body.target_user_id,
+        p_token_hash: tokenHash,
+        p_expires_at: expiresAt,
+      });
+      if (error || !invitation) {
+        if (error?.code === "42501") return reply({ error: "forbidden" }, 403);
+        if (error?.code === "P0002") return reply({ error: "not_found" }, 404);
+        if (error?.code === "22023") return reply({ error: "invalid_argument", detail: "scene_not_invitable" }, 400);
+        throw new Error("database_error");
+      }
+      // The plaintext secret is returned once and is never stored in the database.
+      return reply({ invitation: { ...invitation, token: secret } }, 201);
+    }
+
+    if (req.method === "POST" && path === "/v1/invitations/redeem") {
+      const body = await readBody(req);
+      if (!isText(body.token, 128) || !/^[0-9a-f]{64}$/i.test(body.token)) {
+        return reply({ error: "invalid_argument", detail: "token_required" }, 400);
+      }
+      const tokenHash = await sha256(body.token);
+      const { data: result, error } = await db.rpc("zhi_redeem_world_invitation", {
+        p_token_hash: tokenHash,
+        p_actor_user_id: actor.userId,
+      });
+      if (error || !result) {
+        if (error?.code === "42501") return reply({ error: "forbidden", detail: "invitation_target_mismatch" }, 403);
+        if (error?.code === "P0002") return reply({ error: "not_found", detail: "invitation_invalid" }, 404);
+        if (error?.code === "22023") return reply({ error: "conflict", detail: "invitation_unavailable" }, 409);
+        throw new Error("database_error");
+      }
+      return reply(result, 200);
     }
 
     if (req.method === "POST" && parts.length === 4 && parts[0] === "v1" && parts[1] === "scenes" && parts[3] === "join") {
