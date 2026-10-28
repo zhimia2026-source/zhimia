@@ -235,10 +235,11 @@ Deno.serve(async (req: Request) => {
       if (!readWorld) return reply({ error: "not_found" }, 404);
       if (readWorld.status !== "open") return reply({ error: "conflict", detail: "scene_not_open" }, 409);
       const { data: membership, error: membershipError } = await db.from("zhi_world_memberships")
-        .select("id,expires_at").eq("world_id", sceneId).eq("principal_user_id", actor.userId)
+        .select("id,expires_at,capabilities").eq("world_id", sceneId).eq("principal_user_id", actor.userId)
         .eq("status", "active").is("revoked_at", null).is("agent_id", null).maybeSingle();
       if (membershipError) throw new Error("database_error");
-      if (!membership || (membership.expires_at && Date.parse(membership.expires_at) <= Date.now())) {
+      if (!membership || (membership.expires_at && Date.parse(membership.expires_at) <= Date.now()) ||
+          !membership.capabilities?.includes("message:read")) {
         return reply({ error: "forbidden" }, 403);
       }
       const limitRaw = Number(url.searchParams.get("limit") ?? "50");
