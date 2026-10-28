@@ -148,12 +148,37 @@ def main() -> int:
     expect(status == 200 and started.get("care", {}).get("state") == "in_progress",
            "valid approved ticket permits the scoped workflow transition")
 
+    # Move through a valid cycle back to action_review so the replay reaches
+    # the ticket validation path rather than failing only on the state machine.
+    status, feedback = call(ACCESS_TOKEN, {
+        "action": "transition", "care_id": care_id, "to_state": "feedback_review",
+        "reason_code": "api_smoke_test",
+    })
+    expect(status == 200 and feedback.get("care", {}).get("state") == "feedback_review",
+           "post-action feedback review transition succeeds")
+
+    status, goal_again = call(ACCESS_TOKEN, {
+        "action": "transition", "care_id": care_id, "to_state": "goal_set",
+        "reason_code": "api_smoke_test",
+    })
+    expect(status == 200 and goal_again.get("care", {}).get("state") == "goal_set",
+           "feedback review can return to goal setting")
+
+    status, review_again = call(ACCESS_TOKEN, {
+        "action": "transition", "care_id": care_id, "to_state": "action_review",
+        "reason_code": "api_smoke_test",
+    })
+    expect(status == 200 and review_again.get("care", {}).get("state") == "action_review",
+           "workflow can return to action review")
+
     status, replay = call(ACCESS_TOKEN, {
         "action": "transition", "care_id": care_id, "to_state": "in_progress",
         "ticket_id": ticket_id, "reason_code": "ticket_replay_test",
     })
-    expect(status == 409,
-           "a consumed ticket cannot be replayed")
+    expect(status == 409 and replay.get("error") in {
+        "approved_ticket_invalid_or_expired", "care_revision_conflict"
+    },
+           "consumed or stale-revision ticket is rejected by the atomic gate")
 
     status, duplicate = call(ACCESS_TOKEN, {
         "action": "create",
