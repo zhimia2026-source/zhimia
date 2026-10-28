@@ -32,7 +32,7 @@
 }
 ```
 
-`care_id` 可省略，省略时服务端生成 UUID。记录强制为 private，初始状态为 discovered。成功返回 HTTP 201。
+`care_id` 可省略，省略时服务端生成 UUID。记录强制为 private，初始状态为 discovered。成功返回 HTTP 201；重复的 `(user_id, care_id)` 返回 HTTP 409。
 
 ### 列出本人记录
 
@@ -81,4 +81,26 @@
 
 - 已验证：迁移已应用；两张表存在且启用 RLS；`anon` 与 `authenticated` 没有 SELECT 权限；`service_role` 有服务端访问权限；没有添加宽泛客户端策略。
 - 已部署：Edge Function `zhi-care` v1，`verify_jwt=true`。
-- 待验证：使用有效登录令牌进行 create/list/get/transition/evidence 端到端请求；跨账号隔离；并发冲突；审计失败恢复；聊天 UI 接入。未完成这些步骤前，不视为生产验收通过。
+- 已新增 `scripts/smoke_test_zhi_care.py`，用于真实 API 冒烟测试：create/list/get/add_evidence/transition、重复 ID 冲突、监督执行门禁；设置第二个用户令牌后还会测试跨账号隔离。
+- 待验证：实际运行上述脚本、并发冲突、审计失败恢复、聊天 UI 接入。未完成这些步骤前，不视为生产验收通过。
+
+## 运行冒烟测试
+
+需要本地 Python 3 与一个有效的 Supabase 登录 access token。脚本会创建一条合成测试记录；当前 API 尚无删除接口，因此记录会保留。
+
+```bash
+# Linux/macOS
+export ZHI_ACCESS_TOKEN='你的登录 access token'
+export ZHI_SECOND_ACCESS_TOKEN='另一个账号的 access token' # 可选，用于隔离测试
+python scripts/smoke_test_zhi_care.py
+```
+
+PowerShell：
+
+```powershell
+$env:ZHI_ACCESS_TOKEN = '你的登录 access token'
+$env:ZHI_SECOND_ACCESS_TOKEN = '另一个账号的 access token' # 可选
+python scripts/smoke_test_zhi_care.py
+```
+
+脚本不会输出 access token。不要把令牌提交到 GitHub 或粘贴到聊天中。
