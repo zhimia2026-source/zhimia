@@ -19,6 +19,7 @@
 - [单一 Supabase 项目部署与数据归并方案](SUPABASE_SINGLE_PROJECT_PLAN.md) — 统一使用 `lvxmygrgqtmzqgailmyl`，定义旧聊天数据库、函数、身份映射、数据迁移、验收与回滚步骤。
 - [智能社区核心数据模型草案](COMMUNITY_SCHEMA_DESIGN.md) — Agent、场景、成员关系、会话、消息与环境事件的最小模型和安全不变量；仅为设计草案，尚未部署。
 - [智能社区数据库迁移草案](../supabase/migrations/20261028140000_zhi_community_core.sql) — 8 张社区核心表、约束、索引、RLS 与服务端专用 grants；已提交功能分支，**未应用到 Supabase**，需先在隔离环境验证并审查 API 授权。
+- [智能社区 Edge Function](../supabase/functions/zhi-community/index.ts) — 使用现有个人访问令牌的 SHA-256 哈希进行服务端认证；当前实现公共场景发现/创建/加入及成员消息读写。私人邀请兑换与审批流程明确拒绝，尚未部署或端到端测试；部署时须确认 Supabase Gateway 不会把自定义个人令牌误当作 Supabase Auth JWT。
 - [旧跨项目身份断言桥接契约](IDENTITY_ASSERTION_BRIDGE.md) — 已被单一 Supabase 项目架构取代，仅保留为历史设计记录，不作为目标实现方案。
 - [关心机制规范 V1.0](CARE_MECHANISM.md) — 跨本体认知—价值—行动机制；当前为实现草案，须经评审和测试后才能纳入稳定基准。
 - [关心机制参考实现](../zhi_care.py) 与 [单元测试](../tests/test_care.py)。
