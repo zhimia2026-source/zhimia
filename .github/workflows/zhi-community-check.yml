@@ -29,6 +29,8 @@ jobs:
           deno-version: v2.x
       - name: Type-check community Edge Function
         run: deno check supabase/functions/zhi-community/index.ts
+      - name: Test token authentication guard
+        run: deno test supabase/functions/zhi-community/auth_helpers_test.ts
 
   migration-smoke-test:
     runs-on: ubuntu-latest
