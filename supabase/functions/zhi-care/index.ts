@@ -194,7 +194,19 @@ Deno.serve(async (req: Request) => {
         p_from_state: row.state, p_to_state: next, p_reason_code: body.reason_code,
         p_ticket_id: next === "in_progress" ? body.ticket_id : null,
       });
-      if (updateError) return json({ error: "care_transition_failed" }, 503, cors);
+      if (updateError) {
+        const detail = updateError.message ?? "";
+        if (detail.includes("approved_ticket_required")) {
+          return json({ error: "approved_ticket_required" }, 403, cors);
+        }
+        if (detail.includes("approved_ticket_invalid_or_expired")) {
+          return json({ error: "approved_ticket_invalid_or_expired" }, 409, cors);
+        }
+        if (detail.includes("care_revision_conflict")) {
+          return json({ error: "care_revision_conflict" }, 409, cors);
+        }
+        return json({ error: "care_transition_failed" }, 503, cors);
+      }
       if (!updated) return json({ error: "care_revision_conflict" }, 409, cors);
       return json({ care: updated }, 200, cors);
     }
