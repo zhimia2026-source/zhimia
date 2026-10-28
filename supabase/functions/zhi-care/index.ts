@@ -111,7 +111,10 @@ Deno.serve(async (req: Request) => {
       state: "discovered", access_policy: "private", revision: 1,
     };
     const { data: row, error } = await db.from("zhi_care_states").insert(rowInput).select("*").single();
-    if (error || !row) return json({ error: error?.code === "23505" ? "care_id_already_exists" : "care_create_failed" }, 503, cors);
+    if (error || !row) {
+      if (error?.code === "23505") return json({ error: "care_id_already_exists" }, 409, cors);
+      return json({ error: "care_create_failed" }, 503, cors);
+    }
     const eventResult = await writeEvent(db, row, { event_type: "created", to_state: "discovered", reason_code: "care_created" });
     if (eventResult.error) {
       await db.from("zhi_care_states").delete().eq("user_id", user.id).eq("care_id", careId).eq("revision", 1);
