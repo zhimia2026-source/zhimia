@@ -19,6 +19,7 @@
 - [智能社区 MVP 实现契约](docs/COMMUNITY_MVP.md)
 - [关心机制规范 V1.0（实现草案）](docs/CARE_MECHANISM.md)
 - [关心机制 Supabase API](docs/CARE_API.md)
+- [真实 API 冒烟测试脚本](scripts/smoke_test_zhi_care.py)
 - [关心机制数据库迁移](supabase/migrations/20261028120000_zhi_care_states.sql)
 - [关心机制 Edge Function](supabase/functions/zhi-care/index.ts)
 - [关心机制 Python 参考实现](zhi_care.py)
