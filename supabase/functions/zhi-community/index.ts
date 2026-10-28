@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { tokenTouchSucceeded } from "./auth_helpers.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -61,7 +62,7 @@ async function authenticate(db: SupabaseClient, req: Request): Promise<Actor | n
     .is("revoked_at", null)
     .select("id")
     .maybeSingle();
-  if (touchError || !touched) return null;
+  if (!tokenTouchSucceeded({ data: touched, error: touchError })) return null;
   return { userId: data.user_id };
 }
 
