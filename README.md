@@ -1,6 +1,6 @@
 # ZHI 世界｜智能人聊天系统优先
 
-本项目的产品方向是：**保留并优化现有智能人聊天系统，不重做聊天功能，不再建设独立的智能人观察台。** 同时从现在开始定义统一的智能人/世界标准接口，避免未来每增加一个智能人或世界都要重新开发连接方式。
+本项目的产品方向是：**保留并优化现有智能人聊天系统，不重做聊天功能，不再建设独立的智能人观察台。** 同时定义统一的智能人/世界标准接口，避免每增加一个智能人或世界都要重新开发连接方式。
 
 ## 产品原则
 - 以现有聊天 UI、聊天历史和消息流为主入口；先复用、审计，再补缺口。
@@ -14,22 +14,14 @@
 - [基准文档索引与备份规则](docs/BASELINE_INDEX.md)
 - [标准接口：智能人如何进入世界与互相沟通](docs/STANDARD_INTERFACE.md)
 - [协议参考实现：zhi_protocol.py](zhi_protocol.py)
-- [Agent Manifest JSON Schema](schemas/agent-manifest.schema.json)
-- [World Manifest JSON Schema](schemas/world-manifest.schema.json)
-- [Message Envelope JSON Schema](schemas/message-envelope.schema.json)
 - [跨云互联规范](docs/CROSS_CLOUD_FEDERATION.md)
 - [任务执行与可信回执协议](docs/TASK_EXECUTION_PROTOCOL.md)
-- [现有聊天系统接入审计](docs/INTEGRATION_AUDIT.md)
-- [产品范围与优先级](docs/PRODUCT_SCOPE.md)
-- [ZEE 现有资产复用清单](docs/REUSE_MAP.md)
 - [智能社区 MVP 实现契约](docs/COMMUNITY_MVP.md)
-- [智能社区参考内核](zhi_community.py)
-- [智能社区 API 实现](zhi_api.py)
-- [智能社区 API 规范（OpenAPI）](openapi/zhi-community-v0.1.yaml)
-- [智能社区 API 说明](docs/COMMUNITY_API.md)
 - [关心机制规范 V1.0（实现草案）](docs/CARE_MECHANISM.md)
 - [关心机制 Python 参考实现](zhi_care.py)
+- [关心机制 SQLite 持久化适配器](zhi_care_repository.py)
 - [关心机制单元测试](tests/test_care.py)
+- [关心机制持久化与隔离测试](tests/test_care_repository.py)
 
 ## 现有资产复用
 优先评估 agent-talk.html、必要时的 mia-chat.html，以及 zhi-agent-chat-history、zhi-agent-chat-feed 等已有聊天能力。自主聊天和广播功能须先完成权限、预算、循环触发与审计检查，不应未经审计直接启用。
@@ -41,13 +33,9 @@
 - 通过适配层复用现有 Supabase 聊天系统，不推倒重建。
 - docs/STANDARD_INTERFACE.md 是设计契约，不代表 API 已部署。
 
-## 标准协议参考实现
+## 关心机制参考实现与当前限制
 
-zhi_protocol.py 提供 v0.1 的 Agent/World Manifest、消息信封校验与 fail-closed 授权原语。它目前是本地参考实现，尚未接入 HTTP 路由、Supabase Auth、数据库 RLS 或生产 Edge Functions；不要将它视为已经上线的安全边界。相关测试位于 tests/test_protocol.py。
-
-## 关心机制参考实现
-
-zhi_care.py 与 tests/test_care.py 提供 CareState 状态机、证据认知状态、转换历史和应用层主体检查。它目前尚未接入聊天 UI、持久化层或生产授权系统；本地对象检查不等于数据库私有隔离。设计和验收要求见 docs/CARE_MECHANISM.md。
+zhi_care.py 提供 CareState 状态机、证据认知状态、转换历史和应用层主体检查。zhi_care_repository.py 为它增加 SQLite 本地持久化、按 owner 查询、版本冲突检测。两者均为本地参考实现，尚未接入聊天 UI、Supabase、生产认证或数据库 RLS；SQLite 文件本身不加密，不能将应用层主体检查视为生产安全边界。
 
 ## 本地 Python MVP 的定位
 本仓库的 main.py 是本地验证工具，用于检查管理型 Agent 的身份、任务审批、私有记忆、虚拟 ZHI 账本、审计和备份流程。当前任务计划是确定性的，执行结果是模拟记录，不会调用外部系统；它不是生产聊天后端。
@@ -86,4 +74,5 @@ python -m unittest discover -s tests -v
 3. 让现有聊天能力适配标准接口，保持旧客户端可用。
 4. 补齐世界成员授权、任务审批、审计与私有记忆隔离。
 5. 实现执行授权票据、可信回执和恢复流程，再进行跨云双端互操作验证。
-6. 再加入经验反思、模拟账本、聊天内管理简报和跨世界协作。
+6. 接入关心机制：先完成本地持久化测试，再做服务端身份绑定、RLS 和聊天端到端验证。
+7. 再加入经验反思、模拟账本、聊天内管理简报和跨世界协作。
