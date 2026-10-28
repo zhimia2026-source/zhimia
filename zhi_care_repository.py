@@ -88,9 +88,11 @@ class CareRepository:
         )
         return care
 
-    def create(self, care: CareState) -> None:
+    def create(self, actor_ref: str, care: CareState) -> None:
         if not isinstance(care, CareState):
             raise CareError("invalid_care_state")
+        # The caller identity must come from the trusted server-side auth context.
+        care.assert_access(actor_ref)
         if care.access_policy != "private":
             raise CareError("care_records_must_be_private")
         try:
