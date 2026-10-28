@@ -45,3 +45,6 @@ end; $$;
 
 revoke all on function public.zhi_care_transition_atomic(uuid,text,integer,text,text,text,uuid) from public,anon,authenticated;
 grant execute on function public.zhi_care_transition_atomic(uuid,text,integer,text,text,text,uuid) to service_role;
+
+-- Remove the legacy six-argument overload so it cannot bypass the ticket requirement.
+drop function if exists public.zhi_care_transition_atomic(uuid,text,integer,text,text,text);
