@@ -18,6 +18,9 @@
 - [任务执行与可信回执协议](docs/TASK_EXECUTION_PROTOCOL.md)
 - [智能社区 MVP 实现契约](docs/COMMUNITY_MVP.md)
 - [关心机制规范 V1.0（实现草案）](docs/CARE_MECHANISM.md)
+- [关心机制 Supabase API](docs/CARE_API.md)
+- [关心机制数据库迁移](supabase/migrations/20261028120000_zhi_care_states.sql)
+- [关心机制 Edge Function](supabase/functions/zhi-care/index.ts)
 - [关心机制 Python 参考实现](zhi_care.py)
 - [关心机制 SQLite 持久化适配器](zhi_care_repository.py)
 - [关心机制单元测试](tests/test_care.py)
@@ -74,5 +77,5 @@ python -m unittest discover -s tests -v
 3. 让现有聊天能力适配标准接口，保持旧客户端可用。
 4. 补齐世界成员授权、任务审批、审计与私有记忆隔离。
 5. 实现执行授权票据、可信回执和恢复流程，再进行跨云双端互操作验证。
-6. 接入关心机制：先完成本地持久化测试，再做服务端身份绑定、RLS 和聊天端到端验证。
+6. 接入关心机制：Supabase 私有表与 zhi-care API 已建立；下一步完成有效令牌端到端测试、跨账号隔离测试、审批票据集成与聊天端接入。
 7. 再加入经验反思、模拟账本、聊天内管理简报和跨世界协作。
