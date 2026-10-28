@@ -68,7 +68,7 @@ create table if not exists public.zhi_world_invitations (
   used_at timestamptz,
   revoked_at timestamptz,
   created_at timestamptz not null default now(),
-  check (target_user_id is not null or target_agent_id is not null)
+  check ((target_user_id is not null) <> (target_agent_id is not null))
 );
 create index if not exists zhi_world_invitations_world_idx
   on public.zhi_world_invitations (world_id, expires_at) where used_at is null and revoked_at is null;
