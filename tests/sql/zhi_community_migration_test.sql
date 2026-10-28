@@ -48,6 +48,60 @@ BEGIN
 END;
 $$;
 
+-- Force the second insert to fail and prove the first insert rolls back too.
+CREATE FUNCTION public.zhi_test_reject_membership_insert()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RAISE EXCEPTION 'injected_membership_failure';
+END;
+$$;
+
+CREATE TRIGGER zhi_test_reject_membership_insert
+BEFORE INSERT ON public.zhi_world_memberships
+FOR EACH ROW EXECUTE FUNCTION public.zhi_test_reject_membership_insert();
+
+DO $$
+DECLARE
+  v_before integer;
+  v_after integer;
+BEGIN
+  SELECT count(*) INTO v_before
+  FROM public.zhi_worlds
+  WHERE name = 'CI Rollback Probe';
+
+  BEGIN
+    PERFORM public.zhi_create_world_with_owner(
+      '11111111-1111-4111-8111-111111111111',
+      'CI Rollback Probe',
+      'This scene must not survive a failed owner insert',
+      'public',
+      'open'
+    );
+    RAISE EXCEPTION 'Expected injected membership failure was not raised';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM = 'Expected injected membership failure was not raised' THEN
+      RAISE;
+    END IF;
+    IF SQLERRM <> 'injected_membership_failure' THEN
+      RAISE;
+    END IF;
+  END;
+
+  SELECT count(*) INTO v_after
+  FROM public.zhi_worlds
+  WHERE name = 'CI Rollback Probe';
+
+  IF v_after <> v_before THEN
+    RAISE EXCEPTION 'Atomic rollback failed: scene row was left behind';
+  END IF;
+END;
+$$;
+
+DROP TRIGGER zhi_test_reject_membership_insert ON public.zhi_world_memberships;
+DROP FUNCTION public.zhi_test_reject_membership_insert();
+
 -- Validate key schema invariants without depending on application credentials.
 DO $$
 BEGIN
