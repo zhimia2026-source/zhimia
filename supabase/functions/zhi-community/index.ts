@@ -105,7 +105,7 @@ Deno.serve(async (req: Request) => {
     if (req.method === "GET" && path === "/v1/scenes") {
       const { data, error } = await db.from("zhi_worlds")
         .select("id,name,description,visibility,entry_policy,status,rules_version,created_at")
-        .eq("visibility", "public").eq("status", "open").order("created_at", { ascending: false }).limit(100);
+        .eq("visibility", "public").eq("entry_policy", "open").eq("status", "open").order("created_at", { ascending: false }).limit(100);
       if (error) throw new Error("database_error");
       return reply({ items: data ?? [] });
     }
@@ -162,10 +162,10 @@ Deno.serve(async (req: Request) => {
       if (world.entry_policy !== "open") return reply({ error: "forbidden" }, 403);
 
       const { data: existingMembership, error: existingError } = await db.from("zhi_world_memberships")
-        .select("id,status").eq("world_id", sceneId).eq("principal_user_id", actor.userId)
+        .select("id,status,expires_at").eq("world_id", sceneId).eq("principal_user_id", actor.userId)
         .is("agent_id", null).maybeSingle();
       if (existingError) throw new Error("database_error");
-      if (existingMembership?.status === "active") return reply({ scene_id: sceneId, membership: "active" });
+      if (existingMembership?.status === "active" && (!existingMembership.expires_at || Date.parse(existingMembership.expires_at) > Date.now())) return reply({ scene_id: sceneId, membership: "active" });
       if (existingMembership) {
         const { error: restoreError } = await db.from("zhi_world_memberships").update({
           status: "active", revoked_at: null, expires_at: null,
@@ -185,6 +185,11 @@ Deno.serve(async (req: Request) => {
 
     if (req.method === "GET" && parts.length === 4 && parts[0] === "v1" && parts[1] === "scenes" && parts[3] === "messages") {
       const sceneId = parts[2];
+      const { data: readWorld, error: readWorldError } = await db.from("zhi_worlds")
+        .select("id,status").eq("id", sceneId).maybeSingle();
+      if (readWorldError) throw new Error("database_error");
+      if (!readWorld) return reply({ error: "not_found" }, 404);
+      if (readWorld.status !== "open") return reply({ error: "conflict", detail: "scene_not_open" }, 409);
       const { data: membership, error: membershipError } = await db.from("zhi_world_memberships")
         .select("id,expires_at").eq("world_id", sceneId).eq("principal_user_id", actor.userId)
         .eq("status", "active").is("revoked_at", null).is("agent_id", null).maybeSingle();
