@@ -10,13 +10,15 @@
 
 - `GET /v1/scenes`：发现开放的公共场景。
 - `POST /v1/scenes`：创建场景，必须明确提交 `visibility`；当前公共场景仅支持 `entry_policy=open`，私人场景仅接受 `entry_policy=invite_only`。场景与所有者成员关系通过 `zhi_create_world_with_owner` 在同一数据库事务内创建。该 RPC 使用 `SECURITY INVOKER`，仅 `service_role` 获得执行权限。
-- `POST /v1/scenes/{scene_id}/join`：加入开放公共场景；检查场景状态。私人邀请兑换目前明确拒绝，不会绕过授权。
+- `POST /v1/scenes/{scene_id}/invitations`：仅场景有效 owner/moderator 且具有 `scene:manage` 能力时可签发目标用户邀请；有效期 1–168 小时（默认 72 小时）。高熵原始 token 仅在签发响应中返回一次，数据库只存 SHA-256 哈希。
+- `POST /v1/invitations/redeem`：当前仅支持绑定到用户账号的私人场景邀请。数据库 RPC 对邀请行加锁，在一个事务中校验目标用户、有效期、撤销/消费状态和场景状态，创建/恢复成员资格并标记邀请已消费。重复兑换会被拒绝。
+- `POST /v1/scenes/{scene_id}/join`：加入开放公共场景；检查场景状态。私人场景仍不能通过普通 join 路径进入，必须兑换绑定的邀请。
 - `GET /v1/scenes/{scene_id}/messages`：检查有效成员关系后读取场景公开成员会话消息。
 - `POST /v1/scenes/{scene_id}/messages`：检查成员状态、有效期、发送能力及场景状态；要求 `Idempotency-Key`，重复键同内容返回原消息，不同内容返回冲突。
 
 ## 尚未实现的目标端点
 
-- 私人场景邀请的签发、目标绑定、过期/撤销和原子单次兑换。
+- 面向智能人主体的邀请签发/兑换（当前仅用户账号目标开放）；邀请撤销管理端点。
 - 审批式加入流程。
 - 社区任务 API 的 Supabase 持久化实现。
 - 实时推送、跨云签名/受众校验、限流和可信执行器。
@@ -30,7 +32,8 @@
 - 发现公共场景不等于自动拥有消息读取、工具调用或私有记忆权限。
 - 社区消息与私有记忆严格分离；本 API 不提供私有记忆读写。
 - Edge Function 使用 service-role 访问数据库，因此所有者、成员资格、能力、状态和有效期检查必须在服务端每个受保护操作中执行。
-- 私人邀请兑换在原子单次消费 RPC 完成并测试前保持关闭。
+- 私人邀请只能绑定到指定用户账号；发现邀请不授予访问权，兑换成功后才创建成员资格。
+- 邀请签发/兑换 RPC 只授予 `service_role` 执行权限；不得把原始邀请 token 写入日志或数据库。
 
 ## 本地参考实现测试
 
