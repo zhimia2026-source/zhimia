@@ -12,6 +12,21 @@
 6. [健康生活顾问智能人部署与验收记录](HEALTH_ADVISOR_DEPLOYMENT.md) — Supabase 迁移、Edge Function、已知限制和上线门禁。
 7. [智能人生命体设计原则与工程规范 V1.0](agent-standard/intelligent-person-lifeform-design-principles-v1.0.md) — 身份、记忆、决策、自主权、进化治理与验收原则。\n8. [智能人部署验收总表](agent-standard/deployment-acceptance-registry.md) — 按智能人登记测试证据、阻塞项、版本和发布决定。\n9. [项目总览 README](../README.md) — 产品原则、开发顺序、本地 MVP 定位及安全提醒。
 
+## 功能分支中的扩展提案
+
+- [聊天主入口接入契约](CHAT_ADAPTER_CONTRACT.md) — 独立身份、聊天/历史/关心状态权限与验收清单；尚未完成前后端集成。
+- [聊天接入部署审计补充](CHAT_DEPLOYMENT_AUDIT.md) — 基于当前 Supabase 部署元数据、表结构和上传聊天源码的现状审计；旧聊天 Core 归并和端到端测试仍未完成。
+- [单一 Supabase 项目部署与数据归并方案](SUPABASE_SINGLE_PROJECT_PLAN.md) — 统一使用 `lvxmygrgqtmzqgailmyl`，定义旧聊天数据库、函数、身份映射、数据迁移、验收与回滚步骤。
+- [智能社区核心数据模型草案](COMMUNITY_SCHEMA_DESIGN.md) — Agent、场景、成员关系、会话、消息与环境事件的最小模型和安全不变量；仅为设计草案，尚未部署。
+- [智能社区数据库迁移草案](../supabase/migrations/20261028140000_zhi_community_core.sql) — 8 张社区核心表、约束、索引、RLS 与服务端专用 grants；已提交功能分支，**未应用到 Supabase**，需先在隔离环境验证并审查 API 授权。
+- [智能社区 Edge Function](../supabase/functions/zhi-community/index.ts) — 使用现有个人访问令牌的 SHA-256 哈希进行服务端认证；当前实现公共场景发现/创建/加入及成员消息读写。私人邀请兑换与审批流程明确拒绝，尚未部署或端到端测试；部署时须确认 Supabase Gateway 不会把自定义个人令牌误当作 Supabase Auth JWT。
+- [旧跨项目身份断言桥接契约](IDENTITY_ASSERTION_BRIDGE.md) — 已被单一 Supabase 项目架构取代，仅保留为历史设计记录，不作为目标实现方案。
+- [关心机制规范 V1.0](CARE_MECHANISM.md) — 跨本体认知—价值—行动机制；当前为实现草案，须经评审和测试后才能纳入稳定基准。
+- [关心机制参考实现](../zhi_care.py) 与 [单元测试](../tests/test_care.py)。
+- [关心机制 SQLite 持久化适配器](../zhi_care_repository.py) 与 [持久化/隔离测试](../tests/test_care_repository.py)。
+- [关心机制 Supabase API](CARE_API.md)、[数据库迁移](../supabase/migrations/20261028120000_zhi_care_states.sql)、[Edge Function](../supabase/functions/zhi-care/index.ts) 与 [真实 API 冒烟测试脚本](../scripts/smoke_test_zhi_care.py)。Supabase 端已部署参考 API，但尚未通过端到端验收。
+
+
 ## 不可变设计原则
 
 - **统一协议，不统一部署。** 各参与方保留自己的模型、数据库、私有记忆和运行环境。
