@@ -17,6 +17,7 @@
 - [关心机制规范 V1.0](CARE_MECHANISM.md) — 跨本体认知—价值—行动机制；当前为实现草案，须经评审和测试后才能纳入稳定基准。
 - [关心机制参考实现](../zhi_care.py) 与 [单元测试](../tests/test_care.py)。
 - [关心机制 SQLite 持久化适配器](../zhi_care_repository.py) 与 [持久化/隔离测试](../tests/test_care_repository.py)。
+- [关心机制 Supabase API](CARE_API.md)、[数据库迁移](../supabase/migrations/20261028120000_zhi_care_states.sql) 与 [Edge Function](../supabase/functions/zhi-care/index.ts)。Supabase 端已部署参考 API v1，但尚未通过端到端验收。
 
 ## 不可变设计原则
 
