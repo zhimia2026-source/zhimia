@@ -1,6 +1,6 @@
 # ZHI Care API（Supabase Edge Function）
 
-状态：**已部署 Edge Function v4；监督审批票据已落库，但尚未接入现有聊天 UI，尚未完成端到端验收。**
+状态：**已部署 Edge Function v5；监督审批票据已落库，但尚未接入现有聊天 UI，尚未完成端到端验收。**
 
 入口函数：`zhi-care`。它要求有效 Supabase JWT，并在服务端调用 Auth `getUser(token)` 确认实际用户。请求体中的 `user_id` 会被忽略；数据范围始终由已验证用户的 `user.id` 确定。
 
@@ -109,7 +109,7 @@
 ## 已验证与待验证
 
 - 已验证：迁移已应用；两张表存在且启用 RLS；`anon` 与 `authenticated` 没有 SELECT 权限；`service_role` 有服务端访问权限；没有添加宽泛客户端策略。
-- 已部署：Edge Function `zhi-care` v4，`verify_jwt=true`。
+- 已部署：Edge Function `zhi-care` v5，`verify_jwt=true`。
 - 已验证：审批票据表存在；transition RPC 仅保留带 `ticket_id` 的签名；只有 `service_role` 可执行，`anon` 与 `authenticated` 无执行权限。
 - 已新增 `scripts/smoke_test_zhi_care.py`，用于真实 API 冒烟测试：create/list/get/add_evidence/transition、重复 ID 冲突、监督执行门禁；设置第二个用户令牌后还会测试跨账号隔离。
 - 待验证：实际运行真实 token 冒烟测试、票据过期/重放/并发测试、跨账号隔离、聊天 UI 接入。未完成这些步骤前，不视为生产验收通过。
