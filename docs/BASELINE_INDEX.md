@@ -14,8 +14,9 @@
 
 ## 功能分支中的扩展提案
 
-- [关心机制规范 V1.0](CARE_MECHANISM.md) — 将关心定义为跨本体认知—价值—行动机制；当前为实现草案，须经评审和测试后才能纳入稳定基准。
-- [关心机制参考实现](../zhi_care.py) 与 [单元测试](../tests/test_care.py) — 本地 Python 参考模块，不是生产部署证明。
+- [关心机制规范 V1.0](CARE_MECHANISM.md) — 跨本体认知—价值—行动机制；当前为实现草案，须经评审和测试后才能纳入稳定基准。
+- [关心机制参考实现](../zhi_care.py) 与 [单元测试](../tests/test_care.py)。
+- [关心机制 SQLite 持久化适配器](../zhi_care_repository.py) 与 [持久化/隔离测试](../tests/test_care_repository.py)。
 
 ## 不可变设计原则
 
