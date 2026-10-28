@@ -153,12 +153,25 @@ Deno.serve(async (req: Request) => {
       }
       if (world.entry_policy !== "open") return json({ error: "forbidden" }, 403);
 
-      const { error: membershipError } = await db.from("zhi_world_memberships").upsert({
-        world_id: sceneId, principal_user_id: actor.userId, agent_id: null,
-        membership_role: "member", status: "active", capabilities: ["message:send", "message:read"],
-        joined_at: new Date().toISOString(),
-      }, { onConflict: "world_id,principal_user_id,agent_id", ignoreDuplicates: true });
-      if (membershipError) throw new Error("database_error");
+      const { data: existingMembership, error: existingError } = await db.from("zhi_world_memberships")
+        .select("id,status").eq("world_id", sceneId).eq("principal_user_id", actor.userId)
+        .is("agent_id", null).maybeSingle();
+      if (existingError) throw new Error("database_error");
+      if (existingMembership?.status === "active") return json({ scene_id: sceneId, membership: "active" });
+      if (existingMembership) {
+        const { error: restoreError } = await db.from("zhi_world_memberships").update({
+          status: "active", revoked_at: null, expires_at: null,
+          capabilities: ["message:send", "message:read"], joined_at: new Date().toISOString(),
+        }).eq("id", existingMembership.id);
+        if (restoreError) throw new Error("database_error");
+      } else {
+        const { error: membershipError } = await db.from("zhi_world_memberships").insert({
+          world_id: sceneId, principal_user_id: actor.userId, agent_id: null,
+          membership_role: "member", status: "active", capabilities: ["message:send", "message:read"],
+          joined_at: new Date().toISOString(),
+        });
+        if (membershipError) throw new Error("database_error");
+      }
       return json({ scene_id: sceneId, membership: "active" });
     }
 
@@ -214,12 +227,27 @@ Deno.serve(async (req: Request) => {
       }
       const requestId = req.headers.get("idempotency-key")?.trim();
       if (!requestId || requestId.length > 200) return json({ error: "invalid_argument", detail: "idempotency_key_required" }, 400);
+      const requestHash = await sha256(actor.userId + ":" + conversation.id + ":" + requestId);
+      const requestUuid = requestHash.slice(0, 8) + "-" + requestHash.slice(8, 12) + "-4" +
+        requestHash.slice(13, 16) + "-a" + requestHash.slice(17, 20) + "-" + requestHash.slice(20, 32);
+      const { data: existingMessage, error: existingMessageError } = await db.from("zhi_world_messages")
+        .select("id,conversation_id,sender_user_id,message_kind,payload,created_at")
+        .eq("conversation_id", conversation.id).eq("sender_user_id", actor.userId)
+        .eq("request_id", requestUuid).maybeSingle();
+      if (existingMessageError) throw new Error("database_error");
+      if (existingMessage) {
+        if (existingMessage.payload?.body !== body.body.trim()) return json({ error: "conflict", detail: "idempotency_key_payload_mismatch" }, 409);
+        return json({ message: existingMessage, idempotent_replay: true }, 200);
+      }
       const { data: message, error: messageError } = await db.from("zhi_world_messages").insert({
         conversation_id: conversation.id, sender_user_id: actor.userId, sender_agent_id: null,
-        request_id: crypto.randomUUID(), message_kind: "text", payload: { body: body.body.trim(), client_request_id: requestId },
+        request_id: requestUuid, message_kind: "text", payload: { body: body.body.trim() },
       }).select("id,conversation_id,sender_user_id,message_kind,payload,created_at").single();
-      if (messageError || !message) throw new Error("database_error");
-      return json({ message }, 201);
+      if (messageError || !message) {
+        if (messageError?.code === "23505") return json({ error: "conflict", detail: "idempotency_race_retry" }, 409);
+        throw new Error("database_error");
+      }
+      return json({ message, idempotent_replay: false }, 201);
     }
 
     return json({ error: "not_found" }, 404);
