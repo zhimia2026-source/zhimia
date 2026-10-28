@@ -19,7 +19,7 @@ class CareRepositoryTests(unittest.TestCase):
     def setUp(self):
         self.repo = CareRepository()
         self.care = sample_care()
-        self.repo.create(self.care)
+        self.repo.create("agent:owner", self.care)
 
     def tearDown(self):
         self.repo.close()
@@ -30,6 +30,12 @@ class CareRepositoryTests(unittest.TestCase):
         self.assertEqual(loaded.status, CareStatus.DISCOVERED)
         self.assertEqual(loaded.access_policy, "private")
         self.assertEqual(loaded.care_focus, ("stated_need", "continuity"))
+
+    def test_create_requires_matching_owner(self):
+        with self.assertRaises(CareAccessError):
+            self.repo.create("agent:intruder", sample_care("care:forged:001"))
+        with self.assertRaises(CareNotFound):
+            self.repo.get("agent:intruder", "care:forged:001")
 
     def test_private_record_is_not_discoverable_by_another_owner(self):
         with self.assertRaises(CareNotFound):
@@ -73,7 +79,7 @@ class CareRepositoryTests(unittest.TestCase):
 
     def test_duplicate_care_id_rejected(self):
         with self.assertRaisesRegex(ValueError, "care_id_already_exists"):
-            self.repo.create(sample_care())
+            self.repo.create("agent:owner", sample_care())
 
     def test_persistence_survives_repository_reopen(self):
         self.repo.close()
@@ -81,7 +87,7 @@ class CareRepositoryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = os.path.join(directory, "care.sqlite3")
             first = CareRepository(path)
-            first.create(sample_care("care:disk:001"))
+            first.create("agent:owner", sample_care("care:disk:001"))
             first.close()
             second = CareRepository(path)
             try:
