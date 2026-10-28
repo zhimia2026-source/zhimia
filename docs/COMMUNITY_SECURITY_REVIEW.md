@@ -17,12 +17,12 @@ This review records source-level findings and release gates. It does not certify
 
 ## Required before production
 
-1. **Token revocation race:** code fix committed in `e633363aaadcf1b7b03fd2d958daf947d50d3b45`; the authentication path now uses `auth_helpers.ts` to accept only a successful conditional update that returns a row. Regression cases were added in `auth_helpers_test.ts` for success, no matching row, database error, and mixed data/error. The current workflow has not yet been updated to execute this test file, and the latest head has no reported workflow run/status; this gate remains open.
+1. **Token revocation race:** code fix committed in `e633363aaadcf1b7b03fd2d958daf947d50d3b45`; the authentication path now uses `auth_helpers.ts` to accept only a successful conditional update that returns a row. Regression cases were added in `auth_helpers_test.ts` for success, no matching row, database error, and mixed data/error. The GitHub Actions workflow now runs `deno test supabase/functions/zhi-community/auth_helpers_test.ts`; execution must still be confirmed on the latest head.
 2. **Cross-account isolation:** prove that account A cannot read account B's private conversation, redeem an invitation targeted to B, or use a revoked/expired token.
 3. **Idempotency concurrency:** simultaneous duplicate requests may receive a conflict rather than a replay response. Confirm client retry behavior and add a concurrency test.
 4. **Deployment settings:** verify `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ZHI_ALLOWED_ORIGINS`, and the Edge Function gateway JWT setting. If gateway JWT verification is disabled for the custom ZHI token, the function's own token validation must remain mandatory.
 5. **Migration and rollback:** review and back up the target project before applying the migration; run smoke tests before any traffic cutover.
-6. **Latest CI:** verify CI for the latest branch head, not only earlier commits. At review time, the connector reported no workflow runs and no status checks for the latest auth-helper integration commit.
+6. **Latest CI:** verify CI for the latest branch head, not only earlier commits. The token-auth regression test is now included in the workflow; a green run for the current head remains required.
 
 ## Release gate
 
