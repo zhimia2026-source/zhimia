@@ -128,8 +128,10 @@ class CareRepository:
         care.assert_access(actor_ref)
         if care.access_policy != "private":
             raise CareError("care_records_must_be_private")
-        if not isinstance(expected_revision, int) or expected_revision < 1:
+        if not isinstance(expected_revision, int) or isinstance(expected_revision, bool) or expected_revision < 1:
             raise CareError("invalid_expected_revision")
+        if care.revision <= expected_revision:
+            raise CareError("revision_must_advance")
         encoded = self._encode(care)
         with self.db:
             result = self.db.execute(
