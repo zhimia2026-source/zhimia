@@ -17,7 +17,7 @@ This review records source-level findings and release gates. It does not certify
 
 ## Required before production
 
-1. **Token revocation race:** after looking up a token, the conditional `last_used_at` update must filter `revoked_at IS NULL`, return the affected row, and reject authentication on error or no matching row. Add a regression test and verify the exact committed diff.
+1. **Token revocation race:** code fix committed in `e633363aaadcf1b7b03fd2d958daf947d50d3b45`: the conditional `last_used_at` update filters `revoked_at IS NULL`, selects the affected row, and rejects authentication on error or no matching row. Still required: a regression test and a green CI run for the latest branch head.
 2. **Cross-account isolation:** prove that account A cannot read account B's private conversation, redeem an invitation targeted to B, or use a revoked/expired token.
 3. **Idempotency concurrency:** simultaneous duplicate requests may receive a conflict rather than a replay response. Confirm client retry behavior and add a concurrency test.
 4. **Deployment settings:** verify `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ZHI_ALLOWED_ORIGINS`, and the Edge Function gateway JWT setting. If gateway JWT verification is disabled for the custom ZHI token, the function's own token validation must remain mandatory.
