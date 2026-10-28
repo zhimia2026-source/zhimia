@@ -15,6 +15,7 @@
 ## 功能分支中的扩展提案
 
 - [聊天主入口接入契约](CHAT_ADAPTER_CONTRACT.md) — 独立身份、跨项目授权桥接、聊天/历史/关心状态权限与验收清单；尚未完成前后端集成。
+- [聊天接入部署审计补充](CHAT_DEPLOYMENT_AUDIT.md) — 基于当前 Supabase 部署元数据、表结构和上传聊天源码的现状审计；桥接和端到端测试仍未完成。
 - [关心机制规范 V1.0](CARE_MECHANISM.md) — 跨本体认知—价值—行动机制；当前为实现草案，须经评审和测试后才能纳入稳定基准。
 - [关心机制参考实现](../zhi_care.py) 与 [单元测试](../tests/test_care.py)。
 - [关心机制 SQLite 持久化适配器](../zhi_care_repository.py) 与 [持久化/隔离测试](../tests/test_care_repository.py)。
