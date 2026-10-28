@@ -203,14 +203,17 @@ Deno.serve(async (req: Request) => {
       if (world.entry_policy !== "open") return reply({ error: "forbidden" }, 403);
 
       const { data: existingMembership, error: existingError } = await db.from("zhi_world_memberships")
-        .select("id,status,expires_at").eq("world_id", sceneId).eq("principal_user_id", actor.userId)
+        .select("id,status,expires_at,membership_role,capabilities").eq("world_id", sceneId).eq("principal_user_id", actor.userId)
         .is("agent_id", null).maybeSingle();
       if (existingError) throw new Error("database_error");
       if (existingMembership?.status === "active" && (!existingMembership.expires_at || Date.parse(existingMembership.expires_at) > Date.now())) return reply({ scene_id: sceneId, membership: "active" });
       if (existingMembership) {
         const { error: restoreError } = await db.from("zhi_world_memberships").update({
           status: "active", revoked_at: null, expires_at: null,
-          capabilities: ["message:send", "message:read"], joined_at: new Date().toISOString(),
+          capabilities: existingMembership.membership_role === "owner" || existingMembership.membership_role === "moderator"
+            ? existingMembership.capabilities
+            : ["message:send", "message:read"],
+          joined_at: new Date().toISOString(),
         }).eq("id", existingMembership.id);
         if (restoreError) throw new Error("database_error");
       } else {
