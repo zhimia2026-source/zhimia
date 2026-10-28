@@ -18,7 +18,7 @@
 - [任务执行与可信回执协议](docs/TASK_EXECUTION_PROTOCOL.md)
 - [智能社区 MVP 实现契约](docs/COMMUNITY_MVP.md)
 - [聊天主入口接入契约](docs/CHAT_ADAPTER_CONTRACT.md)
-- [聊天接入部署审计补充](docs/CHAT_DEPLOYMENT_AUDIT.md)
+- [聊天接入部署审计补充](docs/CHAT_DEPLOYMENT_AUDIT.md)\n- [单一 Supabase 项目部署与数据归并方案](docs/SUPABASE_SINGLE_PROJECT_PLAN.md)
 - [关心机制规范 V1.0（实现草案）](docs/CARE_MECHANISM.md)
 - [关心机制 Supabase API](docs/CARE_API.md)
 - [真实 API 冒烟测试脚本](scripts/smoke_test_zhi_care.py)
@@ -32,8 +32,8 @@
 ## 现有资产复用
 优先评估 agent-talk.html、必要时的 mia-chat.html，以及 zhi-agent-chat-history、zhi-agent-chat-feed 等已有聊天能力。上传压缩包中的聊天页面仍使用共享页面密码认证，并包含全体广播和管理型主动消息轮询；不能未经改造直接接入独立身份体系。自主聊天和广播功能须先完成权限、预算、循环触发与审计检查，不应未经审计直接启用。
 
-## 身份接入当前状态
-当前 Supabase 已有个人令牌、续签凭证和令牌管理 Edge Functions；但它们目前主要服务健康顾问流程。旧聊天源码仍采用共享管理员认证。跨项目身份断言交换、聊天资源级授权与端到端隔离测试尚未完成。详见 [聊天接入部署审计补充](docs/CHAT_DEPLOYMENT_AUDIT.md)。
+## 数据库统一部署原则\nZHI 全部数据库、认证、Edge Functions、Storage 与 Realtime 统一使用 `https://lvxmygrgqtmzqgailmyl.supabase.co`。旧聊天源码原先指向其他项目，因此仍需按单项目归并方案迁移表、函数、数据和客户端配置；不能只改 URL，也不能在迁移验收前切换生产流量。\n\n## 身份接入当前状态
+当前 Supabase 已有个人令牌、续签凭证和令牌管理 Edge Functions；但它们目前主要服务健康顾问流程。旧聊天源码仍采用共享管理员认证。旧聊天 Core 归并、聊天资源级授权与端到端隔离测试尚未完成。跨项目身份断言桥接不再是目标方案。详见 [单一 Supabase 项目部署与数据归并方案](docs/SUPABASE_SINGLE_PROJECT_PLAN.md)。
 
 ## 标准接口原则
 - 统一 Agent Manifest、World Manifest、消息信封和版本协商。
