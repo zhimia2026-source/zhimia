@@ -22,7 +22,8 @@ class CareRepositoryTests(unittest.TestCase):
         self.repo.create("agent:owner", self.care)
 
     def tearDown(self):
-        self.repo.close()
+        if self.repo is not None:
+            self.repo.close()
 
     def test_create_and_load_round_trip(self):
         loaded = self.repo.get("agent:owner", self.care.care_id)
