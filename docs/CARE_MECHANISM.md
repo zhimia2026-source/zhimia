@@ -26,12 +26,9 @@ Care 是跨本体认知机制，第一阶段通过新增的 CareState 关联现�
 
 ## 3. 状态机
 
-状态：
-discovered、understanding、goal_set、action_review、in_progress、feedback_review、waiting_for_response、paused、conflict、resolved、terminated。
+状态：discovered、understanding、goal_set、action_review、in_progress、feedback_review、waiting_for_response、paused、conflict、resolved、terminated。
 
-关键规则：
-
-1. 所有状态转换必须由已认证的主体在服务端授权后执行；当前参考模块仅做应用层主体匹配。
+1. 所有状态转换必须由已认证主体在服务端授权后执行；参考模块只做应用层主体匹配。
 2. 进入 in_progress 必须显式通过权限、能力和风险检查；缺少任一项都拒绝执行。
 3. resolved 与 terminated 是终态；需要重新关心时创建新的 CareState，并通过关系引用历史，不复活旧状态。
 4. 新证据不得仅因时间较新而自动覆盖旧记录；冲突须保留并进入复核。
@@ -40,22 +37,19 @@ discovered、understanding、goal_set、action_review、in_progress、feedback_r
 
 ## 4. 证据与时间
 
-每条证据保留引用和认知状态：observed、reported、verified、inferred、hypothesis、unknown、conflicted。证据内容与敏感原文应存放在受保护的数据层，不应因为本模块引用证据就复制全部内容。
+每条证据保留引用和认知状态：observed、reported、verified、inferred、hypothesis、unknown、conflicted。敏感原文存放在受保护的数据层，不应因为引用证据就复制全部内容。事件时间、观测时间、记录时间和有效时间不可混用。未知时间允许为空；对内心状态的推断必须明确标记为推断。
 
-事件时间、观测时间、记录时间和有效时间不可混用。未知时间允许为空。推断对方内心状态时必须明确标注为推断，不得记录成直接观察事实。
-
-## 5. 私有隔离与授权
+## 5. 私有隔离、持久化与授权
 
 - CareState 默认且强制 access_policy=private。
-- 本地对象的 assert_access 仅是应用层防线，不构成生产安全保证。
-- 生产环境必须由服务端认证上下文确定主体，并通过数据库 RLS / 服务端授权控制读取、写入和跨 Agent 引用。
-- 不得信任客户端提交的 subject_ref、actor_id 或权限声明。
+- zhi_care_repository.py 是本地 SQLite 持久化适配器，支持按 owner 查询、序列化、重启恢复和基于 revision 的乐观并发冲突检测。
+- Repository 查询通过 owner_subject 过滤，未授权调用者看不到其他 owner 的记录元数据；此约束只在应用层有效。
+- 生产环境必须由服务端认证上下文确定主体，并通过数据库 RLS / 服务端授权控制读取、写入和跨 Agent 引用。不得信任客户端提交的 subject_ref、actor_id 或权限声明。
+- SQLite 文件本身未加密。任何可直接读取文件的人都可能读取数据；不要将本地适配器误认为生产隔离。
 - 关心记录不自动授予读取目标的私有记忆、调用工具、代表目标作决定或访问其他世界的权限。
 - 访问拒绝、状态转换、审批和回滚应写入独立审计轨迹；生产审计不得由普通用户自行篡改。
 
 ## 6. 认知闭环
-
-建议接入 ZHI 统一认知循环：
 
 感知与理解 → 对象识别 → 记忆关联 → 内部状态更新 → 形成假设与目标 → 行动选择 → 授权检查 → 执行并观察 → 反馈比较 → 学习与整合 → 回归验证。
 
@@ -73,9 +67,11 @@ discovered、understanding、goal_set、action_review、in_progress、feedback_r
 - CARE-08 学习可验证性：后续任务改善可重复测量。
 - CARE-09 隐私隔离：未授权主体无法读取或修改私有数据。
 - CARE-10 版本与回滚：重要变化可比较、审计并在适用时恢复。
+- CARE-11 持久化恢复：关闭并重开数据库后状态、证据和历史保持一致。
+- CARE-12 并发写入：过期 revision 不得覆盖较新的已保存状态。
 
 ## 8. 实施状态与限制
 
-zhi_care.py 是 Python 标准库参考模块；tests/test_care.py 是拟运行的回归测试。此阶段未接入现有聊天 UI、Supabase、生产记忆存储或真实外部工具。不能仅因文件已提交就声称端到端功能已经部署或安全验收完成。
+已提交参考代码：zhi_care.py、zhi_care_repository.py；测试文件：tests/test_care.py、tests/test_care_repository.py。文件已提交不等于测试已通过。本阶段尚未接入现有聊天 UI、Supabase、生产记忆存储或真实外部工具，也未证明生产级私有隔离。
 
-下一步：在本地运行完整单元测试；评审状态机与权限边界；再通过适配层接入现有聊天流程；最后针对真实持久化层实现私有隔离、审计和端到端测试。
+下一步：运行全套单元测试；评审状态机与权限边界；再通过适配层接入现有聊天流程；最后针对真实持久化层实现 RLS、服务端身份绑定、审计和端到端测试。
