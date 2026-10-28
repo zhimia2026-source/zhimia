@@ -128,6 +128,64 @@ create table if not exists public.zhi_world_events (
 create index if not exists zhi_world_events_schedule_idx
   on public.zhi_world_events (world_id, scheduled_at) where status = 'scheduled';
 
+-- Atomically create a scene and its owner membership. This function is intentionally
+-- SECURITY INVOKER; only service_role receives EXECUTE and table privileges.
+create or replace function public.zhi_create_world_with_owner(
+  p_creator_user_id uuid,
+  p_name text,
+  p_description text,
+  p_visibility text,
+  p_entry_policy text
+) returns jsonb
+language plpgsql
+security invoker
+set search_path = pg_catalog, public
+as $
+declare
+  v_world public.zhi_worlds%rowtype;
+begin
+  if p_creator_user_id is null
+     or p_name is null or char_length(btrim(p_name)) not between 1 and 160
+     or p_visibility not in ('public', 'private')
+     or (p_description is not null and char_length(p_description) > 4000)
+     or (p_visibility = 'public' and p_entry_policy <> 'open')
+     or (p_visibility = 'private' and p_entry_policy <> 'invite_only') then
+    raise exception 'invalid_scene_arguments' using errcode = '22023';
+  end if;
+
+  insert into public.zhi_worlds (
+    creator_user_id, name, description, visibility, entry_policy, status
+  ) values (
+    p_creator_user_id, btrim(p_name), coalesce(p_description, ''),
+    p_visibility, p_entry_policy, 'open'
+  ) returning * into v_world;
+
+  insert into public.zhi_world_memberships (
+    world_id, principal_user_id, agent_id, membership_role, status, capabilities
+  ) values (
+    v_world.id, p_creator_user_id, null, 'owner', 'active',
+    array['scene:manage', 'message:send', 'message:read']::text[]
+  );
+
+  return jsonb_build_object(
+    'scene', jsonb_build_object(
+      'id', v_world.id,
+      'name', v_world.name,
+      'description', v_world.description,
+      'visibility', v_world.visibility,
+      'entry_policy', v_world.entry_policy,
+      'status', v_world.status,
+      'rules_version', v_world.rules_version,
+      'created_at', v_world.created_at
+    ),
+    'membership', 'owner'
+  );
+end;
+$;
+
+revoke all on function public.zhi_create_world_with_owner(uuid, text, text, text, text) from public, anon, authenticated;
+grant execute on function public.zhi_create_world_with_owner(uuid, text, text, text, text) to service_role;
+
 -- Defense in depth: RLS is enabled; browser roles have no direct privileges.
 -- Edge Functions must validate the bearer identity, ownership, membership,
 -- conversation membership, capabilities, status, expiry and request_id each time.
