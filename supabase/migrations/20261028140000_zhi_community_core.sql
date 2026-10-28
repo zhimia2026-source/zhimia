@@ -140,7 +140,7 @@ create or replace function public.zhi_create_world_with_owner(
 language plpgsql
 security invoker
 set search_path = pg_catalog, public
-as $
+as $zhi_create_world_with_owner$
 declare
   v_world public.zhi_worlds%rowtype;
 begin
@@ -181,7 +181,7 @@ begin
     'membership', 'owner'
   );
 end;
-$;
+$zhi_create_world_with_owner$;
 
 revoke all on function public.zhi_create_world_with_owner(uuid, text, text, text, text) from public, anon, authenticated;
 grant execute on function public.zhi_create_world_with_owner(uuid, text, text, text, text) to service_role;
