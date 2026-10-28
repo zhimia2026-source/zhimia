@@ -189,6 +189,25 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'invitation was not marked consumed';
   END IF;
+
+  -- An expired invitation must never create or restore membership.
+  INSERT INTO public.zhi_world_invitations (
+    world_id, created_by_user_id, target_user_id, token_hash, expires_at
+  ) VALUES (
+    v_scene_id,
+    '11111111-1111-4111-8111-111111111111',
+    '22222222-2222-4222-8222-222222222222',
+    repeat('b', 64),
+    now() - interval '1 minute'
+  );
+
+  BEGIN
+    PERFORM public.zhi_redeem_world_invitation(repeat('b', 64), '22222222-2222-4222-8222-222222222222');
+    RAISE EXCEPTION 'expired invitation was accepted';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM = 'expired invitation was accepted' THEN RAISE; END IF;
+    IF SQLERRM <> 'invitation_unavailable' THEN RAISE; END IF;
+  END;
 END;
 $$;
 
