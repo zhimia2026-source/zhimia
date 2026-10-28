@@ -14,10 +14,11 @@
 
 ## 功能分支中的扩展提案
 
+- [聊天主入口接入契约](CHAT_ADAPTER_CONTRACT.md) — 独立身份、跨项目授权桥接、聊天/历史/关心状态权限与验收清单；尚未完成前后端集成。
 - [关心机制规范 V1.0](CARE_MECHANISM.md) — 跨本体认知—价值—行动机制；当前为实现草案，须经评审和测试后才能纳入稳定基准。
 - [关心机制参考实现](../zhi_care.py) 与 [单元测试](../tests/test_care.py)。
 - [关心机制 SQLite 持久化适配器](../zhi_care_repository.py) 与 [持久化/隔离测试](../tests/test_care_repository.py)。
-- [关心机制 Supabase API](CARE_API.md)、[数据库迁移](../supabase/migrations/20261028120000_zhi_care_states.sql)、[Edge Function](../supabase/functions/zhi-care/index.ts) 与 [真实 API 冒烟测试脚本](../scripts/smoke_test_zhi_care.py)。Supabase 端已部署参考 API v2，但尚未通过端到端验收。
+- [关心机制 Supabase API](CARE_API.md)、[数据库迁移](../supabase/migrations/20261028120000_zhi_care_states.sql)、[Edge Function](../supabase/functions/zhi-care/index.ts) 与 [真实 API 冒烟测试脚本](../scripts/smoke_test_zhi_care.py)。Supabase 端已部署参考 API，但尚未通过端到端验收。
 
 ## 不可变设计原则
 
