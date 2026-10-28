@@ -133,6 +133,36 @@ Deno.serve(async (req: Request) => {
     return json({ items: data ?? [] }, 200, cors);
   }
 
+  if (action === "request_approval") {
+    if (!validText(body.care_id)) return json({ error: "care_id_required" }, 400, cors);
+    const { data: care, error } = await db.from("zhi_care_states").select("care_id,state,revision").eq("user_id", user.id).eq("care_id", body.care_id).maybeSingle();
+    if (error) return json({ error: "care_read_failed" }, 503, cors);
+    if (!care) return json({ error: "care_not_found" }, 404, cors);
+    if (care.state !== "action_review") return json({ error: "care_not_ready_for_approval" }, 409, cors);
+    const { data: ticket, error: ticketError } = await db.from("zhi_care_approval_tickets").insert({
+      user_id: user.id, care_id: care.care_id, expected_revision: care.revision,
+      action_scope: "transition:in_progress", status: "pending",
+      expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+    }).select("ticket_id,care_id,expected_revision,action_scope,status,expires_at").single();
+    if (ticketError || !ticket) return json({ error: "approval_ticket_create_failed" }, 503, cors);
+    return json({ ticket }, 201, cors);
+  }
+  if (action === "approve_action") {
+    if (!validText(body.ticket_id, 80)) return json({ error: "ticket_id_required" }, 400, cors);
+    const { data: ticket, error } = await db.from("zhi_care_approval_tickets").select("ticket_id,care_id,expected_revision,action_scope,status,expires_at").eq("user_id", user.id).eq("ticket_id", body.ticket_id).maybeSingle();
+    if (error) return json({ error: "approval_ticket_read_failed" }, 503, cors);
+    if (!ticket) return json({ error: "approval_ticket_not_found" }, 404, cors);
+    if (ticket.status !== "pending") return json({ error: "approval_ticket_not_pending" }, 409, cors);
+    if (Date.parse(ticket.expires_at) <= Date.now()) {
+      await db.from("zhi_care_approval_tickets").update({ status: "expired" }).eq("user_id", user.id).eq("ticket_id", ticket.ticket_id).eq("status", "pending");
+      return json({ error: "approval_ticket_expired" }, 409, cors);
+    }
+    const { data: approved, error: approveError } = await db.from("zhi_care_approval_tickets").update({ status: "approved", approved_by: user.id, approved_at: new Date().toISOString() }).eq("user_id", user.id).eq("ticket_id", ticket.ticket_id).eq("status", "pending").select("ticket_id,care_id,expected_revision,action_scope,status,expires_at,approved_at").maybeSingle();
+    if (approveError) return json({ error: "approval_ticket_approve_failed" }, 503, cors);
+    if (!approved) return json({ error: "approval_ticket_race_conflict" }, 409, cors);
+    return json({ ticket: approved }, 200, cors);
+  }
+
   if (action === "get" || action === "transition" || action === "add_evidence") {
     if (!validText(body.care_id)) return json({ error: "care_id_required" }, 400, cors);
     const { data: row, error: lookupError } = await db.from("zhi_care_states")
@@ -153,13 +183,12 @@ Deno.serve(async (req: Request) => {
       const next = body.to_state as Status;
       if (TERMINAL.has(row.state as Status)) return json({ error: "care_state_terminal" }, 409, cors);
       if (!(ALLOWED[row.state as Status] ?? []).includes(next)) return json({ error: "invalid_state_transition" }, 409, cors);
-      // A client-supplied approval flag is not an authorization artifact. Until a server-side
-      // approval-ticket integration exists, no API call may start an action.
-      if (next === "in_progress") return json({ error: "supervised_action_gate_not_integrated" }, 403, cors);
       if (!validText(body.reason_code, 120)) return json({ error: "reason_code_required" }, 400, cors);
+      if (next === "in_progress" && !validText(body.ticket_id, 80)) return json({ error: "approved_ticket_required" }, 403, cors);
       const { data: updated, error: updateError } = await db.rpc("zhi_care_transition_atomic", {
         p_user_id: user.id, p_care_id: row.care_id, p_expected_revision: row.revision,
         p_from_state: row.state, p_to_state: next, p_reason_code: body.reason_code,
+        p_ticket_id: next === "in_progress" ? body.ticket_id : null,
       });
       if (updateError) return json({ error: "care_transition_failed" }, 503, cors);
       if (!updated) return json({ error: "care_revision_conflict" }, 409, cors);
