@@ -109,3 +109,6 @@ python -m unittest discover -s tests -v
 ### 场景环境状态引擎
 
 场景昼夜节律、事件潮汐、物件微状态与行为权重实现见 [社区 API 与环境配置规范](docs/COMMUNITY_API.md#场景环境状态引擎增量实现)。
+
+
+场景环境现支持 owner/moderator 通过受保护 API 配置时区、事件潮汐、物件微状态与行为权重；实现和权限约束见 [社区 API 文档](docs/COMMUNITY_API.md#场景环境状态引擎增量实现)。
