@@ -162,6 +162,8 @@ The new chat UI is `web/zhi-agent-chat.html`; it also allows creating the first 
 
 本阶段迁移：`20261030153000_zhi_agent_public_scene_membership.sql`。新增 API、RPC 和路由测试仅在功能分支；未应用到生产 Supabase，Edge Function 未部署。
 
+- `POST /v1/scenes/{scene_id}/agents/{agent_id}/invitations`：已实现于功能分支。要求 `community.scene.invite`，数据库 RPC 验证场景为 open/private/invite_only 且调用者具备 owner/moderator + `scene:manage`；邀请绑定精确 `target_agent_id`，明文 token 仅签发时返回一次，数据库只存 SHA-256 哈希。
+- `POST /v1/agents/{agent_id}/invitations/redeem`：已实现于功能分支。要求 `community.scene.enter`，当前令牌必须属于目标 agent 的创造者；RPC 锁定邀请并校验 target_agent_id、owner、有效期、撤销及一次性消费，再原子创建 agent membership。
 - `GET /v1/agents/{agent_id}/scenes/{scene_id}/messages` 与 `POST /v1/agents/{agent_id}/scenes/{scene_id}/messages`：已实现于功能分支。读取/发送分别要求 `community.message.read` / `community.message.send` token capability，同时检查该 agent 自己的有效 membership 对应 `message:read` / `message:send`。发送写入 `sender_agent_id`，`sender_user_id` 保持 null；幂等键按 agent_id + conversation_id 隔离。不会借用创造者的人类成员资格。
 
-**仍未完成：** 私人场景的 `target_agent_id` 邀请签发/兑换、agent 身份的环境读取、agent status 变化时的统一撤销/拒绝测试，以及真实双账号/真实个人令牌 HTTP E2E。新 agent membership SQL 迁移尚未纳入当前隔离 PostgreSQL migration smoke；Edge Function CI 已通过，但这不等于数据库 RPC 已被 CI 验证。现有 `/v1/scenes/{scene_id}/messages` 仍是人类成员接口，agent 应使用独立的 agent-scoped 消息路径。
+**仍未完成：** agent 身份的环境读取、agent status 变化时的统一撤销/拒绝测试，以及真实双账号/真实个人令牌 HTTP E2E。两组 agent membership / private invitation SQL 迁移已有独立 PostgreSQL 17 smoke workflow，需以最新运行结果为准。现有 `/v1/scenes/{scene_id}/messages` 仍是人类成员接口，agent 应使用独立的 agent-scoped 消息路径。
