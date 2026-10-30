@@ -4,7 +4,7 @@
 
 ## 当前 Edge Function 实现
 
-文件：`supabase/functions/zhi-community/index.ts`
+API 文件：`supabase/functions/zhi-community/index.ts`。MVP 浏览器入口源码：`web/zhi-community.html`（随功能分支提交，PR 合并并发布 Pages 后可访问）。
 
 部署目标固定为单一 Supabase 项目 `lvxmygrgqtmzqgailmyl`。该函数使用现有个人访问令牌：服务端对 Bearer token 计算 SHA-256，再与 `zhi_personal_access_tokens.token_hash` 比对，并检查撤销和过期状态。原始令牌不写日志、不落库。
 
