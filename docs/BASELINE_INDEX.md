@@ -46,3 +46,5 @@
 
 
 - [旧聊天主入口源码迁移清单](CHAT_LEGACY_SOURCE_MAP.md)：旧讲话室 UI、身份、数据依赖与安全迁移顺序（源码归档已定位，尚未部署迁移）。
+
+- [个人令牌能力模型](PERSONAL_TOKEN_CAPABILITIES.md)：能力白名单、默认权限、续签继承与 Care 适配边界。
