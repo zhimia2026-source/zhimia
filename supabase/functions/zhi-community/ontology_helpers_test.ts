@@ -46,3 +46,25 @@ Deno.test("private cognition is isolated by both owner and agent", () => {
   assertEquals(canAccessPrivateCognition(record, "user-a", "agent-b"), false);
   assertEquals(canAccessPrivateCognition(null, "user-a", "agent-a"), false);
 });
+
+
+Deno.test("unknown cannot carry an inferred explanation or prediction", () => {
+  const result = validateMouRecord({
+    ...valid, evidence_kind: "unknown", confidence: null, source_ids: [],
+    hypothesis: "probably rain", prediction: "rain tomorrow",
+  });
+  assertEquals(result.errors.includes("unknown_must_not_claim_inference_or_prediction"), true);
+});
+
+Deno.test("hypotheses require both inference time and traceable evidence", () => {
+  const noTime = validateMouRecord({
+    ...valid, evidence_kind: "hypothesis", inferred_at: null,
+    hypothesis: "rain may begin", prediction: "rain before noon",
+  });
+  assertEquals(noTime.errors.includes("hypothesis_requires_inferred_at"), true);
+  const noSource = validateMouRecord({
+    ...valid, evidence_kind: "hypothesis", inferred_at: "2026-10-30T08:02:00Z",
+    hypothesis: "rain may begin", prediction: null, source_ids: [],
+  });
+  assertEquals(noSource.errors.includes("hypothesis_requires_source"), true);
+});
