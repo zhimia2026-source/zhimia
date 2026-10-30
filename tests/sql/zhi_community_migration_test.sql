@@ -140,7 +140,7 @@ END;
 $$;
 
 -- Public scene join is open to any authenticated principal and idempotent under concurrency.
-DO $
+DO $public_join_test$
 DECLARE
   v_scene_id uuid;
   v_result jsonb;
@@ -204,7 +204,7 @@ BEGIN
     IF SQLERRM <> 'scene_not_public_open' THEN RAISE; END IF;
   END;
 END;
-$;
+$public_join_test$;
 
 -- Invitation target binding, one-time consumption, and private-scene checks.
 DO $$
