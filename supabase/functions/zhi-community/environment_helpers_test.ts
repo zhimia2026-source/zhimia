@@ -72,3 +72,18 @@ Deno.test("rejects invalid timezones and malformed event windows", () => {
   assertEquals(timezoneRejected, true);
   assertEquals(windowRejected, true);
 });
+
+Deno.test("rejects environment configuration larger than 32 KB", () => {
+  const options = Array.from({ length: 12 }, () => "x".repeat(80));
+  const objects = Array.from({ length: 100 }, (_, index) => ({
+    id: "object-" + index,
+    name: "n".repeat(120),
+    state: "s".repeat(80),
+    interaction_options: options,
+  }));
+  let rejected = false;
+  try { normalizeSceneEnvironmentConfig({ timezone: "UTC", objects }); } catch (error) {
+    rejected = error instanceof Error && error.message === "environment_config_too_large";
+  }
+  assertEquals(rejected, true);
+});
