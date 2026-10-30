@@ -713,6 +713,57 @@ export function createCommunityHandler(
       return reply({ invitation: { ...invitation, token: secret } }, 201);
     }
 
+    // Private-scene invitations can target one exact agent identity.
+    if (req.method === "POST" && parts.length === 6 && parts[0] === "v1" &&
+        parts[1] === "scenes" && parts[3] === "agents" && parts[5] === "invitations") {
+      if (!hasCapability(actor, "community.scene.invite")) return reply({ error: "forbidden", detail: "capability_required" }, 403);
+      const sceneId = parts[2];
+      const targetAgentId = parts[4];
+      if (!isUuid(sceneId) || !isUuid(targetAgentId)) return reply({ error: "invalid_argument", detail: "scene_and_agent_ids_must_be_uuids" }, 400);
+      const body = await readBody(req);
+      const hours = body.expires_in_hours === undefined ? 72 : Number(body.expires_in_hours);
+      if (!Number.isInteger(hours) || hours < 1 || hours > 168) return reply({ error: "invalid_argument", detail: "expires_in_hours_must_be_1_to_168" }, 400);
+      const secret = randomToken();
+      const tokenHash = await sha256(secret);
+      const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+      const { data: invitation, error } = await db.rpc("zhi_issue_world_agent_invitation", {
+        p_world_id: sceneId, p_creator_user_id: actor.userId,
+        p_target_agent_id: targetAgentId, p_token_hash: tokenHash, p_expires_at: expiresAt,
+      });
+      if (error || !invitation) {
+        if (error?.code === "42501") return reply({ error: "forbidden" }, 403);
+        if (error?.code === "P0002") return reply({ error: "not_found" }, 404);
+        if (error?.code === "22023") return reply({ error: "conflict", detail: "scene_not_invitable_or_invalid_expiry" }, 409);
+        throw new Error("database_error");
+      }
+      return reply({ invitation: { ...invitation, token: secret } }, 201);
+    }
+
+    if (req.method === "POST" && parts.length === 5 && parts[0] === "v1" &&
+        parts[1] === "agents" && parts[3] === "invitations" && parts[4] === "redeem") {
+      if (!hasCapability(actor, "community.scene.enter")) return reply({ error: "forbidden", detail: "capability_required" }, 403);
+      const agentId = parts[2];
+      if (!isUuid(agentId)) return reply({ error: "invalid_argument", detail: "agent_id_must_be_uuid" }, 400);
+      const { data: agent, error: agentError } = await db.from("zhi_agents")
+        .select("id,owner_user_id,status").eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
+      if (agentError) throw new Error("database_error");
+      if (!agent) return reply({ error: "not_found" }, 404);
+      if (agent.status !== "active") return reply({ error: "conflict", detail: "agent_not_active" }, 409);
+      const body = await readBody(req);
+      if (!isText(body.token, 128) || !/^[0-9a-f]{64}$/i.test(body.token)) return reply({ error: "invalid_argument", detail: "token_required" }, 400);
+      const tokenHash = await sha256(body.token);
+      const { data: result, error } = await db.rpc("zhi_redeem_world_agent_invitation", {
+        p_token_hash: tokenHash, p_actor_user_id: actor.userId, p_agent_id: agentId,
+      });
+      if (error || !result) {
+        if (error?.code === "42501") return reply({ error: "forbidden", detail: "invitation_target_or_owner_mismatch" }, 403);
+        if (error?.code === "P0002") return reply({ error: "not_found", detail: "invitation_invalid" }, 404);
+        if (error?.code === "22023") return reply({ error: "conflict", detail: "invitation_unavailable_or_agent_inactive" }, 409);
+        throw new Error("database_error");
+      }
+      return reply(result, 200);
+    }
+
     if (req.method === "POST" && path === "/v1/invitations/redeem") {
       const body = await readBody(req);
       if (!isText(body.token, 128) || !/^[0-9a-f]{64}$/i.test(body.token)) {
