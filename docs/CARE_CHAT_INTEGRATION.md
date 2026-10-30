@@ -13,7 +13,7 @@
 - CareState 数据表为 `zhi_care_states`、`zhi_care_events`、`zhi_care_approval_tickets`；均启用 RLS，未开放 anon/authenticated 直连策略。
 - 个人令牌路径由已部署的 `zhi-token-gateway` 验证 opaque token（SHA-256 哈希查表）；令牌记录现有 `capabilities` 字段，包含 `care.read`、`care.write`、`care.approve` 等细粒度能力。
 - 独立的 `zhi-care-personal` 适配器已提交到仓库，但**尚未部署**；它从令牌记录派生 user_id，不信任请求体身份字段。JWT-only 的 `zhi-care` 保持原样，不关闭 JWT 验证。
-- Care 审批申请/批准现由两个原子 RPC 在同一事务写入票据与审计事件；数据库回滚式集成测试已覆盖成功、过期和 revision 失效路径。JWT 版 v7 已通过 CI 类型检查并部署；个人令牌 HTTP、跨账号隔离和聊天 UI 接入仍待完成。
+- Care 审批申请/批准现由两个原子 RPC 在同一事务写入票据与审计事件；数据库回滚式集成测试已覆盖成功、过期和 revision 失效路径。JWT 版 v7 已通过 CI 类型检查并部署；个人令牌版已通过 Deno 类型检查及能力映射/过期撤销守卫单元测试，但 HTTP、跨账号隔离和聊天 UI 接入仍待完成。
 - 当前仓库未检索到 `agent-talk.html` 等聊天前端源文件；聊天接入审计依赖用户此前上传的旧 ZIP 静态检查结果，不能据此直接改写线上聊天页面。
 
 ## 2. 必须先解决的身份协议不匹配
