@@ -1,6 +1,6 @@
 # ZHI Care API（Supabase Edge Function）
 
-状态：**已部署 Edge Function v6；监督审批票据已落库，但尚未接入现有聊天 UI，尚未完成端到端验收。**
+状态：**已部署 Edge Function v7；监督审批票据已落库，但尚未接入现有聊天 UI，尚未完成端到端验收。**
 
 入口函数：`zhi-care`。它要求有效 Supabase JWT，并在服务端调用 Auth `getUser(token)` 确认实际用户。请求体中的 `user_id` 会被忽略；数据范围始终由已验证用户的 `user.id` 确定。
 
@@ -147,4 +147,4 @@ python scripts/smoke_test_zhi_care.py
 - 新增事件类型：`approval_requested`、`approval_granted`、`approval_expired`、`approval_invalidated`。
 - 两个 RPC 均为 `SECURITY INVOKER`；已核实只有 `service_role` 可执行，`anon` 与 `authenticated` 无执行权限。
 - 已在 Supabase 上执行回滚式数据库集成测试：正常申请/批准/消费、审批事件完整性、过期票据、revision 过期失效均通过；测试记录在事务末尾回滚。
-- GitHub Actions Deno 类型检查尚无可确认的成功运行结果；适配器尚未部署，HTTP 令牌/跨账号测试仍待完成。
+- GitHub Actions 已通过 JWT 版与个人令牌版两个 Care Edge Function 的 Deno 类型检查；JWT 版 v7 已部署并保持 `verify_jwt=true`。个人令牌适配器尚未部署，个人令牌 HTTP 与跨账号测试仍待完成。
