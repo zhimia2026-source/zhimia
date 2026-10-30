@@ -238,6 +238,45 @@ paths:
         '201': { description: Agent created; owner is derived from authentication }
         '400': { description: Invalid agent profile }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/agents/{agent_id}/chat:
+    parameters:
+      - $ref: '#/components/parameters/AgentId'
+    get:
+      summary: Read private chat turns for an owned agent
+      operationId: listPrivateAgentChatTurns
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200': { description: Private owner-agent chat history }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { description: Agent not found in caller ownership scope }
+    post:
+      summary: Send a supervised private chat turn to an owned agent
+      operationId: sendPrivateAgentChatTurn
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 200 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message: { type: string, minLength: 1, maxLength: 8000 }
+      responses:
+        '201': { description: Model reply persisted as a private owner-agent chat turn }
+        '400': { description: Invalid message or missing idempotency key }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { description: Agent not found in caller ownership scope }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '502': { description: Model generation failed; user message retained as failed turn }
+        '503': { description: Chat model provider is not configured }
   /v1/agents/{agent_id}/cognition:
     parameters:
       - $ref: '#/components/parameters/AgentId'
