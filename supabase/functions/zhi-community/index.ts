@@ -695,7 +695,7 @@ export function createCommunityHandler(
       if (!isMembershipAuthorized(membership, actor.userId, "message:read")) {
         return reply({ error: "forbidden" }, 403);
       }
-      return reply({ scene_id: sceneId, environment: computeSceneEnvironment(world.environment_state) });
+      return reply({ scene_id: sceneId, environment: computeSceneEnvironment(world.environment_state), configuration: normalizeSceneEnvironmentConfig(world.environment_state) });
     }
 
     if (req.method === "POST" && parts.length === 4 && parts[0] === "v1" && parts[1] === "scenes" && parts[3] === "environment") {
