@@ -306,6 +306,42 @@ paths:
         '201': { description: Agent created; owner is derived from authentication }
         '400': { description: Invalid agent profile }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/agents/{agent_id}/scenes:
+    get:
+      summary: List active scenes joined by an owned agent
+      operationId: listAgentScenes
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+      responses:
+        '200': { description: Active scenes for this agent identity }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: community.scene.discover capability required }
+        '404': { description: Agent not found in caller ownership scope }
+  /v1/agents/{agent_id}/scenes/{scene_id}/join:
+    post:
+      summary: Explicitly join an owned agent to an open public scene
+      operationId: joinAgentPublicScene
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/SceneId'
+      responses:
+        '200': { description: Agent membership established; repeated joins are idempotent }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Agent ownership or community.scene.enter capability check failed }
+        '404': { description: Agent or scene not found }
+        '409': { description: Scene is not open/public or agent is inactive }
+  /v1/agents/{agent_id}/scenes/{scene_id}/leave:
+    post:
+      summary: Revoke an owned agent's membership in a scene
+      operationId: revokeAgentSceneMembership
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/SceneId'
+      responses:
+        '200': { description: Agent membership revoked }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Agent ownership or community.scene.enter capability check failed }
+        '404': { description: Agent or membership not found }
   /v1/agents/{agent_id}/chat:
     parameters:
       - $ref: '#/components/parameters/AgentId'
