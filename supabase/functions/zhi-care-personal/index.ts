@@ -1,5 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { hasCareActionCapability, isUsablePersonalToken } from "./access_helpers.ts";
+import { hasCareActionCapability, isUsablePersonalToken, requiredCareCapability } from "./access_helpers.ts";
 
 const URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -103,11 +103,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const action = body.action;
-  const requiredCapability = typeof action === "string"
-    ? ({ list: "care.read", get: "care.read", create: "care.write",
-        request_approval: "care.write", approve_action: "care.approve",
-        transition: "care.write", add_evidence: "care.write" } as Record<string, string>)[action] ?? null
-    : null;
+  const requiredCapability = requiredCareCapability(action);
   if (!requiredCapability) return json({ error: "unknown_action" }, 400, cors);
   if (!hasCareActionCapability(capabilities, action)) {
     return json({ error: "insufficient_capability", required: requiredCapability }, 403, cors);
