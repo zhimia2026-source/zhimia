@@ -4,7 +4,7 @@ import { isMembershipAuthorized, privilegesForPublicRejoin } from "./access_help
 import { validateMouRecord } from "./ontology_helpers.ts";
 import { buildFeedbackRecord, buildRevisionProposal } from "./cognitive_cycle_helpers.ts";
 import { buildPrivateAgentContext, buildPrivateChatHistory } from "./chat_context_helpers.ts";
-import { computeSceneEnvironment } from "./environment_helpers.ts";
+import { computeSceneEnvironment, normalizeSceneEnvironmentConfig } from "./environment_helpers.ts";
 
 const MAX_BODY_BYTES = 64_000;
 
@@ -696,6 +696,39 @@ export function createCommunityHandler(
         return reply({ error: "forbidden" }, 403);
       }
       return reply({ scene_id: sceneId, environment: computeSceneEnvironment(world.environment_state) });
+    }
+
+    if (req.method === "POST" && parts.length === 4 && parts[0] === "v1" && parts[1] === "scenes" && parts[3] === "environment") {
+      const sceneId = parts[2];
+      const body = await readBody(req);
+      let environmentState: Record<string, unknown>;
+      try {
+        environmentState = normalizeSceneEnvironmentConfig(body.environment_state);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : "invalid_environment_config";
+        return reply({ error: "invalid_argument", detail }, 400);
+      }
+      const { data: membership, error: membershipError } = await db.from("zhi_world_memberships")
+        .select("id,principal_user_id,status,revoked_at,agent_id,expires_at,capabilities,membership_role")
+        .eq("world_id", sceneId).eq("principal_user_id", actor.userId)
+        .eq("status", "active").is("revoked_at", null).is("agent_id", null).maybeSingle();
+      if (membershipError) throw new Error("database_error");
+      if (!isMembershipAuthorized(membership, actor.userId, "scene:manage") ||
+          !["owner", "moderator"].includes(membership?.membership_role ?? "")) {
+        return reply({ error: "forbidden" }, 403);
+      }
+      const { data: result, error } = await db.rpc("zhi_update_world_environment", {
+        p_world_id: sceneId,
+        p_actor_user_id: actor.userId,
+        p_environment_state: environmentState,
+      });
+      if (error || !result) {
+        if (error?.code === "42501") return reply({ error: "forbidden" }, 403);
+        if (error?.code === "P0002") return reply({ error: "not_found" }, 404);
+        if (error?.code === "22023") return reply({ error: "invalid_argument" }, 400);
+        throw new Error("database_error");
+      }
+      return reply(result);
     }
 
     if (req.method === "GET" && parts.length === 4 && parts[0] === "v1" && parts[1] === "scenes" && parts[3] === "messages") {
