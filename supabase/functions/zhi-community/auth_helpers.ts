@@ -11,3 +11,14 @@ export type TokenTouchResult = {
 export function tokenTouchSucceeded(result: TokenTouchResult): boolean {
   return result.error == null && result.data != null;
 }
+
+/** Missing expiry means no configured expiry; malformed or elapsed expiry fails closed. */
+export function isTokenExpiryValid(
+  expiresAt: string | null | undefined,
+  now = Date.now(),
+): boolean {
+  if (expiresAt == null) return true;
+  if (typeof expiresAt !== "string" || expiresAt.trim().length === 0) return false;
+  const expiry = Date.parse(expiresAt);
+  return Number.isFinite(expiry) && expiry > now;
+}
