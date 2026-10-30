@@ -70,7 +70,9 @@ jobs:
           CREATE SCHEMA auth;
           CREATE TABLE auth.users (id uuid PRIMARY KEY);
           SQL
-      - name: Apply community migration to disposable PostgreSQL
+      - name: Apply community core migration to disposable PostgreSQL
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261028140000_zhi_community_core.sql
-      - name: Smoke-test atomic scene creation RPC and access grants
+      - name: Apply atomic public-join migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030121000_zhi_community_atomic_public_join.sql
+      - name: Smoke-test scene creation, invitations, public join, and access grants
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/zhi_community_migration_test.sql
