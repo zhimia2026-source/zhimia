@@ -531,6 +531,35 @@ export function createCommunityHandler(
       return reply({ items: data ?? [] });
     }
 
+    if (req.method === "GET" && path === "/v1/scenes/mine") {
+      const { data: memberships, error: membershipError } = await db.from("zhi_world_memberships")
+        .select("world_id,membership_role,capabilities,expires_at")
+        .eq("principal_user_id", actor.userId).is("agent_id", null)
+        .eq("status", "active").is("revoked_at", null)
+        .order("joined_at", { ascending: false }).limit(100);
+      if (membershipError) throw new Error("database_error");
+      const now = Date.now();
+      const validMemberships = (memberships ?? []).filter((item: { expires_at?: string | null }) =>
+        !item.expires_at || Date.parse(item.expires_at) > now
+      );
+      const worldIds = validMemberships.map((item: { world_id: string }) => item.world_id);
+      if (!worldIds.length) return reply({ items: [] });
+      const { data: worlds, error: worldsError } = await db.from("zhi_worlds")
+        .select("id,name,description,visibility,entry_policy,status,rules_version,created_at")
+        .in("id", worldIds).eq("status", "open").order("created_at", { ascending: false }).limit(100);
+      if (worldsError) throw new Error("database_error");
+      const membershipByWorld = new Map(validMemberships.map((item: {
+        world_id: string; membership_role: string; capabilities: string[];
+      }) => [item.world_id, item]));
+      return reply({
+        items: (worlds ?? []).map((world: { id: string }) => ({
+          ...world,
+          membership_role: membershipByWorld.get(world.id)?.membership_role ?? "member",
+          capabilities: membershipByWorld.get(world.id)?.capabilities ?? [],
+        })),
+      });
+    }
+
     if (req.method === "POST" && path === "/v1/scenes") {
       const body = await readBody(req);
       if (!isText(body.name, 160) || !["public", "private"].includes(String(body.visibility))) {
