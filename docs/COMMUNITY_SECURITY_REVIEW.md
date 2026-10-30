@@ -3,7 +3,7 @@
 Date: 2026-10-30
 Branch: `feature/intelligent-community-mvp-clean`
 
-This review records source-level findings and release gates. It does not certify production deployment.
+This review records source-level findings and CI evidence. It does not certify production deployment.
 
 ## Confirmed design boundaries
 
@@ -14,30 +14,41 @@ This review records source-level findings and release gates. It does not certify
 - Private conversations are excluded from the current message endpoints. Do not enable private chat until each read/write checks active conversation membership, active scene membership, expiry, and the relevant capability.
 - Scene creation writes the scene and owner membership atomically.
 - A unique partial index enforces at most one open group conversation per scene.
-- Private cognition read/write routes check the authenticated owner and agent pair; the feedback route additionally requires an owned hypothesis and appends a separate observation record without modifying the hypothesis. Revision proposals are stored separately, link only same-owner/same-agent feedback through composite foreign keys, and remain shadow-proposed pending owner review.
+- Private cognition read/write routes check the authenticated owner and agent pair. Feedback appends a separate observation record without modifying its hypothesis. Revision proposals link only same-owner/same-agent feedback through composite foreign keys and remain pending owner review.
+- Cognition approvals and rollbacks append new immutable versions; prior records are retained. The human decision note is persisted as `change_note` on the appended version.
+
+## Verified CI evidence
+
+- GitHub Actions run [41018840204](https://github.com/zhimia2026-source/zhimia/actions/runs/41018840204), code commit `8ef6728a704a6125b261fed238b83cc7e37a4368`, passed:
+  - Edge Function type-check and Deno route/helper tests, including two-owner private cognition read-isolation tests.
+  - Disposable PostgreSQL migration smoke tests across the community core, private cognition, revision proposal, revision decision, and change-note audit migrations.
+  - Edge safety tests and Python tests.
+- The two-owner cognition test is a mocked HTTP/API-level test. It verifies that owner A reads only A's cognition, owner B cannot discover A's agent (404, with no cognition-table query), and owner B reads only B's partition.
+- This is **not** a real two-account Supabase Auth + personal-token HTTP end-to-end test. The SQL migrations are tested against disposable PostgreSQL in CI, not against the configured live Supabase project.
+- A later documentation-only commit `6c4427f452be0ea1fdbc85a1353f3a5674923c3a` updated API documentation after the cited code CI run; it did not change executable code. Documentation/OpenAPI validation is being added to CI separately.
 
 ## Required before production
 
-1. **Token revocation race:** code fix committed in `e633363aaadcf1b7b03fd2d958daf947d50d3b45`; the authentication path now uses `auth_helpers.ts` to accept only a successful conditional update that returns a row. Regression cases are included in `auth_helpers_test.ts` and passed in the latest verified run.
-2. **Cross-account isolation:** prove that account A cannot read account B's private conversation, redeem an invitation targeted to B, or use a revoked/expired token.
+1. **Real cross-account isolation:** use two real test accounts and tokens against an isolated Supabase test project. Prove account A cannot read account B's cognition or private conversation, redeem an invitation targeted to B, or use a revoked/expired token. Include negative tests for wrong agent IDs and inactive memberships.
+2. **Chat context boundary:** when integrating cognition into chat, prove that the context builder filters by the authenticated `owner_user_id` and selected `agent_id`; shared scene messages must remain a separate context source and must never be silently persisted as private cognition.
 3. **Idempotency concurrency:** simultaneous duplicate requests may receive a conflict rather than a replay response. Confirm client retry behavior and add a concurrency test.
 4. **Deployment settings:** verify `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ZHI_ALLOWED_ORIGINS`, and the Edge Function gateway JWT setting. If gateway JWT verification is disabled for the custom ZHI token, the function's own token validation must remain mandatory.
-5. **Migration and rollback:** review and back up the target project before applying the migration; run smoke tests before any traffic cutover.
-6. **Latest CI:** GitHub Actions run `41016627288` on commit `7311d4a44d6f82abb01a5f850dc228d95569de67` passed Edge Function typecheck/tests (including private cognition feedback, proposal, approval, and rollback route tests) and applied the community, private-cognition, revision-proposal, and revision-decision migrations to disposable PostgreSQL. SQL smoke tests passed for proposal evidence links, explicit owner approval, stale proposal rejection, append-only version creation, and rollback. This validates migrations in CI, not the live Supabase project. Run URL: https://github.com/zhimia2026-source/zhimia/actions/runs/41016627288
+5. **Migration and rollback:** review and back up the target project before applying migrations; run smoke tests before any traffic cutover.
+6. **Contract parity:** validate the OpenAPI document and review that each documented route, parameter, request body, and response matches the deployed Edge Function implementation.
 
 ## Release gate
 
-Do not describe the community as production-ready until cross-account authorization tests pass, current-commit CI is green, and the migration/function have been deployed and smoke-tested in the intended Supabase project.
+Do not describe the community as production-ready until real cross-account authorization tests pass, current-commit CI is green, and the migration/function have been deployed and smoke-tested in the intended Supabase project.
 
-## Not implemented in this slice
+## Not implemented or not yet verified in this slice
 
-- Private one-to-one messaging
-- Invitation revocation endpoint
-- Approval queue workflow
-- Realtime delivery
-- Cross-cloud signed identity / federation
-- Persistent task execution and tool invocation
-- Scene temporal rhythms and event tides
-- Real Supabase two-account HTTP end-to-end isolation tests
-- Real Supabase two-account HTTP end-to-end isolation tests
-- Any access to private intelligent-person memories
+- Private one-to-one messaging.
+- Invitation revocation endpoint.
+- Approval queue workflow.
+- Realtime delivery.
+- Cross-cloud signed identity, federation, and audience validation.
+- Persistent task execution and trusted tool invocation.
+- Scene temporal rhythms and event tides.
+- Real Supabase two-account HTTP end-to-end isolation tests.
+- Chat-system integration of private cognition.
+- Any access to private intelligent-person memories from shared scene context.
