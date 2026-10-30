@@ -15,7 +15,7 @@ begin
      or p_actor_user_id is null
      or p_environment_state is null
      or jsonb_typeof(p_environment_state) <> 'object'
-     or pg_column_size(p_environment_state) > 32768 then
+     or octet_length(p_environment_state::text) > 32768 then
     raise exception 'invalid_environment_arguments' using errcode = '22023';
   end if;
 
