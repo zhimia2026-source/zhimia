@@ -337,11 +337,13 @@ paths:
               required: [message]
               properties:
                 message: { type: string, minLength: 1, maxLength: 8000 }
+                scene_id: { type: [string, "null"], format: uuid, description: Optional explicitly selected scene; caller must have active membership with message:read. Only computed public environment is passed to the model, never scene messages or private cognition from other identities. }
       responses:
         '201': { description: Model reply persisted as a private owner-agent chat turn }
         '400': { description: Invalid message or missing idempotency key }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { description: Agent not found in caller ownership scope }
+        '403': { description: Selected scene requires an active membership with message:read }
+        '404': { description: Agent or selected scene not found }
         '409': { $ref: '#/components/responses/Conflict' }
         '502': { description: Model generation failed; user message retained as failed turn }
         '503': { description: Chat model provider is not configured }
