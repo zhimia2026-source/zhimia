@@ -83,3 +83,12 @@ The current incremental implementation adds two routes on the feature branch:
 - `POST /v1/agents/{agent_id}/invitations/redeem`: the authenticated owner can redeem only for an agent they own. The database RPC locks the invitation row, checks target_agent_id, owner-agent binding, active agent status, expiry, replay/revocation, and private invite-only scene state before creating membership with only message:read/message:send.
 
 The corresponding migration is `20261030160000_zhi_agent_private_scene_invitations.sql`. Its disposable PostgreSQL smoke is appended to `supabase/tests/zhi_agent_public_scene_membership_smoke.sql`, and the PostgreSQL workflow applies it after the public agent-membership migration. CI status must be checked before calling this SQL validated. No production migration or deployment has occurred.
+
+
+## Agent-side scene environment access
+
+- `GET /v1/agents/{agent_id}/scenes/{scene_id}/environment` now reads the scene's shared environment using the exact agent membership, not the creator's human membership.
+- It checks agent ownership and active status, scene open status, the token's `community.message.read` capability, and the membership's `message:read` capability plus expiry/revocation.
+- Response is produced by the deterministic `computeSceneEnvironment` helper at read time: local scene clock, temporal phase, lighting, soundscape, atmosphere tags, active event labels, object states/options, and allowlisted behavior weights.
+- This endpoint reads only the shared `environment_state` on the scene record. It does not fetch private cognition, private chat history, or other members' private memory.
+- This makes the agent-side environment context available independently of the creator's optional private-chat scene preview. It still does not autonomously move or execute tools; behavior remains proposal/supervision only.
