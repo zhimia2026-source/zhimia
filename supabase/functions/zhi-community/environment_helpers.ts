@@ -121,3 +121,86 @@ export function computeSceneEnvironment(raw: unknown, now = new Date()) {
     behavior_weights: behaviorWeights,
   };
 }
+
+
+/** Accepts only the public scene-environment contract; private cognition fields are rejected. */
+export function normalizeSceneEnvironmentConfig(raw: unknown): JsonRecord {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("invalid_environment_config");
+  const input = record(raw);
+  const allowed = new Set(["timezone", "lighting", "soundscape", "atmosphere_tags", "objects", "events", "behavior_weights"]);
+  if (Object.keys(input).some((key) => !allowed.has(key))) throw new Error("unsupported_environment_field");
+
+  const timezone = boundedText(input.timezone, 80) ?? "UTC";
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: timezone }).format(new Date(0));
+  } catch {
+    throw new Error("invalid_environment_timezone");
+  }
+  const objects = (Array.isArray(input.objects) ? input.objects : []).slice(0, 100).map((value) => {
+    const item = record(value);
+    const id = boundedText(item.id, 80);
+    const name = boundedText(item.name, 120);
+    const state = boundedText(item.state, 80);
+    if (!id || !name || !state) throw new Error("invalid_environment_object");
+    return { id, name, state, interaction_options: boundedList(item.interaction_options, 12) };
+  });
+  if (new Set(objects.map((item) => item.id)).size !== objects.length) throw new Error("duplicate_environment_object_id");
+
+  const events = (Array.isArray(input.events) ? input.events : []).slice(0, 100).map((value) => {
+    const item = record(value);
+    const id = boundedText(item.id, 80);
+    const type = boundedText(item.type, 80);
+    const label = boundedText(item.label, 120);
+    if (!id || !type || !label) throw new Error("invalid_environment_event");
+    const daily = record(item.daily_window);
+    const hasDaily = item.daily_window !== undefined;
+    if (hasDaily) {
+      if (!validTime(daily.start) || !validTime(daily.end) || daily.start === daily.end) throw new Error("invalid_environment_event_window");
+    } else {
+      const start = typeof item.starts_at === "string" ? Date.parse(item.starts_at) : NaN;
+      const end = typeof item.ends_at === "string" ? Date.parse(item.ends_at) : NaN;
+      if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) throw new Error("invalid_environment_event_window");
+    }
+    const delta = record(item.state_delta);
+    const objectStates = record(delta.object_states);
+    const knownObjectIds = new Set(objects.map((object) => object.id));
+    const safeObjectStates: Record<string, string> = {};
+    for (const [objectId, state] of Object.entries(objectStates)) {
+      const safeState = boundedText(state, 80);
+      if (knownObjectIds.has(objectId) && safeState) safeObjectStates[objectId] = safeState;
+    }
+    const weights: Record<string, number> = {};
+    for (const [key, value] of Object.entries(record(item.behavior_weights))) {
+      const weight = clampWeight(value);
+      if (/^[a-z][a-z0-9_]{0,39}$/.test(key) && weight !== null) weights[key] = weight;
+    }
+    return {
+      id, type, label, enabled: item.enabled !== false,
+      ...(hasDaily ? { daily_window: { start: daily.start as string, end: daily.end as string } }
+        : { starts_at: item.starts_at as string, ends_at: item.ends_at as string }),
+      state_delta: {
+        lighting: boundedText(delta.lighting, 80),
+        soundscape: boundedText(delta.soundscape, 80),
+        atmosphere_tags: boundedList(delta.atmosphere_tags),
+        object_states: safeObjectStates,
+      },
+      behavior_weights: weights,
+    };
+  });
+  if (new Set(events.map((event) => event.id)).size !== events.length) throw new Error("duplicate_environment_event_id");
+
+  const behaviorWeights: Record<string, number> = {};
+  for (const [key, value] of Object.entries(record(input.behavior_weights))) {
+    const weight = clampWeight(value);
+    if (/^[a-z][a-z0-9_]{0,39}$/.test(key) && weight !== null) behaviorWeights[key] = weight;
+  }
+  return {
+    timezone,
+    lighting: boundedText(input.lighting, 80) ?? "natural",
+    soundscape: boundedText(input.soundscape, 80) ?? "ambient",
+    atmosphere_tags: boundedList(input.atmosphere_tags),
+    objects,
+    events,
+    behavior_weights: behaviorWeights,
+  };
+}
