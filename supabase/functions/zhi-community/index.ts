@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
-import { tokenTouchSucceeded } from "./auth_helpers.ts";
+import { isTokenExpiryValid, tokenTouchSucceeded } from "./auth_helpers.ts";
 import { isMembershipAuthorized, privilegesForPublicRejoin } from "./access_helpers.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -55,7 +55,7 @@ async function authenticate(db: SupabaseClient, req: Request): Promise<Actor | n
     .eq("token_hash", hash)
     .maybeSingle();
   if (error || !data || data.revoked_at) return null;
-  if (data.expires_at && Date.parse(data.expires_at) <= Date.now()) return null;
+  if (!isTokenExpiryValid(data.expires_at)) return null;
   // Reject tokens revoked after the initial lookup.
   const { data: touched, error: touchError } = await db.from("zhi_personal_access_tokens")
     .update({ last_used_at: new Date().toISOString() })
