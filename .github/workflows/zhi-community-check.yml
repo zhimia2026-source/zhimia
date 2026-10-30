@@ -46,6 +46,8 @@ jobs:
         run: deno test --allow-env=ZHI_ALLOWED_ORIGINS supabase/functions/zhi-community/feedback_routes_test.ts
       - name: Test private cognition revision proposal routes
         run: deno test --allow-env=ZHI_ALLOWED_ORIGINS supabase/functions/zhi-community/revision_proposal_routes_test.ts
+      - name: Test owner-only cognition revision decisions and rollback routes
+        run: deno test --allow-env=ZHI_ALLOWED_ORIGINS supabase/functions/zhi-community/revision_decision_routes_test.ts
       - name: Test approved cognitive revisions and rollback
         run: deno test supabase/functions/zhi-community/cognitive_version_helpers_test.ts
 
