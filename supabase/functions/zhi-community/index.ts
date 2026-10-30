@@ -172,13 +172,23 @@ export function createCommunityHandler(
       if (!hypothesis) return reply({ error: "not_found" }, 404);
 
       const body = await readBody(req);
+      const sourceId = body.source_id;
+      const eventTime = body.event_time;
+      const observedOutcome = body.observed_outcome;
+      const confidence = body.confidence;
+      if (!isText(sourceId, 240) || !isText(eventTime, 80) ||
+          !Number.isFinite(Date.parse(eventTime)) || !isText(observedOutcome, 4000) ||
+          typeof confidence !== "number" || !Number.isFinite(confidence) ||
+          confidence < 0 || confidence > 1) {
+        return reply({ error: "invalid_argument", detail: "invalid_feedback_evidence" }, 400);
+      }
       const feedbackInput = {
         id: crypto.randomUUID(),
-        source_id: body.source_id,
-        event_time: body.event_time,
+        source_id: sourceId,
+        event_time: eventTime,
         recorded_at: new Date().toISOString(),
-        observed_outcome: body.observed_outcome,
-        confidence: body.confidence,
+        observed_outcome: observedOutcome,
+        confidence,
       };
       let feedback;
       try {
