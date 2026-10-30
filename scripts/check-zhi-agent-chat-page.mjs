@@ -19,6 +19,9 @@ for (const required of [
   "role: \"manager\"",
   "POST",
   "/v1/agents",
+  "sceneSelect",
+  "/v1/scenes/mine",
+  "scene_id: selectedSceneId || null",
 ]) {
   if (!html.includes(required)) throw new Error("Missing required chat UI contract: " + required);
 }
