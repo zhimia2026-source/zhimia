@@ -37,7 +37,7 @@ create table if not exists public.zhi_agent_cognition_records (
   constraint zhi_agent_cognition_confidence_check check (
     (evidence_kind = 'unknown' and confidence is null)
     or
-    (evidence_kind <> 'unknown' and confidence between 0 and 1)
+    (evidence_kind <> 'unknown' and confidence is not null and confidence between 0 and 1)
   ),
   constraint zhi_agent_cognition_observation_source_check check (
     evidence_kind not in ('observation', 'fact') or cardinality(source_ids) > 0
