@@ -601,3 +601,30 @@ BEGIN
   END IF;
 END;
 $zhi_environment_config_test$;
+
+DO $zhi_environment_size_limit_test$
+DECLARE
+  v_scene_id uuid;
+  v_result jsonb;
+BEGIN
+  v_result := public.zhi_create_world_with_owner(
+    '11111111-1111-4111-8111-111111111111',
+    'CI Environment Size Limit',
+    'Size limit test',
+    'public',
+    'open'
+  );
+  v_scene_id := (v_result #>> '{scene,id}')::uuid;
+  BEGIN
+    PERFORM public.zhi_update_world_environment(
+      v_scene_id,
+      '11111111-1111-4111-8111-111111111111',
+      jsonb_build_object('payload', repeat('x', 33000))
+    );
+    RAISE EXCEPTION 'oversized environment configuration was accepted';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM = 'oversized environment configuration was accepted' THEN RAISE; END IF;
+    IF SQLERRM <> 'invalid_environment_arguments' THEN RAISE; END IF;
+  END;
+END;
+$zhi_environment_size_limit_test$;
