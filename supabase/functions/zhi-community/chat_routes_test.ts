@@ -7,7 +7,7 @@ const ownerB = "22222222-2222-4222-8222-222222222222";
 const agentA = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const agentB = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
-function harness(actorId: string) {
+function harness(actorId: string, sceneAllowed = false) {
   const queriedTables: string[] = [];
   const filtersByTable: Record<string, Record<string, unknown>> = {};
   let capturedModelMessages: unknown[] = [];
@@ -22,11 +22,28 @@ function harness(actorId: string) {
       const builder: Record<string, any> = {
         select(_columns: string) { return builder; },
         eq(key: string, value: unknown) { filters[key] = value; return builder; },
+        is(key: string, value: unknown) { filters[key] = value; return builder; },
         order(_key: string, _options: unknown) { return builder; },
         limit(_value: number) { return builder; },
         insert(value: Record<string, unknown>) { operation = "insert"; inserted = value; return builder; },
         update(value: Record<string, unknown>) { operation = "update"; updated = value; return builder; },
         maybeSingle() {
+          if (table === "zhi_worlds") {
+            return Promise.resolve({ data: filters.id === "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+              ? { id: filters.id, name: "林间社区", description: "公共林地", visibility: "public", status: "open",
+                  environment_state: { timezone: "Asia/Singapore", lighting: "overcast", soundscape: "rain_on_leaves",
+                    atmosphere_tags: ["rain"], behavior_weights: { seek_shelter: 0.9 },
+                    objects: [{ id: "shelter", name: "橡树屋檐", state: "wet_roof", interaction_options: ["rest"] }],
+                    events: [{ id: "rain", type: "rain", label: "林间阵雨", daily_window: { start: "00:00", end: "23:59" },
+                      behavior_weights: { seek_shelter: 0.9 } }] } }
+              : null, error: null });
+          }
+          if (table === "zhi_world_memberships") {
+            return Promise.resolve({ data: sceneAllowed && filters.principal_user_id === actorId
+              ? { principal_user_id: actorId, status: "active", revoked_at: null, agent_id: null,
+                  expires_at: null, capabilities: ["message:read"] }
+              : null, error: null });
+          }
           if (table === "zhi_agents") {
             const expected = actorId === ownerA ? agentA : agentB;
             return Promise.resolve({ data: filters.id === expected && filters.owner_user_id === actorId
@@ -126,4 +143,38 @@ Deno.test("same owner cannot mix private chat between two different agents", asy
   assertEquals(response.status, 404);
   assertEquals(h.queriedTables.includes("zhi_agent_cognition_records"), false);
   assertEquals(h.queriedTables.includes("zhi_agent_chat_turns"), false);
+});
+
+
+Deno.test("private chat can use explicitly selected scene environment after membership authorization", async () => {
+  const h = harness(ownerA, true);
+  const response = await h.handler(new Request(
+    `https://unit.test/functions/v1/zhi-community/v1/agents/${agentA}/chat`,
+    {
+      method: "POST",
+      headers: { authorization: "Bearer token-a", "content-type": "application/json", "idempotency-key": "turn-a-scene-1" },
+      body: JSON.stringify({ message: "下雨了，我们可以做什么？", scene_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc" }),
+    },
+  ));
+  assertEquals(response.status, 201);
+  assertEquals(h.filtersByTable.zhi_worlds.id, "cccccccc-cccc-4ccc-8ccc-cccccccccccc");
+  assertEquals(h.filtersByTable.zhi_world_memberships.principal_user_id, ownerA);
+  assertStringIncludes(JSON.stringify(h.getModelMessages()), "林间社区");
+  assertStringIncludes(JSON.stringify(h.getModelMessages()), "寻找遮蔽处");
+  assertStringIncludes(JSON.stringify(h.getModelMessages()), "林间阵雨");
+  assertEquals(h.queriedTables.includes("zhi_world_messages"), false);
+});
+
+Deno.test("private chat rejects a scene when the owner has no active message-read membership", async () => {
+  const h = harness(ownerA, false);
+  const response = await h.handler(new Request(
+    `https://unit.test/functions/v1/zhi-community/v1/agents/${agentA}/chat`,
+    {
+      method: "POST",
+      headers: { authorization: "Bearer token-a", "content-type": "application/json", "idempotency-key": "turn-a-scene-denied" },
+      body: JSON.stringify({ message: "请看看场景", scene_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc" }),
+    },
+  ));
+  assertEquals(response.status, 403);
+  assertEquals(JSON.stringify(h.getModelMessages()), "[]");
 });
