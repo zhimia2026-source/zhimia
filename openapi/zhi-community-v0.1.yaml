@@ -306,6 +306,50 @@ paths:
         '201': { description: Agent created; owner is derived from authentication }
         '400': { description: Invalid agent profile }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/scenes/{scene_id}/agents/{agent_id}/invitations:
+    post:
+      summary: Issue a private-scene invitation bound to an exact agent
+      operationId: issueAgentSceneInvitation
+      parameters:
+        - $ref: '#/components/parameters/SceneId'
+        - $ref: '#/components/parameters/AgentId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expires_in_hours: { type: integer, minimum: 1, maximum: 168, default: 72 }
+      responses:
+        '201': { description: One-time invitation token returned once; target_agent_id is bound in storage }
+        '400': { description: Invalid scene, agent, or expiry }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: community.scene.invite or scene manager authority required }
+        '404': { description: Scene or target agent not found }
+        '409': { description: Scene is not open for private invitations }
+  /v1/agents/{agent_id}/invitations/redeem:
+    post:
+      summary: Redeem a private-scene invitation for the authenticated owner's exact agent
+      operationId: redeemAgentSceneInvitation
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string, minLength: 64, maxLength: 64 }
+      responses:
+        '200': { description: Agent membership created or restored atomically }
+        '400': { description: Invalid token }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Invitation target agent or authenticated owner mismatch }
+        '404': { description: Invitation or agent not found }
+        '409': { description: Invitation expired, revoked, used, or agent inactive }
   /v1/agents/{agent_id}/scenes:
     get:
       summary: List active scenes joined by an owned agent
