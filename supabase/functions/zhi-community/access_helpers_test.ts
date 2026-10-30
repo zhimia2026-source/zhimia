@@ -26,3 +26,10 @@ Deno.test("denies missing capability and missing membership", () => {
   assertEquals(isMembershipAuthorized({ ...active, capabilities: ["message:read"] }, "user-a", "message:send"), false);
   assertEquals(isMembershipAuthorized(null, "user-a", "message:read"), false);
 });
+
+
+Deno.test("fails closed when membership expiry is malformed", () => {
+  assertEquals(isMembershipAuthorized(
+    { ...active, expires_at: "not-a-date" }, "user-a", "message:read",
+  ), false);
+});
