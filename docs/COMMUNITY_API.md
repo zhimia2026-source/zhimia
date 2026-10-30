@@ -95,7 +95,7 @@ Edge Function、数据库迁移、聊天页面和自动化检查已提交到功�
 - A failed model request marks the turn as failed and returns `502 chat_generation_failed`. Retrying the same idempotency key returns a conflict; clients should send a new key for a new attempt.
 - Chat content does not automatically create or update long-term cognition. The supervised feedback/proposal/approval workflow remains separate.
 
-The new chat UI is `web/zhi-agent-chat.html`. It is a branch artifact, not a deployed page. It uses the existing personal access token model and stores the token only in browser `sessionStorage`. It does not restore the old shared-password gate, global broadcast, old Core database, or old Agnes endpoints.
+The new chat UI is `web/zhi-agent-chat.html`; it also allows creating the first private manager Agent. The community UI is `web/zhi-community.html`; it supports public-scene discovery/join, private-scene creation, targeted invitation redemption/issuance, member-scene listing, and shared scene messages. Both are branch artifacts, not deployed pages. It uses the existing personal access token model and stores the token only in browser `sessionStorage`. It does not restore the old shared-password gate, global broadcast, old Core database, or old Agnes endpoints.
 
 **Release limitation:** the endpoint requires the new private-chat migration and the three provider secrets. The current CI uses a mocked model provider and disposable PostgreSQL; real provider connectivity and real two-account Supabase HTTP E2E remain outstanding. The context helper has explicit size limits and tests for prompt-injection-like strings in stored cognition data.
 
