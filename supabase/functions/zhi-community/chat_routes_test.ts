@@ -337,3 +337,36 @@ Deno.test("another owner cannot redeem an invitation for an agent they do not ow
   assertEquals(response.status, 404);
   assertEquals(h.rpcCalls.length, 0);
 });
+
+
+Deno.test("agent reads scene environment only through its own active membership", async () => {
+  const h = harness(ownerA, true, ["community.message.read"]);
+  const response = await h.handler(new Request(
+    `https://unit.test/functions/v1/zhi-community/v1/agents/${agentA}/scenes/cccccccc-cccc-4ccc-8ccc-cccccccccccc/environment`,
+    { headers: { authorization: "Bearer token-a" } },
+  ));
+  const body = await response.json();
+  assertEquals(response.status, 200);
+  assertEquals(body.agent_id, agentA);
+  assertEquals(h.filtersByTable.zhi_world_memberships.agent_id, agentA);
+  assertEquals(h.filtersByTable.zhi_world_memberships.principal_user_id, ownerA);
+  assertEquals(body.environment.soundscape, "rain_on_leaves");
+});
+
+Deno.test("creator human membership cannot substitute for agent environment membership", async () => {
+  const h = harness(ownerA, false, ["community.message.read"]);
+  const response = await h.handler(new Request(
+    `https://unit.test/functions/v1/zhi-community/v1/agents/${agentA}/scenes/cccccccc-cccc-4ccc-8ccc-cccccccccccc/environment`,
+    { headers: { authorization: "Bearer token-a" } },
+  ));
+  assertEquals(response.status, 403);
+});
+
+Deno.test("agent environment read requires community.message.read token capability", async () => {
+  const h = harness(ownerA, true, ["community.scene.enter"]);
+  const response = await h.handler(new Request(
+    `https://unit.test/functions/v1/zhi-community/v1/agents/${agentA}/scenes/cccccccc-cccc-4ccc-8ccc-cccccccccccc/environment`,
+    { headers: { authorization: "Bearer token-a" } },
+  ));
+  assertEquals(response.status, 403);
+});
