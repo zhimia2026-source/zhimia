@@ -147,4 +147,4 @@ python scripts/smoke_test_zhi_care.py
 - 新增事件类型：`approval_requested`、`approval_granted`、`approval_expired`、`approval_invalidated`。
 - 两个 RPC 均为 `SECURITY INVOKER`；已核实只有 `service_role` 可执行，`anon` 与 `authenticated` 无执行权限。
 - 已在 Supabase 上执行回滚式数据库集成测试：正常申请/批准/消费、审批事件完整性、过期票据、revision 过期失效均通过；测试记录在事务末尾回滚。
-- GitHub Actions 已通过 JWT 版与个人令牌版两个 Care Edge Function 的 Deno 类型检查；JWT 版 v7 已部署并保持 `verify_jwt=true`。个人令牌适配器尚未部署，个人令牌 HTTP 与跨账号测试仍待完成。
+- GitHub Actions 已通过 JWT 版与个人令牌版两个 Care Edge Function 的 Deno 类型检查，并通过个人令牌能力映射、未知动作拒绝、过期/撤销令牌守卫单元测试；JWT 版 v7 已部署并保持 `verify_jwt=true`。个人令牌适配器尚未部署，个人令牌 HTTP 与跨账号测试仍待完成。
