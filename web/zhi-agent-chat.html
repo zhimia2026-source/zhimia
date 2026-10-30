@@ -73,6 +73,8 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
   let token = sessionStorage.getItem(TOKEN_KEY) || "";
   let agents = [];
   let scenes = [];
+  let agentScenes = [];
+  let selectedAgentSceneId = "";
   let selectedSceneId = "";
   let selected = null;
   let busy = false;
@@ -179,6 +181,126 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
     } catch (error) {
       $("log").replaceChildren(); const msg = document.createElement("div"); msg.className = "welcome"; msg.textContent = "历史读取失败：" + error.message; $("log").append(msg);
     }
+    selectedAgentSceneId = "";
+    await loadAgentScenes();
+  }
+  async function loadAgentScenes() {
+    const select = $("agentSceneSelect");
+    select.replaceChildren();
+    if (!selected) {
+      const option = document.createElement("option"); option.value = ""; option.textContent = "先选择智能人"; select.append(option);
+      select.disabled = true; $("refreshAgentScenes").disabled = true; $("loadAgentMessages").disabled = true;
+      $("agentMessageBody").disabled = true; $("sendAgentMessage").disabled = true;
+      return;
+    }
+    try {
+      const result = await api("/v1/agents/" + encodeURIComponent(selected.id) + "/scenes");
+      agentScenes = result.items || [];
+      const empty = document.createElement("option"); empty.value = "";
+      empty.textContent = agentScenes.length ? "选择智能人加入的场景" : "这位智能人尚未加入场景";
+      select.append(empty);
+      for (const scene of agentScenes) {
+        const option = document.createElement("option"); option.value = scene.id;
+        option.textContent = (scene.name || "未命名场景") + (scene.visibility === "private" ? " · 私人" : " · 公共");
+        select.append(option);
+      }
+      selectedAgentSceneId = agentScenes.some(scene => scene.id === selectedAgentSceneId) ? selectedAgentSceneId : "";
+      select.value = selectedAgentSceneId;
+      select.disabled = false; $("refreshAgentScenes").disabled = false;
+      $("loadAgentMessages").disabled = !selectedAgentSceneId;
+      $("agentMessageBody").disabled = !selectedAgentSceneId; $("sendAgentMessage").disabled = !selectedAgentSceneId;
+      $("joinAgentScene").disabled = false; $("redeemAgentInvitation").disabled = false;
+      $("agentCommunityStatus").textContent = "已读取这位智能人的 " + agentScenes.length + " 个场景成员关系。";
+      if (selectedAgentSceneId) await loadAgentMessages();
+      else {
+        $("agentMessages").replaceChildren();
+        const hint = document.createElement("div"); hint.className = "muted"; hint.textContent = "选择一个已加入的场景后，这里显示该智能人有权读取的共享消息。"; $("agentMessages").append(hint);
+      }
+    } catch (error) {
+      agentScenes = []; selectedAgentSceneId = "";
+      const option = document.createElement("option"); option.value = ""; option.textContent = "无法读取智能人场景"; select.append(option);
+      select.disabled = true; $("loadAgentMessages").disabled = true;
+      $("agentMessageBody").disabled = true; $("sendAgentMessage").disabled = true;
+      $("agentCommunityStatus").textContent = "读取失败：" + error.message + "。请确认令牌具有 community.scene.discover。";
+    }
+  }
+  async function joinAgentScene() {
+    if (!selected) return;
+    const sceneId = $("agentSceneId").value.trim();
+    if (!/^[0-9a-f-]{36}$/i.test(sceneId)) {
+      $("agentCommunityStatus").textContent = "请填写有效的公共场景 UUID。"; return;
+    }
+    $("joinAgentScene").disabled = true;
+    try {
+      await api("/v1/agents/" + encodeURIComponent(selected.id) + "/scenes/" + encodeURIComponent(sceneId) + "/join", { method: "POST", body: "{}" });
+      $("agentCommunityStatus").textContent = "智能人已加入公共场景。";
+      selectedAgentSceneId = sceneId;
+      await loadAgentScenes();
+    } catch (error) {
+      $("agentCommunityStatus").textContent = "加入失败：" + error.message + "。请确认场景为开放公共场景且令牌具有 community.scene.enter。";
+    } finally { $("joinAgentScene").disabled = !selected; }
+  }
+  async function redeemAgentInvitation() {
+    if (!selected) return;
+    const invitation = $("agentInvitationToken").value.trim();
+    if (!/^[0-9a-f]{64}$/i.test(invitation)) {
+      $("agentCommunityStatus").textContent = "请粘贴发给这位智能人的 64 位邀请令牌。"; return;
+    }
+    $("redeemAgentInvitation").disabled = true;
+    try {
+      await api("/v1/agents/" + encodeURIComponent(selected.id) + "/invitations/redeem", {
+        method: "POST", body: JSON.stringify({ token: invitation }),
+      });
+      $("agentInvitationToken").value = "";
+      $("agentCommunityStatus").textContent = "私人场景邀请已由这位智能人接受。";
+      await loadAgentScenes();
+    } catch (error) {
+      $("agentCommunityStatus").textContent = "邀请兑换失败：" + error.message + "。请确认邀请确实绑定给这位智能人且尚未过期或使用。";
+    } finally { $("redeemAgentInvitation").disabled = !selected; }
+  }
+  async function loadAgentMessages() {
+    if (!selected || !selectedAgentSceneId) return;
+    try {
+      const result = await api("/v1/agents/" + encodeURIComponent(selected.id) + "/scenes/" +
+        encodeURIComponent(selectedAgentSceneId) + "/messages?limit=50");
+      const messages = (result.items || []).slice().reverse();
+      $("agentMessages").replaceChildren();
+      if (!messages.length) {
+        const empty = document.createElement("div"); empty.className = "muted"; empty.textContent = "这个场景还没有消息。"; $("agentMessages").append(empty);
+      }
+      for (const message of messages) {
+        const node = document.createElement("div");
+        node.className = "communityMessage" + (message.sender_agent_id === selected.id ? " agent" : "");
+        const who = document.createElement("strong");
+        who.textContent = message.sender_agent_id === selected.id ? (selected.display_name || "这位智能人") : "社区成员";
+        const body = document.createElement("div"); body.textContent = message.payload?.body || "";
+        const time = document.createElement("div"); time.className = "muted";
+        time.textContent = message.created_at ? new Date(message.created_at).toLocaleString("zh-SG") : "";
+        node.append(who, body, time); $("agentMessages").append(node);
+      }
+      $("agentMessages").scrollTop = $("agentMessages").scrollHeight;
+      $("agentCommunityStatus").textContent = "已读取 " + messages.length + " 条场景消息。";
+    } catch (error) {
+      $("agentCommunityStatus").textContent = "消息读取失败：" + error.message + "。需要 community.message.read 和该智能人自己的 message:read 成员权限。";
+    }
+  }
+  async function sendAgentCommunityMessage(event) {
+    event.preventDefault();
+    if (!selected || !selectedAgentSceneId) return;
+    const body = $("agentMessageBody").value.trim();
+    if (!body) return;
+    $("sendAgentMessage").disabled = true;
+    try {
+      await api("/v1/agents/" + encodeURIComponent(selected.id) + "/scenes/" +
+        encodeURIComponent(selectedAgentSceneId) + "/messages", {
+          method: "POST", headers: { "idempotency-key": crypto.randomUUID() },
+          body: JSON.stringify({ body }),
+        });
+      $("agentMessageBody").value = "";
+      await loadAgentMessages();
+    } catch (error) {
+      $("agentCommunityStatus").textContent = "发送失败：" + error.message + "。需要 community.message.send 和该智能人自己的 message:send 成员权限。";
+    } finally { $("sendAgentMessage").disabled = !selectedAgentSceneId; }
   }
   async function createAgent() {
     const name = $("newAgentName").value.trim();
@@ -237,6 +359,17 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
       busy = false; $("send").disabled = !selected; $("message").disabled = !selected; $("message").focus();
     }
   }
+  $("joinAgentScene").addEventListener("click", joinAgentScene);
+  $("redeemAgentInvitation").addEventListener("click", redeemAgentInvitation);
+  $("refreshAgentScenes").addEventListener("click", loadAgentScenes);
+  $("loadAgentMessages").addEventListener("click", loadAgentMessages);
+  $("agentSceneSelect").addEventListener("change", () => {
+    selectedAgentSceneId = $("agentSceneSelect").value;
+    const active = Boolean(selectedAgentSceneId);
+    $("loadAgentMessages").disabled = !active; $("agentMessageBody").disabled = !active; $("sendAgentMessage").disabled = !active;
+    if (active) loadAgentMessages();
+  });
+  $("agentMessageForm").addEventListener("submit", sendAgentCommunityMessage);
   $("loginForm").addEventListener("submit", e => { e.preventDefault(); connect(); });
   $("composer").addEventListener("submit", sendMessage);
   $("message").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("composer").requestSubmit(); } });
@@ -245,7 +378,7 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
   $("createAgent").addEventListener("click", createAgent);
   $("newAgentName").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); createAgent(); } });
   $("refresh").addEventListener("click", () => selected ? choose(selected) : loadAgents());
-  $("logout").addEventListener("click", () => { sessionStorage.removeItem(TOKEN_KEY); token = ""; agents = []; selected = null; showGate(); });
+  $("logout").addEventListener("click", () => { sessionStorage.removeItem(TOKEN_KEY); token = ""; agents = []; selected = null; agentScenes = []; selectedAgentSceneId = ""; showGate(); });
   if (token) { showApp(); Promise.all([loadAgents(), loadScenes()]); } else showGate();
 })();
 </script>
