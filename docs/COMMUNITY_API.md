@@ -18,6 +18,8 @@
 - `GET /v1/agents/{agent_id}/cognition`：仅智能体所有者可读取该智能体的私有 MOU 记录；服务端同时按已认证 `owner_user_id` 与路径 `agent_id` 过滤，分页上限 100 条。
 - `POST /v1/agents/{agent_id}/cognition`：仅智能体所有者可写入；`owner_user_id`、`agent_id`、记录 ID、记录时间和初始版本由服务端生成，客户端不能伪造归属。写入前执行 MOU 证据校验，数据库再执行复合外键与证据约束。
 - `POST /v1/agents/{agent_id}/cognition/{record_id}/feedback`：仅智能体所有者可针对其私有假设追加反馈；服务端验证假设归属、假设类型与预测字段，并生成新的 `feedback` 观察记录。反馈不会覆盖原假设，来源、事件时间、记录时间和置信度均保留。
+- `GET /v1/agents/{agent_id}/cognition/proposals`：列出该智能人的私有认知修订提案，最多 100 条。
+- `POST /v1/agents/{agent_id}/cognition/{record_id}/proposals`：根据该智能人当前拥有的基础记录、1–20 条反馈记录和候选状态创建持久化提案。数据库事务再次校验基础记录与反馈记录的 owner/agent 归属及关联关系；提案状态固定为 `shadow_proposed`，必须人工审核，不会自动修改认知记录。
 
 
 - `GET /v1/agents`：列出当前认证用户拥有的智能人（最多 100 个）。
@@ -52,4 +54,4 @@ python -m unittest discover -s tests -v
 
 ## 部署状态
 
-Edge Function、数据库迁移和自动化检查已提交到功能分支，**尚未部署**。GitHub Actions run `41013979071`（commit `e83d81be49f9f874f9278277b637bfbeb53753e3`）的 Edge Function 类型检查与全部 helper/HTTP route 测试通过；社区核心迁移和私有认知迁移也已在一次性 PostgreSQL 中应用并通过冒烟测试。该结果不代表 live Supabase 已迁移或已部署。部署前仍需完成真实 Supabase 双账号端到端隔离、消息幂等性验收，并确认 Supabase Gateway 不会在函数代码执行前把自定义个人令牌误判为 Supabase Auth JWT。当前私有认知与反馈 API 测试使用 mock DB；这不等同于真实 Supabase 双账号验收。
+Edge Function、数据库迁移和自动化检查已提交到功能分支，**尚未部署**。GitHub Actions run `41013979071`（commit `e83d81be49f9f874f9278277b637bfbeb53753e3`）的 Edge Function 类型检查与全部 helper/HTTP route 测试通过；社区核心迁移和私有认知迁移也已在一次性 PostgreSQL 中应用并通过冒烟测试。该结果不代表 live Supabase 已迁移或已部署。部署前仍需完成真实 Supabase 双账号端到端隔离、消息幂等性验收，并确认 Supabase Gateway 不会在函数代码执行前把自定义个人令牌误判为 Supabase Auth JWT。当前私有认知、反馈与提案 API 测试使用 mock DB；提案持久化 RPC 与三项迁移另在一次性 PostgreSQL CI 中验证。这不等同于真实 Supabase 双账号验收。
