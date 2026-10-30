@@ -512,6 +512,7 @@ export function createCommunityHandler(
         "私有上下文数据：" + privateContext,
         "当前场景环境数据（若为空则表示未选择场景）：" + sceneAwarenessContext,
         "场景行为建议：" + sceneBehaviorGuidance,
+        "场景候选行动只是建议，必须保留 requires_supervision=true 与 executed=false 的语义；当前聊天接口不会执行工具或现实动作。若涉及行动，先说明理由并向用户请求明确授权。",
       ].join("\\n");
       const messages = [
         { role: "system", content: systemPrompt },
