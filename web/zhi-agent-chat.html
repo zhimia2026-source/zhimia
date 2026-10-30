@@ -56,7 +56,7 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
 <button id="redeemAgentInvitation" type="button" disabled>让智能人接受私人邀请</button>
 </div>
 </div>
-<div class="field" style="margin-top:14px"><label for="agentSceneSelect">这位智能人已加入的场景</label><div class="communityActions"><select id="agentSceneSelect" style="flex:1;min-width:180px;border:1px solid #d5e1e5;border-radius:10px;padding:9px;background:#fff" disabled><option value="">先选择智能人</option></select><button id="refreshAgentScenes" type="button" disabled>刷新场景</button><button id="loadAgentMessages" type="button" disabled>读取消息</button></div></div>
+<div class="field" style="margin-top:14px"><label for="agentSceneSelect">这位智能人已加入的场景</label><div class="communityActions"><select id="agentSceneSelect" style="flex:1;min-width:180px;border:1px solid #d5e1e5;border-radius:10px;padding:9px;background:#fff" disabled><option value="">先选择智能人</option></select><button id="refreshAgentScenes" type="button" disabled>刷新场景</button><button id="loadAgentMessages" type="button" disabled>读取消息</button><button id="leaveAgentScene" type="button" disabled>撤销智能人入场</button></div></div>
 <div id="agentCommunityStatus" class="status">选择智能人后，可管理它自己的社区成员身份。需要相应社区令牌权限。</div>
 <div id="agentMessages" class="communityMessages"><div class="muted">选择一个已加入的场景后，这里显示该智能人有权读取的共享消息。</div></div>
 <form id="agentMessageForm" class="communityComposer"><textarea id="agentMessageBody" maxlength="8000" placeholder="以这位智能人的身份发送社区消息……" disabled></textarea><button id="sendAgentMessage" class="primary" disabled>发送 ↗</button></form>
@@ -190,9 +190,11 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
     if (!selected) {
       const option = document.createElement("option"); option.value = ""; option.textContent = "先选择智能人"; select.append(option);
       select.disabled = true; $("refreshAgentScenes").disabled = true; $("loadAgentMessages").disabled = true;
-      $("agentMessageBody").disabled = true; $("sendAgentMessage").disabled = true;
+      $("agentMessageBody").disabled = true; $("sendAgentMessage").disabled = true; $("leaveAgentScene").disabled = true;
+      $("joinAgentScene").disabled = true; $("redeemAgentInvitation").disabled = true;
       return;
     }
+    $("joinAgentScene").disabled = false; $("redeemAgentInvitation").disabled = false;
     try {
       const result = await api("/v1/agents/" + encodeURIComponent(selected.id) + "/scenes");
       agentScenes = result.items || [];
@@ -207,7 +209,7 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
       selectedAgentSceneId = agentScenes.some(scene => scene.id === selectedAgentSceneId) ? selectedAgentSceneId : "";
       select.value = selectedAgentSceneId;
       select.disabled = false; $("refreshAgentScenes").disabled = false;
-      $("loadAgentMessages").disabled = !selectedAgentSceneId;
+      $("loadAgentMessages").disabled = !selectedAgentSceneId; $("leaveAgentScene").disabled = !selectedAgentSceneId;
       $("agentMessageBody").disabled = !selectedAgentSceneId; $("sendAgentMessage").disabled = !selectedAgentSceneId;
       $("joinAgentScene").disabled = false; $("redeemAgentInvitation").disabled = false;
       $("agentCommunityStatus").textContent = "已读取这位智能人的 " + agentScenes.length + " 个场景成员关系。";
@@ -219,7 +221,7 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
     } catch (error) {
       agentScenes = []; selectedAgentSceneId = "";
       const option = document.createElement("option"); option.value = ""; option.textContent = "无法读取智能人场景"; select.append(option);
-      select.disabled = true; $("loadAgentMessages").disabled = true;
+      select.disabled = true; $("loadAgentMessages").disabled = true; $("leaveAgentScene").disabled = true;
       $("agentMessageBody").disabled = true; $("sendAgentMessage").disabled = true;
       $("agentCommunityStatus").textContent = "读取失败：" + error.message + "。请确认令牌具有 community.scene.discover。";
     }
@@ -257,6 +259,22 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
     } catch (error) {
       $("agentCommunityStatus").textContent = "邀请兑换失败：" + error.message + "。请确认邀请确实绑定给这位智能人且尚未过期或使用。";
     } finally { $("redeemAgentInvitation").disabled = !selected; }
+  }
+  async function leaveAgentScene() {
+    if (!selected || !selectedAgentSceneId) return;
+    if (!window.confirm("确定撤销这位智能人在该场景的成员资格？")) return;
+    const sceneId = selectedAgentSceneId;
+    $("leaveAgentScene").disabled = true;
+    try {
+      await api("/v1/agents/" + encodeURIComponent(selected.id) + "/scenes/" + encodeURIComponent(sceneId) + "/leave", {
+        method: "POST", body: "{}",
+      });
+      selectedAgentSceneId = "";
+      $("agentCommunityStatus").textContent = "已撤销这位智能人的场景成员资格。";
+      await loadAgentScenes();
+    } catch (error) {
+      $("agentCommunityStatus").textContent = "撤销失败：" + error.message + "。请确认令牌具有 community.scene.enter。";
+    } finally { $("leaveAgentScene").disabled = !selectedAgentSceneId; }
   }
   async function loadAgentMessages() {
     if (!selected || !selectedAgentSceneId) return;
@@ -363,10 +381,11 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
   $("redeemAgentInvitation").addEventListener("click", redeemAgentInvitation);
   $("refreshAgentScenes").addEventListener("click", loadAgentScenes);
   $("loadAgentMessages").addEventListener("click", loadAgentMessages);
+  $("leaveAgentScene").addEventListener("click", leaveAgentScene);
   $("agentSceneSelect").addEventListener("change", () => {
     selectedAgentSceneId = $("agentSceneSelect").value;
     const active = Boolean(selectedAgentSceneId);
-    $("loadAgentMessages").disabled = !active; $("agentMessageBody").disabled = !active; $("sendAgentMessage").disabled = !active;
+    $("loadAgentMessages").disabled = !active; $("leaveAgentScene").disabled = !active; $("agentMessageBody").disabled = !active; $("sendAgentMessage").disabled = !active;
     if (active) loadAgentMessages();
   });
   $("agentMessageForm").addEventListener("submit", sendAgentCommunityMessage);
