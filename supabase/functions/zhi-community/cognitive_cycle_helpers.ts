@@ -1,4 +1,4 @@
-import type { MouRecord } from "./ontology_helpers.ts";
+import { validateMouRecord, type MouRecord } from "./ontology_helpers.ts";
 
 export type FeedbackInput = {
   id: string;
@@ -6,6 +6,8 @@ export type FeedbackInput = {
   event_time: string;
   recorded_at: string;
   observed_outcome: string;
+  /** Must be grounded in the source's reliability; never silently default to certainty. */
+  confidence: number;
 };
 
 /** Creates an append-only feedback record; it never edits the source hypothesis. */
@@ -20,10 +22,13 @@ export function buildFeedbackRecord(
   if (!input.id.trim() || !input.source_id.trim() || !input.observed_outcome.trim()) {
     throw new Error("feedback_fields_required");
   }
+  if (!Number.isFinite(input.confidence) || input.confidence < 0 || input.confidence > 1) {
+    throw new Error("invalid_feedback_confidence");
+  }
   if (!Number.isFinite(Date.parse(input.event_time)) || !Number.isFinite(Date.parse(input.recorded_at))) {
     throw new Error("invalid_feedback_timestamp");
   }
-  return {
+  const feedback: MouRecord = {
     id: input.id,
     owner_user_id: hypothesis.owner_user_id,
     agent_id: hypothesis.agent_id,
@@ -38,7 +43,7 @@ export function buildFeedbackRecord(
     relation_ids: [hypothesis.id, ...hypothesis.relation_ids],
     evidence_kind: "observation",
     source_ids: [input.source_id],
-    confidence: 1,
+    confidence: input.confidence,
     event_time: input.event_time,
     recorded_at: input.recorded_at,
     inferred_at: null,
@@ -46,6 +51,9 @@ export function buildFeedbackRecord(
     prediction: null,
     version: 1,
   };
+  const validation = validateMouRecord(feedback);
+  if (!validation.valid) throw new Error(`invalid_feedback_record:${validation.errors.join(",")}`);
+  return feedback;
 }
 
 export type RevisionProposal = {
@@ -62,25 +70,44 @@ export type RevisionProposal = {
   created_at: string;
 };
 
-/** Proposes a versioned state change without mutating the current model. */
+/** Requires real, validated feedback records linked to this exact hypothesis and principal. */
 export function buildRevisionProposal(
   current: MouRecord,
   proposal: {
     id: string;
-    feedback_record_ids: string[];
+    feedback_records: MouRecord[];
     proposed_state: Record<string, unknown>;
     created_at: string;
   },
 ): RevisionProposal {
-  if (!proposal.id.trim() || !proposal.feedback_record_ids.length ||
-      proposal.feedback_record_ids.some((id) => !id.trim())) {
-    throw new Error("proposal_and_feedback_ids_required");
+  if (!proposal.id.trim() || !proposal.feedback_records.length) {
+    throw new Error("proposal_and_feedback_records_required");
   }
+  if (!validateMouRecord(current).valid) throw new Error("invalid_current_record");
   if (!proposal.proposed_state || typeof proposal.proposed_state !== "object" ||
       Array.isArray(proposal.proposed_state)) {
     throw new Error("proposed_state_must_be_object");
   }
   if (!Number.isFinite(Date.parse(proposal.created_at))) throw new Error("invalid_proposal_timestamp");
+
+  const ids = proposal.feedback_records.map((record) => record.id);
+  if (new Set(ids).size !== ids.length) throw new Error("duplicate_feedback_records");
+
+  for (const feedback of proposal.feedback_records) {
+    if (!validateMouRecord(feedback).valid) throw new Error("invalid_feedback_record");
+    if (feedback.object_type !== "feedback" || feedback.evidence_kind !== "observation") {
+      throw new Error("source_must_be_observed_feedback");
+    }
+    if (feedback.owner_user_id !== current.owner_user_id || feedback.agent_id !== current.agent_id) {
+      throw new Error("feedback_principal_mismatch");
+    }
+    if (feedback.object_id !== current.object_id ||
+        !feedback.relation_ids.includes(current.id) ||
+        feedback.state.hypothesis_id !== current.id) {
+      throw new Error("feedback_hypothesis_mismatch");
+    }
+  }
+
   return {
     id: proposal.id,
     owner_user_id: current.owner_user_id,
@@ -88,7 +115,7 @@ export function buildRevisionProposal(
     target_object_id: current.object_id,
     based_on_record_id: current.id,
     based_on_version: current.version,
-    feedback_record_ids: [...proposal.feedback_record_ids],
+    feedback_record_ids: ids,
     proposed_state: structuredClone(proposal.proposed_state),
     status: "shadow_proposed",
     requires_human_review: true,
