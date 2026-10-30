@@ -32,7 +32,12 @@ create table if not exists public.zhi_worlds (
   environment_state jsonb not null default '{}'::jsonb check (jsonb_typeof(environment_state) = 'object'),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  check (visibility <> 'public' or entry_policy <> 'invite_only')
+  -- Keep persisted scene policy aligned with the implemented join flows:
+  -- public scenes are open-entry; private scenes require an invitation.
+  check (
+    (visibility = 'public' and entry_policy = 'open')
+    or (visibility = 'private' and entry_policy = 'invite_only')
+  )
 );
 create index if not exists zhi_worlds_public_directory_idx
   on public.zhi_worlds (status, name) where visibility = 'public';
