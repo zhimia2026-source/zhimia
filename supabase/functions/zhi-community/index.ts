@@ -253,7 +253,7 @@ export function createCommunityHandler(
         return reply({ error: "invalid_argument", detail: "proposed_state_must_be_object" }, 400);
       }
 
-      const columns = "id,owner_user_id,agent_id,object_type,object_id,state,relation_ids,evidence_kind,source_ids,confidence,event_time,recorded_at,inferred_at,hypothesis,prediction,version";
+      const columns = "id,owner_user_id,agent_id,object_type,object_id,state,relation_ids,evidence_kind,source_ids,confidence,event_time,recorded_at,inferred_at,hypothesis,prediction,version,change_kind,previous_record_id,source_proposal_id,change_note";
       const { data: baseRecord, error: baseError } = await db.from("zhi_agent_cognition_records")
         .select(columns).eq("id", baseRecordId).eq("owner_user_id", actor.userId)
         .eq("agent_id", agentId).maybeSingle();
@@ -304,7 +304,7 @@ export function createCommunityHandler(
       if (agent.status !== "active") return reply({ error: "conflict", detail: "agent_not_active" }, 409);
 
       const { data: hypothesis, error: hypothesisError } = await db.from("zhi_agent_cognition_records")
-        .select("id,owner_user_id,agent_id,object_type,object_id,state,relation_ids,evidence_kind,source_ids,confidence,event_time,recorded_at,inferred_at,hypothesis,prediction,version")
+        .select("id,owner_user_id,agent_id,object_type,object_id,state,relation_ids,evidence_kind,source_ids,confidence,event_time,recorded_at,inferred_at,hypothesis,prediction,version,change_kind,previous_record_id,source_proposal_id,change_note")
         .eq("id", hypothesisId).eq("owner_user_id", actor.userId).eq("agent_id", agentId).maybeSingle();
       if (hypothesisError) throw new Error("database_error");
       if (!hypothesis) return reply({ error: "not_found" }, 404);
@@ -336,7 +336,7 @@ export function createCommunityHandler(
       }
       const { data: inserted, error } = await db.from("zhi_agent_cognition_records")
         .insert(feedback)
-        .select("id,owner_user_id,agent_id,object_type,object_id,state,relation_ids,evidence_kind,source_ids,confidence,event_time,recorded_at,inferred_at,hypothesis,prediction,version")
+        .select("id,owner_user_id,agent_id,object_type,object_id,state,relation_ids,evidence_kind,source_ids,confidence,event_time,recorded_at,inferred_at,hypothesis,prediction,version,change_kind,previous_record_id,source_proposal_id,change_note")
         .single();
       if (error || !inserted) throw new Error("database_error");
       return reply({ record: inserted }, 201);
@@ -358,7 +358,7 @@ export function createCommunityHandler(
         const limit = Number(url.searchParams.get("limit") ?? "50");
         if (!Number.isInteger(limit) || limit < 1 || limit > 100) return reply({ error: "invalid_argument", detail: "limit_must_be_1_to_100" }, 400);
         const { data: records, error } = await db.from("zhi_agent_cognition_records")
-          .select("id,owner_user_id,agent_id,object_type,object_id,state,relation_ids,evidence_kind,source_ids,confidence,event_time,recorded_at,inferred_at,hypothesis,prediction,version")
+          .select("id,owner_user_id,agent_id,object_type,object_id,state,relation_ids,evidence_kind,source_ids,confidence,event_time,recorded_at,inferred_at,hypothesis,prediction,version,change_kind,previous_record_id,source_proposal_id,change_note")
           .eq("owner_user_id", actor.userId).eq("agent_id", agentId)
           .order("recorded_at", { ascending: false }).limit(limit);
         if (error) throw new Error("database_error");
@@ -388,7 +388,7 @@ export function createCommunityHandler(
       if (!validation.valid) return reply({ error: "invalid_argument", detail: "invalid_mou_record", fields: validation.errors }, 400);
       const { data: inserted, error } = await db.from("zhi_agent_cognition_records")
         .insert(record)
-        .select("id,owner_user_id,agent_id,object_type,object_id,state,relation_ids,evidence_kind,source_ids,confidence,event_time,recorded_at,inferred_at,hypothesis,prediction,version")
+        .select("id,owner_user_id,agent_id,object_type,object_id,state,relation_ids,evidence_kind,source_ids,confidence,event_time,recorded_at,inferred_at,hypothesis,prediction,version,change_kind,previous_record_id,source_proposal_id,change_note")
         .single();
       if (error || !inserted) throw new Error("database_error");
       return reply({ record: inserted }, 201);
