@@ -1,0 +1,26 @@
+name: Care Personal Adapter Check
+
+on:
+  push:
+    branches: [feature/intelligent-community-mvp]
+    paths:
+      - "supabase/functions/zhi-care-personal/**"
+      - ".github/workflows/care-adapter-check.yml"
+  pull_request:
+    paths:
+      - "supabase/functions/zhi-care-personal/**"
+      - ".github/workflows/care-adapter-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  deno-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check Care personal-token adapter
+        run: deno check supabase/functions/zhi-care-personal/index.ts
