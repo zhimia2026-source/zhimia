@@ -23,3 +23,29 @@ export function isMembershipAuthorized(
   if (!Array.isArray(membership.capabilities) || !membership.capabilities.includes(capability)) return false;
   return true;
 }
+
+export type RejoinPrivileges = {
+  membership_role: "owner" | "member";
+  capabilities: string[];
+};
+
+/**
+ * Public-scene rejoining must not resurrect moderator privileges after revocation
+ * or expiry. Only the original owner role is retained; all other actors rejoin
+ * with ordinary messaging capabilities.
+ */
+export function privilegesForPublicRejoin(
+  existingRole: string,
+  existingCapabilities: string[] | null,
+): RejoinPrivileges {
+  if (existingRole === "owner") {
+    return {
+      membership_role: "owner",
+      capabilities: Array.isArray(existingCapabilities) ? [...existingCapabilities] : [],
+    };
+  }
+  return {
+    membership_role: "member",
+    capabilities: ["message:send", "message:read"],
+  };
+}
