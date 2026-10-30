@@ -211,3 +211,68 @@ BEGIN
 END;
 $$;
 
+
+
+-- Private cognition records must bind the agent to its actual owner.
+INSERT INTO public.zhi_agents (id, owner_user_id, display_name, role)
+VALUES
+  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '11111111-1111-4111-8111-111111111111', 'Agent A', 'manager'),
+  ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', '22222222-2222-4222-8222-222222222222', 'Agent B', 'manager');
+
+INSERT INTO public.zhi_agent_cognition_records (
+  owner_user_id, agent_id, object_type, object_id, state,
+  evidence_kind, source_ids, confidence, event_time
+) VALUES (
+  '11111111-1111-4111-8111-111111111111',
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  'world', 'forest-1', '{"weather":"rain"}',
+  'observation', ARRAY['event-1'], 0.9, now()
+);
+
+DO $$
+BEGIN
+  IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid = 'public.zhi_agent_cognition_records'::regclass) THEN
+    RAISE EXCEPTION 'RLS must be enabled on private cognition records';
+  END IF;
+  IF has_table_privilege('anon', 'public.zhi_agent_cognition_records', 'SELECT')
+     OR has_table_privilege('authenticated', 'public.zhi_agent_cognition_records', 'SELECT') THEN
+    RAISE EXCEPTION 'browser roles must not directly read private cognition records';
+  END IF;
+  IF NOT has_table_privilege('service_role', 'public.zhi_agent_cognition_records', 'SELECT')
+     OR NOT has_table_privilege('service_role', 'public.zhi_agent_cognition_records', 'INSERT') THEN
+    RAISE EXCEPTION 'service_role must mediate private cognition access';
+  END IF;
+
+  -- A mismatched owner/agent pair must fail at the composite foreign key.
+  BEGIN
+    INSERT INTO public.zhi_agent_cognition_records (
+      owner_user_id, agent_id, object_type, object_id, state,
+      evidence_kind, source_ids, confidence
+    ) VALUES (
+      '22222222-2222-4222-8222-222222222222',
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      'self', 'spoofed-agent', '{}',
+      'observation', ARRAY['test-source'], 0.8
+    );
+    RAISE EXCEPTION 'cross-owner cognition insert was accepted';
+  EXCEPTION WHEN foreign_key_violation THEN
+    NULL;
+  END;
+
+  -- Unknown must not acquire fabricated confidence.
+  BEGIN
+    INSERT INTO public.zhi_agent_cognition_records (
+      owner_user_id, agent_id, object_type, object_id, state,
+      evidence_kind, source_ids, confidence
+    ) VALUES (
+      '11111111-1111-4111-8111-111111111111',
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      'self', 'invalid-unknown', '{}',
+      'unknown', '{}', 0.5
+    );
+    RAISE EXCEPTION 'unknown cognition record accepted fabricated confidence';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+END;
+$$;
