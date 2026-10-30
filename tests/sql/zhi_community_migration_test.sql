@@ -432,8 +432,17 @@ BEGIN
   IF (v_result #>> '{record,version}')::integer <> 4
      OR v_result #>> '{record,change_kind}' <> 'rollback'
      OR v_result #>> '{record,previous_record_id}' <> v_approved_record_id::text
-     OR (v_result #> '{record,state}') <> '{"weather":"rain"}'::jsonb THEN
-    RAISE EXCEPTION 'rollback did not append a correct restored snapshot';
+     OR (v_result #> '{record,state}') <> '{"weather":"rain"}'::jsonb
+     OR v_result #>> '{record,change_note}' <> 'Restore prior state in disposable CI' THEN
+    RAISE EXCEPTION 'rollback did not append a correct restored snapshot with durable audit note';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.zhi_agent_cognition_records
+    WHERE id = v_approved_record_id
+      AND change_note = 'Approved in disposable CI'
+      AND change_kind = 'approved_revision'
+  ) THEN
+    RAISE EXCEPTION 'approved revision decision note was not persisted in version history';
   END IF;
 
   -- A proposal based on the old version cannot overwrite a newer current version.
