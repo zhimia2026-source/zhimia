@@ -120,6 +120,35 @@ export function createCommunityHandler(
     const path = url.pathname.includes(marker) ? url.pathname.slice(url.pathname.indexOf(marker) + marker.length) : url.pathname;
     const parts = path.split("/").filter(Boolean);
 
+    if (req.method === "GET" && path === "/v1/agents") {
+      const { data: agents, error } = await db.from("zhi_agents")
+        .select("id,owner_user_id,display_name,role,visibility,manifest_version,public_manifest,status,created_at,updated_at")
+        .eq("owner_user_id", actor.userId).order("created_at", { ascending: false }).limit(100);
+      if (error) throw new Error("database_error");
+      return reply({ items: agents ?? [] });
+    }
+
+    if (req.method === "POST" && path === "/v1/agents") {
+      const body = await readBody(req);
+      if (!isText(body.display_name, 120)) return reply({ error: "invalid_argument", detail: "display_name_required" }, 400);
+      const role = body.role === undefined ? "manager" : body.role;
+      const visibility = body.visibility === undefined ? "private" : body.visibility;
+      const manifest = body.public_manifest === undefined ? {} : body.public_manifest;
+      if (!isText(role, 80) || !["private", "public"].includes(String(visibility)) ||
+          !manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
+        return reply({ error: "invalid_argument", detail: "invalid_agent_profile" }, 400);
+      }
+      const { data: agent, error } = await db.from("zhi_agents").insert({
+        owner_user_id: actor.userId,
+        display_name: body.display_name.trim(),
+        role,
+        visibility,
+        public_manifest: manifest,
+      }).select("id,owner_user_id,display_name,role,visibility,manifest_version,public_manifest,status,created_at,updated_at").single();
+      if (error || !agent) throw new Error("database_error");
+      return reply({ agent }, 201);
+    }
+
     // Private cognition is scoped to the authenticated owner + an agent they own.
     // It is deliberately separate from scene messages and shared conversation context.
     if (parts.length === 4 && parts[0] === "v1" && parts[1] === "agents" && parts[3] === "cognition" &&
