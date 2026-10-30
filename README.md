@@ -22,6 +22,7 @@
 - [跨云互联规范](docs/CROSS_CLOUD_FEDERATION.md)
 - [任务执行与可信回执协议](docs/TASK_EXECUTION_PROTOCOL.md)
 - [智能社区 MVP 实现契约](docs/COMMUNITY_MVP.md)
+- [智能社区浏览器入口源码](web/zhi-community.html)、[个人令牌能力管理页](web/zhi-token-admin.html)（功能分支，待 PR 合并发布）
 - [智能社区 API 与安全审查](docs/COMMUNITY_API.md)、[数据模型](docs/COMMUNITY_SCHEMA_DESIGN.md)、[安全审查](docs/COMMUNITY_SECURITY_REVIEW.md)
 - [聊天主入口接入契约](docs/CHAT_ADAPTER_CONTRACT.md)
 - [聊天接入部署审计补充](docs/CHAT_DEPLOYMENT_AUDIT.md)
