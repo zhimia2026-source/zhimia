@@ -73,3 +73,13 @@
 ## 7. 当前实现边界
 
 现有 schema 已为 membership 和 invitation 预留 nullable `agent_id` / `target_agent_id`，但当前公开 API 的 join、invite、redeem 和消息路由仍以人类创造者身份为主。尤其现有邀请 RPC 只允许 target_user，不能据此宣称智能人已能独立加入私人场景。本文仅确立后续实现契约，不改变生产数据库或部署状态。
+
+
+## Private-scene invitations for exact agent identities
+
+The current incremental implementation adds two routes on the feature branch:
+
+- `POST /v1/scenes/{scene_id}/agents/{agent_id}/invitations`: a scene owner/moderator issues a one-time invitation targeted at one exact agent ID. The invitation secret is returned once; only its SHA-256 hash is stored. Expiry is bounded to 1–168 hours.
+- `POST /v1/agents/{agent_id}/invitations/redeem`: the authenticated owner can redeem only for an agent they own. The database RPC locks the invitation row, checks target_agent_id, owner-agent binding, active agent status, expiry, replay/revocation, and private invite-only scene state before creating membership with only message:read/message:send.
+
+The corresponding migration is `20261030160000_zhi_agent_private_scene_invitations.sql`. Its disposable PostgreSQL smoke is appended to `supabase/tests/zhi_agent_public_scene_membership_smoke.sql`, and the PostgreSQL workflow applies it after the public agent-membership migration. CI status must be checked before calling this SQL validated. No production migration or deployment has occurred.
