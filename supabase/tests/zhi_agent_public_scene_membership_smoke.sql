@@ -127,7 +127,7 @@ end;
 $$;
 
 
-do $
+do $agent_invite_smoke$
 declare
   v_result jsonb;
   v_count integer;
@@ -226,6 +226,6 @@ begin
     raise exception 'agent_invitation_redeem_grants_invalid';
   end if;
 end;
-$;
+$agent_invite_smoke$;
 
 rollback;
