@@ -25,7 +25,7 @@ function harness(actorId: string, sceneAllowed = false, capabilities = ["communi
         eq(key: string, value: unknown) { filters[key] = value; return builder; },
         is(key: string, value: unknown) { filters[key] = value; return builder; },
         order(_key: string, _options: unknown) { return builder; },
-        limit(_value: number) { return builder; },
+        limit(_value: number) { return builder; },\n        in(key: string, value: unknown) { filters[key] = value; return builder; },
         insert(value: Record<string, unknown>) { operation = "insert"; inserted = value; return builder; },
         update(value: Record<string, unknown>) { operation = "update"; updated = value; return builder; },
         maybeSingle() {
@@ -40,10 +40,19 @@ function harness(actorId: string, sceneAllowed = false, capabilities = ["communi
               : null, error: null });
           }
           if (table === "zhi_world_memberships") {
+            const expectedAgent = actorId === ownerA ? agentA : agentB;
+            const isAgent = filters.agent_id === expectedAgent;
             return Promise.resolve({ data: sceneAllowed && filters.principal_user_id === actorId
-              ? { principal_user_id: actorId, status: "active", revoked_at: null, agent_id: null,
-                  expires_at: null, capabilities: ["message:read"] }
+              ? { principal_user_id: actorId, status: "active", revoked_at: null,
+                  agent_id: isAgent ? expectedAgent : null,
+                  expires_at: null, capabilities: isAgent ? ["message:read", "message:send"] : ["message:read"] }
               : null, error: null });
+          }
+          if (table === "zhi_world_conversations") {
+            return Promise.resolve({ data: null, error: null });
+          }
+          if (table === "zhi_world_messages") {
+            return Promise.resolve({ data: null, error: null });
           }
           if (table === "zhi_agents") {
             const expected = actorId === ownerA ? agentA : agentB;
@@ -65,6 +74,12 @@ function harness(actorId: string, sceneAllowed = false, capabilities = ["communi
           if (table === "zhi_agent_chat_turns" && operation === "insert") return Promise.resolve({ data: {
             id: "turn-1", owner_user_id: inserted.owner_user_id, agent_id: inserted.agent_id,
             user_message: inserted.user_message, status: "pending", created_at: "2026-10-30T00:00:00Z",
+          }, error: null });
+          if (table === "zhi_world_conversations" && operation === "insert") return Promise.resolve({ data: { id: "conversation-1" }, error: null });
+          if (table === "zhi_world_messages" && operation === "insert") return Promise.resolve({ data: {
+            id: "message-1", conversation_id: inserted.conversation_id, sender_user_id: inserted.sender_user_id,
+            sender_agent_id: inserted.sender_agent_id, request_id: inserted.request_id,
+            message_kind: inserted.message_kind, payload: inserted.payload, created_at: "2026-10-30T00:00:00Z",
           }, error: null });
           return Promise.resolve({ data: null, error: null });
         },
@@ -226,4 +241,48 @@ Deno.test("creator can revoke their own agent scene membership", async () => {
   ));
   assertEquals(response.status, 200);
   assertEquals(h.rpcCalls[0].name, "zhi_revoke_agent_world_membership");
+});
+
+
+Deno.test("agent sends a community message with sender_agent_id, never sender_user_id", async () => {
+  const h = harness(ownerA, true, ["community.message.send"]);
+  const response = await h.handler(new Request(
+    `https://unit.test/functions/v1/zhi-community/v1/agents/${agentA}/scenes/cccccccc-cccc-4ccc-8ccc-cccccccccccc/messages`,
+    {
+      method: "POST",
+      headers: { authorization: "Bearer token-a", "content-type": "application/json", "idempotency-key": "agent-msg-1" },
+      body: JSON.stringify({ body: "大家好，我来社区了。" }),
+    },
+  ));
+  const body = await response.json();
+  assertEquals(response.status, 201);
+  assertEquals(body.message.sender_agent_id, agentA);
+  assertEquals(body.message.sender_user_id, null);
+  assertEquals(body.message.payload.body, "大家好，我来社区了。");
+});
+
+Deno.test("agent message send is denied without its own active scene membership", async () => {
+  const h = harness(ownerA, false, ["community.message.send"]);
+  const response = await h.handler(new Request(
+    `https://unit.test/functions/v1/zhi-community/v1/agents/${agentA}/scenes/cccccccc-cccc-4ccc-8ccc-cccccccccccc/messages`,
+    {
+      method: "POST",
+      headers: { authorization: "Bearer token-a", "content-type": "application/json", "idempotency-key": "agent-msg-denied" },
+      body: JSON.stringify({ body: "不应发送" }),
+    },
+  ));
+  assertEquals(response.status, 403);
+});
+
+Deno.test("agent message send requires the token message-send capability", async () => {
+  const h = harness(ownerA, true, ["community.scene.enter"]);
+  const response = await h.handler(new Request(
+    `https://unit.test/functions/v1/zhi-community/v1/agents/${agentA}/scenes/cccccccc-cccc-4ccc-8ccc-cccccccccccc/messages`,
+    {
+      method: "POST",
+      headers: { authorization: "Bearer token-a", "content-type": "application/json", "idempotency-key": "agent-msg-no-scope" },
+      body: JSON.stringify({ body: "不应发送" }),
+    },
+  ));
+  assertEquals(response.status, 403);
 });
