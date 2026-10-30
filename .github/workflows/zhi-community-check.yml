@@ -122,6 +122,8 @@ jobs:
           SQL
       - name: Apply community migration to disposable PostgreSQL
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261028140000_zhi_community_core.sql
+      - name: Apply scene environment configuration migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030210000_zhi_scene_environment_config.sql
       - name: Apply private cognition migration to disposable PostgreSQL
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030120000_zhi_private_cognition_records.sql
       - name: Apply cognition revision proposals migration to disposable PostgreSQL
