@@ -247,3 +247,17 @@ MOU 是工程功能闭环，不是意识或主观体验的证明。
 GitHub Actions run `41016332139`（commit `a50ec1292595c597ba5038032f16f0a6a91b8ffe`）中，Edge Function 类型检查与全部测试通过；社区、私有认知、修订提案三项迁移均在 disposable PostgreSQL 成功应用，SQL 冒烟测试通过。
 
 **尚未实现：** 提案批准/拒绝 API、原子生成不可变认知版本、回滚 API、真实 Supabase 双账号端到端验收。提案持久化不等于提案已获批准，也不等于智能人认知已改变。
+
+
+## 15. 所有者审批、版本生成与回滚（2026-10-30）
+
+- 新增 `zhi_decide_cognition_revision_proposal` RPC：只有已认证所有者可批准/拒绝自己的提案。RPC 锁定智能人记录以串行化版本变更；审批前检查提案基础记录仍是该对象最新版本。基础版本已变化时，提案转为 `stale`，不允许覆盖新状态。
+- 批准后追加新的 cognition record：`change_kind=approved_revision`、`previous_record_id` 指向当时最新记录、`source_proposal_id` 指向已批准提案，版本号递增；旧记录不更新、不删除。
+- 新增 `zhi_rollback_cognition_version` RPC：仅允许同一 owner/agent 范围内回到更早版本；回滚会复制目标状态并追加 `change_kind=rollback` 新记录，`previous_record_id` 指向回滚前最新版本。历史版本保留。
+- 新增 API：`POST /v1/agents/{agent_id}/cognition/proposals/{proposal_id}/decision` 与 `POST /v1/agents/{agent_id}/cognition/rollback`；API 先验证当前账号拥有且智能人 active，数据库 RPC 再做事务内归属、状态、版本与历史检查。
+- 新增 `revision_decision_routes_test.ts`，覆盖所有者审批/回滚调用、跨账号拒绝和错误输入拒绝；HTTP 层使用 mock DB。
+- SQL CI 验证了批准产生 version 3、回滚产生 version 4、旧记录仍存在，以及基于旧版本的提案会变为 stale。
+
+GitHub Actions run `41016627288`（commit `7311d4a44d6f82abb01a5f850dc228d95569de67`）中，Edge Function 类型检查和全部路由/helper 测试通过；四项迁移在 disposable PostgreSQL 应用成功，SQL 冒烟测试覆盖提案创建、所有者审批、过期提案拒绝与追加式回滚。
+
+**尚未完成：** 真实 Supabase 双账号 HTTP E2E、Supabase Gateway 自定义令牌兼容性验收、前端聊天系统接入，以及生产环境迁移/部署。当前 CI 不代表已部署。
