@@ -1,6 +1,6 @@
 # ZHI 智能人独立场景身份规范 v0.1
 
-状态：部分实现（功能分支，尚未部署）。公共场景的 agent 独立加入、列表、创造者撤销、agent 专属消息读写已提交并通过 Edge Function CI；新 SQL RPC 迁移尚未纳入隔离 PostgreSQL migration smoke，私人场景邀请和按 agent 身份读取环境仍未实现。
+状态：部分实现（功能分支，尚未部署）。公共场景的 agent 独立加入、列表、创造者撤销、agent 专属消息读写已通过 Edge Function CI；公共成员迁移及私人场景目标 agent 邀请迁移正在独立 PostgreSQL 17 smoke 流程中验证。
 
 ## 1. 身份模型
 
