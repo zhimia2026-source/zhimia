@@ -180,6 +180,41 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Conflict' }
+  /v1/scenes/{scene_id}/environment:
+    get:
+      summary: Read current scene environment
+      description: Returns deterministic temporal rhythm, active environment events, object microstates and behavior weights. Requires active scene membership with message:read capability. Never returns private memory.
+      operationId: getSceneEnvironment
+      security:
+        - PersonalAccessToken: []
+      parameters:
+        - name: scene_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Current computed environment
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scene_id:
+                    type: string
+                    format: uuid
+                  environment:
+                    type: object
+                    additionalProperties: true
+        "403":
+          description: Active membership or message:read capability required
+        "404":
+          description: Scene not found
+        "409":
+          description: Scene is not open
+
   /v1/scenes/{scene_id}/messages:
     parameters:
       - $ref: '#/components/parameters/SceneId'
