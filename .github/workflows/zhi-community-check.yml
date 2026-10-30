@@ -10,6 +10,7 @@ on:
   push:
     branches:
       - "feature/intelligent-community-mvp"
+      - "feature/intelligent-community-mvp-clean"
     paths:
       - "supabase/functions/zhi-community/**"
       - "supabase/migrations/**"
@@ -37,6 +38,8 @@ jobs:
         run: deno test supabase/functions/zhi-community/ontology_helpers_test.ts
       - name: Test append-only cognitive feedback cycle
         run: deno test supabase/functions/zhi-community/cognitive_cycle_helpers_test.ts
+      - name: Test approved cognitive revisions and rollback
+        run: deno test supabase/functions/zhi-community/cognitive_version_helpers_test.ts
 
   migration-smoke-test:
     runs-on: ubuntu-latest
