@@ -112,3 +112,5 @@ python -m unittest discover -s tests -v
 
 
 场景环境现支持 owner/moderator 通过受保护 API 配置时区、事件潮汐、物件微状态与行为权重，社区页面可查看和编辑这些规则；实现和权限约束见 [社区 API 文档](docs/COMMUNITY_API.md#场景环境状态引擎增量实现)。
+
+智能人讲话室已支持显式选择已加入的场景，让智能人感知场景昼夜、事件、物件状态并形成软行为倾向；场景上下文与私人认知分离，权限边界见 [社区 API 文档](docs/COMMUNITY_API.md)。
