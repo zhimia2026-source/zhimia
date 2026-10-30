@@ -96,6 +96,7 @@ function randomToken(bytes = 32): string {
 export type CommunityHandlerDependencies = {
   dbClient?: () => SupabaseClient;
   authenticate?: (db: SupabaseClient, req: Request) => Promise<Actor | null>;
+  fetchModel?: typeof fetch;
 };
 
 /** Exported request handler enables HTTP-level tests with isolated dependencies. */
@@ -104,6 +105,7 @@ export function createCommunityHandler(
 ): (req: Request) => Promise<Response> {
   const getDb = dependencies.dbClient ?? dbClient;
   const authenticateRequest = dependencies.authenticate ?? authenticate;
+  const callModel = dependencies.fetchModel ?? fetch;
   return async (req: Request) => {
   const cors = corsHeaders(req);
   if (!cors) return json({ error: "origin_not_allowed" }, 403);
@@ -392,6 +394,128 @@ export function createCommunityHandler(
         .single();
       if (error || !inserted) throw new Error("database_error");
       return reply({ record: inserted }, 201);
+    }
+
+    // Private agent chat: session history and private cognition are loaded only
+    // after binding the requested agent to the authenticated owner. Scene messages
+    // are intentionally excluded from this context.
+    if (parts.length === 4 && parts[0] === "v1" && parts[1] === "agents" &&
+        parts[3] === "chat" && (req.method === "GET" || req.method === "POST")) {
+      const agentId = parts[2];
+      if (!isUuid(agentId)) return reply({ error: "invalid_argument", detail: "agent_id_must_be_uuid" }, 400);
+      const { data: agent, error: agentError } = await db.from("zhi_agents")
+        .select("id,owner_user_id,display_name,role,public_manifest,status")
+        .eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
+      if (agentError) throw new Error("database_error");
+      if (!agent) return reply({ error: "not_found" }, 404);
+      if (agent.status !== "active") return reply({ error: "conflict", detail: "agent_not_active" }, 409);
+
+      if (req.method === "GET") {
+        const limit = Number(url.searchParams.get("limit") ?? "50");
+        if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+          return reply({ error: "invalid_argument", detail: "limit_must_be_1_to_100" }, 400);
+        }
+        const { data: turns, error } = await db.from("zhi_agent_chat_turns")
+          .select("id,owner_user_id,agent_id,user_message,assistant_message,status,provider_model,created_at,completed_at")
+          .eq("owner_user_id", actor.userId).eq("agent_id", agentId)
+          .order("created_at", { ascending: false }).limit(limit);
+        if (error) throw new Error("database_error");
+        return reply({ items: (turns ?? []).reverse() });
+      }
+
+      const body = await readBody(req);
+      if (!isText(body.message, 8000)) return reply({ error: "invalid_argument", detail: "message_must_be_1_to_8000_chars" }, 400);
+      const requestKey = req.headers.get("idempotency-key")?.trim();
+      if (!requestKey || requestKey.length > 200) {
+        return reply({ error: "invalid_argument", detail: "idempotency_key_required" }, 400);
+      }
+      const providerUrl = Deno.env.get("ZHI_CHAT_API_URL") ?? "";
+      const providerKey = Deno.env.get("ZHI_CHAT_API_KEY") ?? "";
+      const providerModel = Deno.env.get("ZHI_CHAT_MODEL") ?? "";
+      if (!providerUrl.startsWith("https://") || !providerKey || !providerModel) {
+        return reply({ error: "chat_model_not_configured" }, 503);
+      }
+
+      const { data: existing, error: existingError } = await db.from("zhi_agent_chat_turns")
+        .select("id,owner_user_id,agent_id,user_message,assistant_message,status,provider_model,created_at,completed_at")
+        .eq("owner_user_id", actor.userId).eq("agent_id", agentId).eq("request_key", requestKey).maybeSingle();
+      if (existingError) throw new Error("database_error");
+      if (existing) {
+        if (existing.user_message !== body.message.trim()) {
+          return reply({ error: "conflict", detail: "idempotency_key_payload_mismatch" }, 409);
+        }
+        if (existing.status === "complete") return reply({ turn: existing, idempotent_replay: true });
+        return reply({ error: "conflict", detail: existing.status === "pending" ? "turn_in_progress" : "turn_failed_no_replay" }, 409);
+      }
+
+      const [cognitionResult, historyResult] = await Promise.all([
+        db.from("zhi_agent_cognition_records")
+          .select("object_type,object_id,state,evidence_kind,source_ids,confidence,event_time,recorded_at,inferred_at,hypothesis,prediction,version")
+          .eq("owner_user_id", actor.userId).eq("agent_id", agentId)
+          .order("recorded_at", { ascending: false }).limit(20),
+        db.from("zhi_agent_chat_turns")
+          .select("user_message,assistant_message,status,created_at")
+          .eq("owner_user_id", actor.userId).eq("agent_id", agentId)
+          .eq("status", "complete").order("created_at", { ascending: false }).limit(12),
+      ]);
+      if (cognitionResult.error || historyResult.error) throw new Error("database_error");
+      const cognition = cognitionResult.data ?? [];
+      const history = (historyResult.data ?? []).reverse();
+      const { data: pendingTurn, error: insertError } = await db.from("zhi_agent_chat_turns")
+        .insert({
+          owner_user_id: actor.userId, agent_id: agentId, request_key: requestKey,
+          user_message: body.message.trim(), status: "pending",
+        })
+        .select("id,owner_user_id,agent_id,user_message,status,created_at")
+        .single();
+      if (insertError || !pendingTurn) {
+        if (insertError?.code === "23505") return reply({ error: "conflict", detail: "idempotency_race_retry" }, 409);
+        throw new Error("database_error");
+      }
+
+      const systemPrompt = [
+        "你是 ZHI 世界中的一位独立智能人。请依据提供的身份资料与私有认知记录表达，不要编造未被记录支持的经历。",
+        "区分观察、事实、推断、假设和未知；证据不足时明确说不确定。可以有独立观点，不必迎合用户。",
+        "聊天内容默认只保存在当前私有会话，不自动转化为长期认知；不要声称已经执行现实世界动作。",
+        "当前上下文只包含当前所有者与当前 Agent 的私有认知和私有会话历史，不包含任何场景共享消息。",
+        "身份资料：" + JSON.stringify({ display_name: agent.display_name, role: agent.role, public_manifest: agent.public_manifest ?? {} }),
+        "私有认知记录：" + JSON.stringify(cognition),
+      ].join("\n");
+      const messages = [
+        { role: "system", content: systemPrompt },
+        ...history.flatMap((turn: { user_message: string; assistant_message: string }) => [
+          { role: "user", content: turn.user_message },
+          { role: "assistant", content: turn.assistant_message },
+        ]),
+        { role: "user", content: body.message.trim() },
+      ];
+
+      let modelReply = "";
+      try {
+        const upstream = await callModel(providerUrl, {
+          method: "POST",
+          headers: { authorization: `Bearer ${providerKey}`, "content-type": "application/json" },
+          body: JSON.stringify({ model: providerModel, messages, temperature: 0.7, max_tokens: 900, stream: false }),
+          signal: AbortSignal.timeout(45_000),
+        });
+        const result = await upstream.json().catch(() => ({}));
+        if (!upstream.ok) throw new Error("provider_http_error");
+        modelReply = String(result?.choices?.[0]?.message?.content ?? "").trim();
+        if (!modelReply) throw new Error("provider_empty_reply");
+      } catch {
+        await db.from("zhi_agent_chat_turns").update({ status: "failed", error_code: "provider_unavailable" })
+          .eq("id", pendingTurn.id).eq("owner_user_id", actor.userId).eq("agent_id", agentId).eq("status", "pending");
+        return reply({ error: "chat_generation_failed" }, 502);
+      }
+
+      const completedAt = new Date().toISOString();
+      const { data: completed, error: completeError } = await db.from("zhi_agent_chat_turns")
+        .update({ assistant_message: modelReply, status: "complete", provider_model: providerModel, completed_at: completedAt })
+        .eq("id", pendingTurn.id).eq("owner_user_id", actor.userId).eq("agent_id", agentId).eq("status", "pending")
+        .select("id,owner_user_id,agent_id,user_message,assistant_message,status,provider_model,created_at,completed_at")
+        .maybeSingle();
+      if (completeError || !completed) throw new Error("database_error");
+      return reply({ turn: completed, idempotent_replay: false }, 201);
     }
 
     if (req.method === "GET" && path === "/v1/scenes") {
