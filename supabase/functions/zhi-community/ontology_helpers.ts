@@ -48,8 +48,19 @@ export function validateMouRecord(value: unknown): MouValidation {
     if (r[key] !== null && (typeof r[key] !== "string" || !Number.isFinite(Date.parse(r[key] as string)))) errors.push(`invalid_${key}`);
   }
   if (r.evidence_kind === "inference" && (typeof r.inferred_at !== "string" || !r.inferred_at)) errors.push("inference_requires_inferred_at");
-  if (r.evidence_kind === "hypothesis" && (typeof r.hypothesis !== "string" || !r.hypothesis.trim())) errors.push("hypothesis_requires_text");
-  if (r.prediction !== null && typeof r.prediction !== "string") errors.push("invalid_prediction");
+  if (r.evidence_kind === "hypothesis") {
+    if (typeof r.hypothesis !== "string" || !r.hypothesis.trim()) errors.push("hypothesis_requires_text");
+    if (typeof r.inferred_at !== "string" || !r.inferred_at) errors.push("hypothesis_requires_inferred_at");
+    if (!Array.isArray(r.source_ids) || r.source_ids.length === 0) errors.push("hypothesis_requires_source");
+  }
+  if (r.evidence_kind === "unknown" &&
+      (r.inferred_at !== null || r.hypothesis !== null || r.prediction !== null)) {
+    errors.push("unknown_must_not_claim_inference_or_prediction");
+  }
+  if (r.evidence_kind === "observation" || r.evidence_kind === "fact") {
+    if (r.inferred_at !== null || r.hypothesis !== null) errors.push("direct_evidence_must_not_claim_inference");
+  }
+  if (r.prediction !== null && (typeof r.prediction !== "string" || !r.prediction.trim())) errors.push("invalid_prediction");
   if (!Number.isInteger(r.version) || (r.version as number) < 1) errors.push("invalid_version");
   return { valid: errors.length === 0, errors };
 }
