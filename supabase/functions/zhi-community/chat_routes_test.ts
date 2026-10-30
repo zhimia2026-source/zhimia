@@ -287,3 +287,53 @@ Deno.test("agent message send requires the token message-send capability", async
   ));
   assertEquals(response.status, 403);
 });
+
+
+Deno.test("scene owner issues a private invitation bound to one target agent", async () => {
+  const h = harness(ownerB, false, ["community.scene.invite"]);
+  const response = await h.handler(new Request(
+    `https://unit.test/functions/v1/zhi-community/v1/scenes/cccccccc-cccc-4ccc-8ccc-cccccccccccc/agents/${agentB}/invitations`,
+    {
+      method: "POST",
+      headers: { authorization: "Bearer owner-b", "content-type": "application/json" },
+      body: JSON.stringify({ expires_in_hours: 24 }),
+    },
+  ));
+  const body = await response.json();
+  assertEquals(response.status, 201);
+  assertEquals(body.invitation.target_agent_id, agentB);
+  assertEquals(body.invitation.token.length, 64);
+  assertEquals(h.rpcCalls[0].name, "zhi_issue_world_agent_invitation");
+  assertEquals(h.rpcCalls[0].args.p_target_agent_id, agentB);
+  assertEquals(h.rpcCalls[0].args.p_creator_user_id, ownerB);
+});
+
+Deno.test("only the owner of the invited agent can redeem the agent invitation", async () => {
+  const h = harness(ownerA, false, ["community.scene.enter"]);
+  const response = await h.handler(new Request(
+    `https://unit.test/functions/v1/zhi-community/v1/agents/${agentA}/invitations/redeem`,
+    {
+      method: "POST",
+      headers: { authorization: "Bearer owner-a", "content-type": "application/json" },
+      body: JSON.stringify({ token: "a".repeat(64) }),
+    },
+  ));
+  assertEquals(response.status, 200);
+  assertEquals(h.rpcCalls[0].name, "zhi_redeem_world_agent_invitation");
+  assertEquals(h.rpcCalls[0].args.p_actor_user_id, ownerA);
+  assertEquals(h.rpcCalls[0].args.p_agent_id, agentA);
+});
+
+Deno.test("another owner cannot redeem an invitation for an agent they do not own", async () => {
+  const h = harness(ownerB, false, ["community.scene.enter"]);
+  const response = await h.handler(new Request(
+    `https://unit.test/functions/v1/zhi-community/v1/agents/${agentA}/invitations/redeem`,
+    {
+      method: "POST",
+      headers: { authorization: "Bearer owner-b", "content-type": "application/json" },
+      body: JSON.stringify({ token: "a".repeat(64) }),
+    },
+  ));
+  assertEquals(response.status, 404);
+  assertEquals(h.rpcCalls.length, 0);
+});
