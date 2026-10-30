@@ -139,6 +139,73 @@ BEGIN
 END;
 $$;
 
+-- Public scene join is open to any authenticated principal and idempotent under concurrency.
+DO $
+DECLARE
+  v_scene_id uuid;
+  v_result jsonb;
+  v_count integer;
+BEGIN
+  v_result := public.zhi_create_world_with_owner(
+    '11111111-1111-4111-8111-111111111111',
+    'CI Public Join Scene',
+    'Atomic public join test',
+    'public',
+    'open'
+  );
+  v_scene_id := (v_result #>> '{scene,id}')::uuid;
+
+  v_result := public.zhi_join_public_world(
+    v_scene_id, '22222222-2222-4222-8222-222222222222'
+  );
+  IF v_result ->> 'membership' <> 'active' THEN
+    RAISE EXCEPTION 'public join did not create active membership';
+  END IF;
+
+  -- A repeated join restores/returns the same membership instead of duplicating it.
+  v_result := public.zhi_join_public_world(
+    v_scene_id, '22222222-2222-4222-8222-222222222222'
+  );
+  SELECT count(*) INTO v_count
+  FROM public.zhi_world_memberships
+  WHERE world_id = v_scene_id
+    AND principal_user_id = '22222222-2222-4222-8222-222222222222'
+    AND agent_id IS NULL
+    AND status = 'active';
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'public join is not idempotent; active membership count=%', v_count;
+  END IF;
+
+  IF has_function_privilege('anon', 'public.zhi_join_public_world(uuid,uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'anon must not execute public join RPC';
+  END IF;
+  IF has_function_privilege('authenticated', 'public.zhi_join_public_world(uuid,uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'authenticated must not execute public join RPC';
+  END IF;
+  IF NOT has_function_privilege('service_role', 'public.zhi_join_public_world(uuid,uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'service_role must execute public join RPC';
+  END IF;
+
+  v_result := public.zhi_create_world_with_owner(
+    '11111111-1111-4111-8111-111111111111',
+    'CI Private Join Denial',
+    'Private scenes must not allow public join',
+    'private',
+    'invite_only'
+  );
+  v_scene_id := (v_result #>> '{scene,id}')::uuid;
+  BEGIN
+    PERFORM public.zhi_join_public_world(
+      v_scene_id, '22222222-2222-4222-8222-222222222222'
+    );
+    RAISE EXCEPTION 'private scene accepted public join';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM = 'private scene accepted public join' THEN RAISE; END IF;
+    IF SQLERRM <> 'scene_not_public_open' THEN RAISE; END IF;
+  END;
+END;
+$;
+
 -- Invitation target binding, one-time consumption, and private-scene checks.
 DO $$
 DECLARE
