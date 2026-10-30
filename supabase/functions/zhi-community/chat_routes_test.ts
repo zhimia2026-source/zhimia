@@ -292,7 +292,7 @@ Deno.test("agent message send requires the token message-send capability", async
 Deno.test("scene owner issues a private invitation bound to one target agent", async () => {
   const h = harness(ownerB, false, ["community.scene.invite"]);
   const response = await h.handler(new Request(
-    `https://unit.test/functions/v1/zhi-community/v1/scenes/cccccccc-cccc-4ccc-8ccc-cccccccccccc/agents/${agentB}/invitations`,
+    `https://unit.test/functions/v1/zhi-community/v1/scenes/cccccccc-cccc-4ccc-8ccc-cccccccccccc/agents/${agentA}/invitations`,
     {
       method: "POST",
       headers: { authorization: "Bearer owner-b", "content-type": "application/json" },
