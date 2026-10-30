@@ -1,6 +1,6 @@
 # ZHI Community Security Review — MVP Gate
 
-Date: 2026-10-28
+Date: 2026-10-30
 Branch: `feature/intelligent-community-mvp-clean`
 
 This review records source-level findings and release gates. It does not certify production deployment.
@@ -14,15 +14,16 @@ This review records source-level findings and release gates. It does not certify
 - Private conversations are excluded from the current message endpoints. Do not enable private chat until each read/write checks active conversation membership, active scene membership, expiry, and the relevant capability.
 - Scene creation writes the scene and owner membership atomically.
 - A unique partial index enforces at most one open group conversation per scene.
+- Private cognition read/write routes check the authenticated owner and agent pair; the feedback route additionally requires an owned hypothesis and appends a separate observation record without modifying the hypothesis.
 
 ## Required before production
 
-1. **Token revocation race:** code fix committed in `e633363aaadcf1b7b03fd2d958daf947d50d3b45`; the authentication path now uses `auth_helpers.ts` to accept only a successful conditional update that returns a row. Regression cases were added in `auth_helpers_test.ts` for success, no matching row, database error, and mixed data/error. The GitHub Actions workflow now runs `deno test supabase/functions/zhi-community/auth_helpers_test.ts`; execution must still be confirmed on the latest head.
+1. **Token revocation race:** code fix committed in `e633363aaadcf1b7b03fd2d958daf947d50d3b45`; the authentication path now uses `auth_helpers.ts` to accept only a successful conditional update that returns a row. Regression cases are included in `auth_helpers_test.ts` and passed in the latest verified run.
 2. **Cross-account isolation:** prove that account A cannot read account B's private conversation, redeem an invitation targeted to B, or use a revoked/expired token.
 3. **Idempotency concurrency:** simultaneous duplicate requests may receive a conflict rather than a replay response. Confirm client retry behavior and add a concurrency test.
 4. **Deployment settings:** verify `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ZHI_ALLOWED_ORIGINS`, and the Edge Function gateway JWT setting. If gateway JWT verification is disabled for the custom ZHI token, the function's own token validation must remain mandatory.
 5. **Migration and rollback:** review and back up the target project before applying the migration; run smoke tests before any traffic cutover.
-6. **Latest CI:** run 75 on commit `fa88db1` passed Edge Function typecheck/tests and applied both community and private-cognition migrations to disposable PostgreSQL; SQL smoke tests passed. This validates the migration in CI, not the live Supabase project.
+6. **Latest CI:** GitHub Actions run `41013979071` on commit `e83d81be49f9f874f9278277b637bfbeb53753e3` passed Edge Function typecheck/tests (including the new private cognition feedback route tests) and applied both community and private-cognition migrations to disposable PostgreSQL; SQL smoke tests passed. This validates the migration in CI, not the live Supabase project. Run URL: https://github.com/zhimia2026-source/zhimia/actions/runs/41013979071
 
 ## Release gate
 
@@ -37,4 +38,6 @@ Do not describe the community as production-ready until cross-account authorizat
 - Cross-cloud signed identity / federation
 - Persistent task execution and tool invocation
 - Scene temporal rhythms and event tides
+- Persistent cognition revision proposal/approval/rollback API
+- Real Supabase two-account HTTP end-to-end isolation tests
 - Any access to private intelligent-person memories
