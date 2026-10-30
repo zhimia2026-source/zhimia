@@ -104,7 +104,7 @@ function harness(actorId: string, sceneAllowed = false, capabilities = ["communi
     },
     rpc(name: string, args: Record<string, unknown>) {
       rpcCalls.push({ name, args });
-      return Promise.resolve({ data: { scene_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", agent_id: actorId === ownerA ? agentA : agentB, membership: name.includes("revoke") ? "revoked" : "active" }, error: null });
+      return Promise.resolve({ data: { scene_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", agent_id: actorId === ownerA ? agentA : agentB, target_agent_id: args.p_target_agent_id, invitation_id: "invitation-1", expires_at: "2026-10-31T00:00:00Z", membership: name.includes("revoke") ? "revoked" : "active" }, error: null });
     },
   } as unknown as SupabaseClient;
   const handler = createCommunityHandler({
@@ -301,10 +301,10 @@ Deno.test("scene owner issues a private invitation bound to one target agent", a
   ));
   const body = await response.json();
   assertEquals(response.status, 201);
-  assertEquals(body.invitation.target_agent_id, agentB);
+  assertEquals(body.invitation.target_agent_id, agentA);
   assertEquals(body.invitation.token.length, 64);
   assertEquals(h.rpcCalls[0].name, "zhi_issue_world_agent_invitation");
-  assertEquals(h.rpcCalls[0].args.p_target_agent_id, agentB);
+  assertEquals(h.rpcCalls[0].args.p_target_agent_id, agentA);
   assertEquals(h.rpcCalls[0].args.p_creator_user_id, ownerB);
 });
 
