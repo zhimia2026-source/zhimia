@@ -1,5 +1,5 @@
 import { assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
-import { buildPrivateAgentContext } from "./chat_context_helpers.ts";
+import { buildPrivateAgentContext, buildPrivateChatHistory } from "./chat_context_helpers.ts";
 
 Deno.test("private chat context excludes public manifest and bounds untrusted cognition text", () => {
   const context = buildPrivateAgentContext(
@@ -36,7 +36,6 @@ Deno.test("private chat context caps cognition records and ignores malformed val
 });
 
 Deno.test("private chat history keeps only eight bounded completed turns", () => {
-  const { buildPrivateChatHistory } = await import("./chat_context_helpers.ts");
   const turns = Array.from({ length: 12 }, (_, index) => ({
     user_message: "user-" + index + " " + "u".repeat(4000),
     assistant_message: "assistant-" + index + " " + "a".repeat(4000),
