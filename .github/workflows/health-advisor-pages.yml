@@ -30,7 +30,7 @@ jobs:
         run: |
           mkdir -p _site
           cp web/zhi-health-advisor.html _site/index.html
-          cp web/zhi-health-advisor-client.js _site/zhi-health-advisor-client.js _site/chat.html
+          cp web/zhi-health-advisor-client.js _site/zhi-health-advisor-client.js
           cp web/zhi-token-admin.html _site/token-admin.html
           cp web/zhi-agent-chat.html _site/chat.html
           test -s _site/index.html
