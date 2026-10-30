@@ -9,11 +9,11 @@
 目标 Supabase 项目固定为 `lvxmygrgqtmzqgailmyl`。
 
 已核实：
-- `zhi-care` Edge Function 为 ACTIVE v6，`verify_jwt=true`，通过 Supabase Auth `getUser(token)` 验证 JWT。
+- `zhi-care` Edge Function 为 ACTIVE v7，`verify_jwt=true`，通过 Supabase Auth `getUser(token)` 验证 JWT。
 - CareState 数据表为 `zhi_care_states`、`zhi_care_events`、`zhi_care_approval_tickets`；均启用 RLS，未开放 anon/authenticated 直连策略。
 - 个人令牌路径由已部署的 `zhi-token-gateway` 验证 opaque token（SHA-256 哈希查表）；令牌记录现有 `capabilities` 字段，包含 `care.read`、`care.write`、`care.approve` 等细粒度能力。
 - 独立的 `zhi-care-personal` 适配器已提交到仓库，但**尚未部署**；它从令牌记录派生 user_id，不信任请求体身份字段。JWT-only 的 `zhi-care` 保持原样，不关闭 JWT 验证。
-- Care 审批申请/批准现由两个原子 RPC 在同一事务写入票据与审计事件；数据库回滚式集成测试已覆盖成功、过期和 revision 失效路径。HTTP 个人令牌、跨账号隔离和 CI 类型检查仍待完成。
+- Care 审批申请/批准现由两个原子 RPC 在同一事务写入票据与审计事件；数据库回滚式集成测试已覆盖成功、过期和 revision 失效路径。JWT 版 v7 已通过 CI 类型检查并部署；个人令牌 HTTP、跨账号隔离和聊天 UI 接入仍待完成。
 - 当前仓库未检索到 `agent-talk.html` 等聊天前端源文件；聊天接入审计依赖用户此前上传的旧 ZIP 静态检查结果，不能据此直接改写线上聊天页面。
 
 ## 2. 必须先解决的身份协议不匹配
@@ -24,7 +24,7 @@
 
 这两种凭证不可互换。不得把个人令牌直接交给 JWT-only 的 `zhi-care`，也不得把请求体里的 `user_id` 当作身份凭据。
 
-此外，个人令牌表尚无细粒度 scopes。因而在增加、迁移并统一执行能力范围之前，不能宣称“聊天令牌只具有 chat 权限”或直接把所有个人令牌授权为 Care 写入凭证。
+此外，个人令牌表现已具备细粒度 `capabilities` 白名单，默认只签发最小健康聊天权限；续签继承原能力。个人令牌版 Care 适配器源码按 `care.read`、`care.write`、`care.approve` 门禁，但尚未部署，不能宣称该凭证路径已经通过 HTTP 与跨账号隔离验收。
 
 ## 3. 推荐的安全接入决策
 
