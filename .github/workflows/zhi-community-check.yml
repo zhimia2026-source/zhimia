@@ -31,6 +31,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Parse OpenAPI and workflow YAML documents
         run: ruby -e 'require "yaml"; ARGV.each { |path| YAML.parse_file(path); puts "YAML syntax OK " + path }' openapi/zhi-community-v0.1.yaml .github/workflows/zhi-community-check.yml .github/workflows/health-advisor-pages.yml
+      - name: Validate private chat page and embedded JavaScript
+        run: node scripts/check-zhi-agent-chat-page.mjs
 
   edge-function-typecheck:
     runs-on: ubuntu-latest
