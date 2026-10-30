@@ -432,7 +432,7 @@ BEGIN
   IF (v_result #>> '{record,version}')::integer <> 4
      OR v_result #>> '{record,change_kind}' <> 'rollback'
      OR v_result #>> '{record,previous_record_id}' <> v_approved_record_id::text
-     OR v_result #>> '{record,state}' <> '{"weather":"rain"}'::jsonb::text THEN
+     OR (v_result #> '{record,state}') <> '{"weather":"rain"}'::jsonb THEN
     RAISE EXCEPTION 'rollback did not append a correct restored snapshot';
   END IF;
 
@@ -457,8 +457,8 @@ BEGIN
     RAISE EXCEPTION 'stale proposal was not rejected';
   END IF;
 
-  IF NOT has_function_privilege('anon', 'public.zhi_decide_cognition_revision_proposal(uuid,uuid,uuid,boolean,text)', 'EXECUTE') = false
-     OR NOT has_function_privilege('authenticated', 'public.zhi_rollback_cognition_version(uuid,uuid,uuid,text)', 'EXECUTE') = false THEN
+  IF has_function_privilege('anon', 'public.zhi_decide_cognition_revision_proposal(uuid,uuid,uuid,boolean,text)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.zhi_rollback_cognition_version(uuid,uuid,uuid,text)', 'EXECUTE') THEN
     RAISE EXCEPTION 'browser roles must not execute revision decision or rollback RPCs';
   END IF;
   IF NOT has_function_privilege('service_role', 'public.zhi_decide_cognition_revision_proposal(uuid,uuid,uuid,boolean,text)', 'EXECUTE')
