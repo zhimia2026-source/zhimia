@@ -3,18 +3,19 @@ import { Script } from "node:vm";
 
 const path = "web/zhi-agent-chat.html";
 const html = readFileSync(path, "utf8");
-const scripts = [...html.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/gi)]
-  .map((match) => match[1])
-  .filter((source) => source.trim().length > 0);
-
-if (scripts.length !== 1) throw new Error("Expected exactly one inline application script");
-new Script(scripts[0], { filename: path });
+const openTag = html.indexOf("<script>");
+const closeTag = html.indexOf("</script>", openTag + 8);
+if (openTag < 0 || closeTag < 0 || html.indexOf("<script>", openTag + 8) >= 0) {
+  throw new Error("Expected exactly one inline application script");
+}
+const source = html.slice(openTag + 8, closeTag);
+new Script(source, { filename: path });
 
 for (const required of [
-  'https://lvxmygrgqtmzqgailmyl.supabase.co/functions/v1/zhi-community',
-  'sessionStorage.setItem(TOKEN_KEY, token)',
-  'idempotency-key',
-  '/chat?limit=50',
+  "https://lvxmygrgqtmzqgailmyl.supabase.co/functions/v1/zhi-community",
+  "sessionStorage.setItem(TOKEN_KEY, token)",
+  "idempotency-key",
+  "/chat?limit=50",
 ]) {
   if (!html.includes(required)) throw new Error("Missing required chat UI contract: " + required);
 }
