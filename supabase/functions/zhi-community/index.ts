@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { tokenTouchSucceeded } from "./auth_helpers.ts";
-import { isMembershipAuthorized } from "./access_helpers.ts";
+import { isMembershipAuthorized, privilegesForPublicRejoin } from "./access_helpers.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -213,11 +213,14 @@ Deno.serve(async (req: Request) => {
       if (existingError) throw new Error("database_error");
       if (existingMembership?.status === "active" && (!existingMembership.expires_at || Date.parse(existingMembership.expires_at) > Date.now())) return reply({ scene_id: sceneId, membership: "active" });
       if (existingMembership) {
+        const rejoinPrivileges = privilegesForPublicRejoin(
+          existingMembership.membership_role,
+          existingMembership.capabilities,
+        );
         const { error: restoreError } = await db.from("zhi_world_memberships").update({
           status: "active", revoked_at: null, expires_at: null,
-          capabilities: existingMembership.membership_role === "owner" || existingMembership.membership_role === "moderator"
-            ? existingMembership.capabilities
-            : ["message:send", "message:read"],
+          membership_role: rejoinPrivileges.membership_role,
+          capabilities: rejoinPrivileges.capabilities,
           joined_at: new Date().toISOString(),
         }).eq("id", existingMembership.id);
         if (restoreError) throw new Error("database_error");
