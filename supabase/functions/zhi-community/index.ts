@@ -97,6 +97,7 @@ export type CommunityHandlerDependencies = {
   dbClient?: () => SupabaseClient;
   authenticate?: (db: SupabaseClient, req: Request) => Promise<Actor | null>;
   fetchModel?: typeof fetch;
+  chatConfig?: { apiUrl: string; apiKey: string; model: string };
 };
 
 /** Exported request handler enables HTTP-level tests with isolated dependencies. */
@@ -106,6 +107,11 @@ export function createCommunityHandler(
   const getDb = dependencies.dbClient ?? dbClient;
   const authenticateRequest = dependencies.authenticate ?? authenticate;
   const callModel = dependencies.fetchModel ?? fetch;
+  const chatConfig = dependencies.chatConfig ?? {
+    apiUrl: Deno.env.get("ZHI_CHAT_API_URL") ?? "",
+    apiKey: Deno.env.get("ZHI_CHAT_API_KEY") ?? "",
+    model: Deno.env.get("ZHI_CHAT_MODEL") ?? "",
+  };
   return async (req: Request) => {
   const cors = corsHeaders(req);
   if (!cors) return json({ error: "origin_not_allowed" }, 403);
@@ -429,9 +435,9 @@ export function createCommunityHandler(
       if (!requestKey || requestKey.length > 200) {
         return reply({ error: "invalid_argument", detail: "idempotency_key_required" }, 400);
       }
-      const providerUrl = Deno.env.get("ZHI_CHAT_API_URL") ?? "";
-      const providerKey = Deno.env.get("ZHI_CHAT_API_KEY") ?? "";
-      const providerModel = Deno.env.get("ZHI_CHAT_MODEL") ?? "";
+      const providerUrl = chatConfig.apiUrl;
+      const providerKey = chatConfig.apiKey;
+      const providerModel = chatConfig.model;
       if (!providerUrl.startsWith("https://") || !providerKey || !providerModel) {
         return reply({ error: "chat_model_not_configured" }, 503);
       }
