@@ -377,3 +377,15 @@ Deno.test("agent environment read requires community.message.read token capabili
   ));
   assertEquals(response.status, 403);
 });
+
+Deno.test("public scene discovery requires the explicit community.scene.discover capability", async () => {
+  const h = harness(ownerA, false, ["community.scene.enter"]);
+  const response = await h.handler(new Request(
+    "https://unit.test/functions/v1/zhi-community/v1/scenes",
+    { headers: { authorization: "Bearer token-a" } },
+  ));
+  const body = await response.json();
+  assertEquals(response.status, 403);
+  assertEquals(body.detail, "capability_required");
+  assertEquals(h.queriedTables.includes("zhi_worlds"), false);
+});
