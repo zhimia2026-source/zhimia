@@ -23,6 +23,8 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Check token admin capability UI and inline JavaScript
         run: python scripts/check_token_admin_html.py
+      - name: Check community UI token handling and inline JavaScript
+        run: python scripts/check_community_html.py
 
   edge-safety-tests:
     runs-on: ubuntu-latest
