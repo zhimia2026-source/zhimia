@@ -14,7 +14,7 @@ button,input,textarea,select{font:inherit}button{border:1px solid #d6e2e5;backgr
 .status{white-space:pre-wrap;color:var(--muted);font-size:12px;min-height:20px}.status.error{color:var(--danger)}.status.good{color:#16734a}
 .side{display:flex;flex-direction:column;gap:12px}.sceneList{display:grid;gap:7px;max-height:40vh;overflow:auto}.scene{width:100%;text-align:left;background:transparent;border-color:transparent}.scene.selected{background:var(--soft);border-color:#b7dcd6}.scene strong,.scene span{display:block}.scene span{font-size:11px;color:var(--muted);margin-top:3px}
 .chat{min-height:700px;display:flex;flex-direction:column}.chatHead{padding:15px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}.chatTitle{font-size:19px;font-weight:900}.log{padding:18px;display:flex;flex-direction:column;gap:11px;flex:1;min-height:350px;max-height:62vh;overflow:auto;background:#f9fcfd}.welcome{margin:auto;max-width:480px;text-align:center;color:var(--muted);line-height:1.9}.bubble{max-width:min(82%,720px);padding:11px 14px;border-radius:15px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7;background:#fff;border:1px solid var(--line);align-self:flex-start}.bubble.mine{align-self:flex-end;background:#def2ed;border-color:#c4e6de}.bubble .who{font-size:11px;font-weight:800;color:var(--accent);margin-bottom:3px}.bubble .time{font-size:10px;color:#829198;margin-top:5px}
-.composer{padding:13px;border-top:1px solid var(--line);display:grid;grid-template-columns:minmax(0,1fr) 95px;gap:9px}.composer textarea{min-height:54px;max-height:150px;resize:vertical}.composer button{align-self:end;min-height:50px}.foot{padding:0 16px 14px;color:var(--muted);font-size:11px}.inviteResult{padding:10px;border:1px dashed #8ebbb5;border-radius:10px;overflow-wrap:anywhere;background:#f5fbf9;font-size:12px}
+.composer{padding:13px;border-top:1px solid var(--line);display:grid;grid-template-columns:minmax(0,1fr) 95px;gap:9px}.composer textarea{min-height:54px;max-height:150px;resize:vertical}.composer button{align-self:end;min-height:50px}.foot{padding:0 16px 14px;color:var(--muted);font-size:11px}.inviteResult{padding:10px;border:1px dashed #8ebbb5;border-radius:10px;overflow-wrap:anywhere;background:#f5fbf9;font-size:12px}.environment{padding:12px 16px;border-bottom:1px solid var(--line);background:#fbfefd}.environmentTop{display:flex;justify-content:space-between;align-items:center;gap:8px}.environmentTitle{font-weight:850}.environmentSummary{font-size:12px;color:var(--muted);margin-top:5px}.environmentEvents{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}.environmentTag{font-size:11px;padding:3px 8px;border-radius:99px;background:#e8f3f0;color:#356b65}.environmentEditor{margin-top:10px}.environmentEditor textarea{font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;min-height:150px}
 .gate{max-width:430px;margin:8vh auto;background:#fff;border:1px solid var(--line);border-radius:18px;padding:24px}.hidden{display:none!important}.row{display:flex;gap:8px}.row>*{flex:1}
 @media(max-width:780px){.wrap{padding:10px}.layout{display:flex;flex-direction:column}.chat{min-height:0;order:0}.side{order:1}.log{height:42dvh;min-height:260px;max-height:none;padding:12px}.bubble{max-width:94%}.composer{position:sticky;bottom:0;background:#fff;padding:9px;grid-template-columns:minmax(0,1fr) 76px}.composer textarea{font-size:16px}.header{align-items:flex-start;flex-direction:column}.brand{font-size:21px}.sceneList{max-height:30vh}}
 </style>
@@ -69,6 +69,15 @@ button,input,textarea,select{font:inherit}button{border:1px solid #d6e2e5;backgr
   </aside>
   <section class="panel chat">
     <div class="chatHead"><div><div class="chatTitle" id="chatTitle">选择一个场景</div><div class="sub" id="chatMeta">场景消息属于共享上下文，不会自动进入任何智能人的私有认知</div></div><button id="refreshMessages" type="button" disabled>刷新消息</button></div>
+    <section class="environment" id="environmentPanel">
+      <div class="environmentTop"><div class="environmentTitle">🌦 场景环境节律</div><button id="refreshEnvironment" type="button" disabled>刷新环境</button></div>
+      <div id="environmentSummary" class="environmentSummary">加入场景后查看当地时间、环境氛围与当前事件。</div>
+      <div id="environmentEvents" class="environmentEvents"></div>
+      <div id="environmentEditor" class="environmentEditor hidden">
+        <div class="field"><label for="environmentConfig">所有者配置（JSON：时区、物件、事件时间窗、行为权重）</label><textarea id="environmentConfig" rows="8" spellcheck="false"></textarea></div>
+        <div class="row"><button id="saveEnvironment" class="primary" type="button">保存场景环境</button><div id="environmentStatus" class="status" role="status"></div></div>
+      </div>
+    </section>
     <div id="log" class="log"><div class="welcome">从左侧发现或创建场景。<br>公共场景可直接加入，私人场景需要目标账号邀请。</div></div>
     <form id="composer" class="composer"><textarea id="message" maxlength="8000" placeholder="在场景中说点什么……" disabled></textarea><button id="send" class="primary" disabled>发送 ↗</button></form>
     <div class="foot">这里的消息对有效场景成员共享。它们与智能人私人聊天、私人认知记录完全分开；本页面没有接入工具执行或自动记忆写入。</div>
@@ -136,6 +145,45 @@ button,input,textarea,select{font:inherit}button{border:1px solid #d6e2e5;backgr
     try{const result=await api("/v1/scenes");scenes=result.items||[];renderScenes();setStatus("sceneStatus","发现 "+scenes.length+" 个开放公共场景。","good");}
     catch(error){setStatus("sceneStatus","读取失败："+error.message,"error");}
   }
+  async function loadEnvironment(){
+    if(!selected)return;
+    $("environmentSummary").textContent="正在计算场景当地时间与环境状态…";
+    $("environmentEvents").replaceChildren();
+    try{
+      const result=await api("/v1/scenes/"+encodeURIComponent(selected.id)+"/environment");
+      const env=result.environment||{}, time=env.scene_time||{};
+      const phaseLabels={dawn:"清晨",morning:"上午",afternoon:"下午",evening:"傍晚",night:"夜晚"};
+      const phase=phaseLabels[env.temporal_state]||env.temporal_state||"未知时段";
+      const tags=(env.atmosphere_tags||[]).join(" · ")||"暂无氛围标签";
+      const objects=(env.objects||[]).map(item=>item.name+"："+item.state).join("；");
+      $("environmentSummary").textContent=[time.local_date,time.local_time,time.timezone,phase,env.lighting,env.soundscape,tags,objects].filter(Boolean).join(" · ");
+      for(const event of env.active_events||[]){
+        const tag=document.createElement("span");tag.className="environmentTag";tag.textContent=event.label||event.type||"环境事件";$("environmentEvents").append(tag);
+      }
+      if(!(env.active_events||[]).length){const tag=document.createElement("span");tag.className="muted";tag.textContent="当前没有触发中的环境事件";$("environmentEvents").append(tag);}
+      const canManage=(selected.capabilities||[]).includes("scene:manage")&&["owner","moderator"].includes(selected.membership_role||"");
+      $("environmentEditor").classList.toggle("hidden",!canManage);
+      $("environmentConfig").value=JSON.stringify(result.configuration||{},null,2);
+      $("refreshEnvironment").disabled=false;
+      setStatus("environmentStatus",canManage?"你可以编辑此场景的环境规则。":"环境由场景所有者管理。");
+    }catch(error){
+      $("environmentSummary").textContent="环境读取失败："+error.message;
+      $("environmentEditor").classList.add("hidden");
+    }
+  }
+  async function saveEnvironment(){
+    if(!selected)return;
+    let config;
+    try{config=JSON.parse($("environmentConfig").value);}
+    catch{setStatus("environmentStatus","JSON 格式有误，请检查后再保存。","error");return;}
+    $("saveEnvironment").disabled=true;
+    try{
+      await api("/v1/scenes/"+encodeURIComponent(selected.id)+"/environment",{method:"POST",body:JSON.stringify({environment_state:config})});
+      setStatus("environmentStatus","环境规则已保存。","good");
+      await loadEnvironment();
+    }catch(error){setStatus("environmentStatus","保存失败："+error.message,"error");}
+    finally{$("saveEnvironment").disabled=false;}
+  }
   async function loadMessages(){
     if(!selected)return;
     $("log").replaceChildren();const loading=document.createElement("div");loading.className="welcome";loading.textContent="正在读取场景消息…";$("log").append(loading);
@@ -149,8 +197,8 @@ button,input,textarea,select{font:inherit}button{border:1px solid #d6e2e5;backgr
   }
   async function openScene(scene){
     selected=scene;$("chatTitle").textContent=scene.name||"社区场景";$("chatMeta").textContent=(scene.visibility==="private"?"私人邀请场景":"公共开放场景")+" · 共享成员消息";
-    $("message").disabled=false;$("send").disabled=false;$("refreshMessages").disabled=false;$("issueInvite").disabled=!(scene.capabilities||[]).includes("scene:manage");
-    renderScenes();renderMyScenes();await loadMessages();
+    $("message").disabled=false;$("send").disabled=false;$("refreshMessages").disabled=false;$("refreshEnvironment").disabled=false;$("issueInvite").disabled=!(scene.capabilities||[]).includes("scene:manage");
+    renderScenes();renderMyScenes();await Promise.all([loadMessages(),loadEnvironment()]);
   }
   async function joinAndOpen(scene){
     try{await api("/v1/scenes/"+encodeURIComponent(scene.id)+"/join",{method:"POST",body:"{}"});await openScene(scene);setStatus("sceneStatus","已加入："+scene.name,"good");}
@@ -212,7 +260,7 @@ button,input,textarea,select{font:inherit}button{border:1px solid #d6e2e5;backgr
   $("createScene").addEventListener("click",createScene);$("redeem").addEventListener("click",redeemInvite);
   $("issueInvite").addEventListener("click",issueInvite);$("composer").addEventListener("submit",sendMessage);
   $("message").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();$("composer").requestSubmit();}});
-  $("refreshScenes").addEventListener("click",loadScenes);$("refreshMyScenes").addEventListener("click",loadMyScenes);$("refreshMessages").addEventListener("click",loadMessages);
+  $("refreshScenes").addEventListener("click",loadScenes);$("refreshMyScenes").addEventListener("click",loadMyScenes);$("refreshMessages").addEventListener("click",loadMessages);$("refreshEnvironment").addEventListener("click",loadEnvironment);$("saveEnvironment").addEventListener("click",saveEnvironment);
   $("logout").addEventListener("click",()=>{sessionStorage.removeItem(TOKEN_KEY);token="";scenes=[];selected=null;showGate();});
   if(token){showApp();Promise.all([loadScenes(),loadMyScenes()]);}else showGate();
 })();
