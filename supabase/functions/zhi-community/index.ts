@@ -125,8 +125,8 @@ Deno.serve(async (req: Request) => {
       const entryPolicy = body.entry_policy === undefined
         ? (visibility === "public" ? "open" : "invite_only")
         : body.entry_policy;
-      // This first API slice implements open public scenes only. Private invitation
-      // redemption and approval queues remain disabled until atomic workflows exist.
+      // Public scenes use open entry; private scenes are entered only through
+      // the target-bound, one-time invitation redemption endpoint below.
       if ((visibility === "public" && entryPolicy !== "open") ||
           (visibility === "private" && entryPolicy !== "invite_only") ||
           (body.description !== undefined && (typeof body.description !== "string" || body.description.length > 4000))) {
@@ -194,42 +194,18 @@ Deno.serve(async (req: Request) => {
 
     if (req.method === "POST" && parts.length === 4 && parts[0] === "v1" && parts[1] === "scenes" && parts[3] === "join") {
       const sceneId = parts[2];
-      const { data: world, error: worldError } = await db.from("zhi_worlds")
-        .select("id,visibility,entry_policy,status").eq("id", sceneId).maybeSingle();
-      if (worldError) throw new Error("database_error");
-      if (!world) return reply({ error: "not_found" }, 404);
-      if (world.status !== "open") return reply({ error: "conflict", detail: "scene_not_open" }, 409);
-
-      if (world.visibility === "private") {
-        // Private invitation redemption needs an atomic one-time consume operation.
-        // Refuse until that RPC is deployed; never silently treat visibility as authorization.
-        return reply({ error: "forbidden", detail: "private_invitation_redemption_not_enabled" }, 403);
+      if (!isUuid(sceneId)) return reply({ error: "invalid_argument", detail: "scene_id_must_be_uuid" }, 400);
+      const { data: result, error } = await db.rpc("zhi_join_public_world", {
+        p_world_id: sceneId,
+        p_actor_user_id: actor.userId,
+      });
+      if (error) {
+        if (error.code === "P0002") return reply({ error: "not_found" }, 404);
+        if (error.code === "42501") return reply({ error: "forbidden", detail: "scene_not_public_open" }, 403);
+        if (error.code === "22023") return reply({ error: "conflict", detail: "scene_not_open" }, 409);
+        throw new Error("database_error");
       }
-      if (world.entry_policy !== "open") return reply({ error: "forbidden" }, 403);
-
-      const { data: existingMembership, error: existingError } = await db.from("zhi_world_memberships")
-        .select("id,status,expires_at,membership_role,capabilities").eq("world_id", sceneId).eq("principal_user_id", actor.userId)
-        .is("agent_id", null).maybeSingle();
-      if (existingError) throw new Error("database_error");
-      if (existingMembership?.status === "active" && (!existingMembership.expires_at || Date.parse(existingMembership.expires_at) > Date.now())) return reply({ scene_id: sceneId, membership: "active" });
-      if (existingMembership) {
-        const { error: restoreError } = await db.from("zhi_world_memberships").update({
-          status: "active", revoked_at: null, expires_at: null,
-          capabilities: existingMembership.membership_role === "owner" || existingMembership.membership_role === "moderator"
-            ? existingMembership.capabilities
-            : ["message:send", "message:read"],
-          joined_at: new Date().toISOString(),
-        }).eq("id", existingMembership.id);
-        if (restoreError) throw new Error("database_error");
-      } else {
-        const { error: membershipError } = await db.from("zhi_world_memberships").insert({
-          world_id: sceneId, principal_user_id: actor.userId, agent_id: null,
-          membership_role: "member", status: "active", capabilities: ["message:send", "message:read"],
-          joined_at: new Date().toISOString(),
-        });
-        if (membershipError) throw new Error("database_error");
-      }
-      return reply({ scene_id: sceneId, membership: "active" });
+      return reply(result, 200);
     }
 
     if (req.method === "GET" && parts.length === 4 && parts[0] === "v1" && parts[1] === "scenes" && parts[3] === "messages") {
