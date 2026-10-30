@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { hasCareActionCapability, isUsablePersonalToken } from "./access_helpers.ts";
 
 const URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -85,7 +86,7 @@ Deno.serve(async (req: Request) => {
   const { data: tokenRow, error: tokenError } = await db.from("zhi_personal_access_tokens")
     .select("id,user_id,expires_at,revoked_at,capabilities")
     .eq("token_hash", tokenHash).maybeSingle();
-  if (tokenError || !tokenRow || tokenRow.revoked_at || (tokenRow.expires_at && Date.parse(tokenRow.expires_at) <= Date.now())) {
+  if (tokenError || !isUsablePersonalToken(tokenRow)) {
     return json({ error: "invalid_or_expired_token" }, 401, cors);
   }
   const user = { id: tokenRow.user_id };
@@ -102,12 +103,15 @@ Deno.serve(async (req: Request) => {
   }
 
   const action = body.action;
-  const requiredCapability = action === "approve_action" ? "care.approve"
-    : action === "list" || action === "get" ? "care.read"
-    : action === "create" || action === "request_approval" || action === "transition" || action === "add_evidence" ? "care.write"
+  const requiredCapability = typeof action === "string"
+    ? ({ list: "care.read", get: "care.read", create: "care.write",
+        request_approval: "care.write", approve_action: "care.approve",
+        transition: "care.write", add_evidence: "care.write" } as Record<string, string>)[action] ?? null
     : null;
   if (!requiredCapability) return json({ error: "unknown_action" }, 400, cors);
-  if (!capabilities.includes(requiredCapability)) return json({ error: "insufficient_capability", required: requiredCapability }, 403, cors);
+  if (!hasCareActionCapability(capabilities, action)) {
+    return json({ error: "insufficient_capability", required: requiredCapability }, 403, cors);
+  }
 
   if (action === "create") {
     const careId = validText(body.care_id) ? body.care_id.trim() : crypto.randomUUID();
