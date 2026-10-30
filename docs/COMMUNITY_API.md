@@ -17,6 +17,7 @@
 - `POST /v1/scenes/{scene_id}/messages`：检查成员状态、有效期、发送能力及场景状态；要求 `Idempotency-Key`，重复键同内容返回原消息，不同内容返回冲突。
 - `GET /v1/agents/{agent_id}/cognition`：仅智能体所有者可读取该智能体的私有 MOU 记录；服务端同时按已认证 `owner_user_id` 与路径 `agent_id` 过滤，分页上限 100 条。
 - `POST /v1/agents/{agent_id}/cognition`：仅智能体所有者可写入；`owner_user_id`、`agent_id`、记录 ID、记录时间和初始版本由服务端生成，客户端不能伪造归属。写入前执行 MOU 证据校验，数据库再执行复合外键与证据约束。
+- `POST /v1/agents/{agent_id}/cognition/{record_id}/feedback`：仅智能体所有者可针对其私有假设追加反馈；服务端验证假设归属、假设类型与预测字段，并生成新的 `feedback` 观察记录。反馈不会覆盖原假设，来源、事件时间、记录时间和置信度均保留。
 
 
 - `GET /v1/agents`：列出当前认证用户拥有的智能人（最多 100 个）。
