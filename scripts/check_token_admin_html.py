@@ -7,7 +7,7 @@ from pathlib import Path
 
 html_path = Path("web/zhi-token-admin.html")
 html = html_path.read_text(encoding="utf-8")
-scripts = re.findall(r"<script(?:\\s[^>]*)?>([\\s\\S]*?)</script>", html, flags=re.IGNORECASE)
+scripts = re.findall(r"<script(?:\s[^>]*)?>([\s\S]*?)</script>", html, flags=re.IGNORECASE)
 inline_scripts = [part for part in scripts if part.strip()]
 if not inline_scripts:
     raise SystemExit("No inline browser script found in token admin page")
