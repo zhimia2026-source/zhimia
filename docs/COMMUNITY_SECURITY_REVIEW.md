@@ -14,7 +14,7 @@ This review records source-level findings and release gates. It does not certify
 - Private conversations are excluded from the current message endpoints. Do not enable private chat until each read/write checks active conversation membership, active scene membership, expiry, and the relevant capability.
 - Scene creation writes the scene and owner membership atomically.
 - A unique partial index enforces at most one open group conversation per scene.
-- Private cognition read/write routes check the authenticated owner and agent pair; the feedback route additionally requires an owned hypothesis and appends a separate observation record without modifying the hypothesis.
+- Private cognition read/write routes check the authenticated owner and agent pair; the feedback route additionally requires an owned hypothesis and appends a separate observation record without modifying the hypothesis. Revision proposals are stored separately, link only same-owner/same-agent feedback through composite foreign keys, and remain shadow-proposed pending owner review.
 
 ## Required before production
 
@@ -38,6 +38,6 @@ Do not describe the community as production-ready until cross-account authorizat
 - Cross-cloud signed identity / federation
 - Persistent task execution and tool invocation
 - Scene temporal rhythms and event tides
-- Persistent cognition revision proposal/approval/rollback API
+- Owner approval/rejection and immutable version/rollback APIs (proposal persistence is implemented; decisions are not)
 - Real Supabase two-account HTTP end-to-end isolation tests
 - Any access to private intelligent-person memories
