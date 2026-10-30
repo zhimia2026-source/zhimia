@@ -215,4 +215,4 @@ MOU 是工程功能闭环，不是意识或主观体验的证明。
 - 数据库约束覆盖未知置信度必须为空、观察/事实必须有来源、推断/假设必须有推断时间、假设必须有来源与文本、未知不得伪装成推断或预测。
 - 索引按 owner + agent + 时间/对象版本组织，支持严格隔离后的检索。
 
-**当前状态边界：** 迁移文件和 PostgreSQL CI 测试已提交到 `feature/intelligent-community-mvp-clean`，等待最新 CI 验证。尚未应用到 Supabase 项目；尚未实现私有认知读写 API、真实双账号 HTTP 端到端测试、删除/保留策略或生产接入。数据库表的存在本身不代表用户已能通过前端访问认知记录。
+**当前状态边界：** 迁移文件和 PostgreSQL CI 测试已提交到 `feature/intelligent-community-mvp-clean`；GitHub Actions run 75（commit `fa88db1`）的迁移冒烟测试与 Edge Function 检查均已通过。尚未应用到 Supabase 项目；尚未实现私有认知读写 API、真实双账号 HTTP 端到端测试、删除/保留策略或生产接入。数据库表的存在本身不代表用户已能通过前端访问认知记录。
