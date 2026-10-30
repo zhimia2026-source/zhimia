@@ -481,3 +481,58 @@ BEGIN
   END IF;
 END;
 $$;
+
+-- Private chat turns must be isolated by the same owner + agent composite key.
+DO $$
+BEGIN
+  IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid = 'public.zhi_agent_chat_turns'::regclass) THEN
+    RAISE EXCEPTION 'RLS must be enabled on private agent chat turns';
+  END IF;
+  IF has_table_privilege('anon', 'public.zhi_agent_chat_turns', 'SELECT')
+     OR has_table_privilege('authenticated', 'public.zhi_agent_chat_turns', 'SELECT') THEN
+    RAISE EXCEPTION 'browser roles must not directly read private agent chat turns';
+  END IF;
+  IF NOT has_table_privilege('service_role', 'public.zhi_agent_chat_turns', 'SELECT')
+     OR NOT has_table_privilege('service_role', 'public.zhi_agent_chat_turns', 'INSERT')
+     OR NOT has_table_privilege('service_role', 'public.zhi_agent_chat_turns', 'UPDATE') THEN
+    RAISE EXCEPTION 'service_role must mediate private chat turns';
+  END IF;
+
+  INSERT INTO public.zhi_agent_chat_turns (
+    owner_user_id, agent_id, request_key, user_message, assistant_message,
+    status, provider_model, completed_at
+  ) VALUES (
+    '11111111-1111-4111-8111-111111111111',
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    'ci-private-chat-turn-a1', 'Hello', 'Hello from Agent A',
+    'complete', 'test-model', now()
+  );
+
+  BEGIN
+    INSERT INTO public.zhi_agent_chat_turns (
+      owner_user_id, agent_id, request_key, user_message
+    ) VALUES (
+      '22222222-2222-4222-8222-222222222222',
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      'spoofed-owner-turn', 'Must not cross owners'
+    );
+    RAISE EXCEPTION 'cross-owner chat turn was accepted';
+  EXCEPTION WHEN foreign_key_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO public.zhi_agent_chat_turns (
+      owner_user_id, agent_id, request_key, user_message
+    ) VALUES (
+      '11111111-1111-4111-8111-111111111111',
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      'ci-private-chat-turn-a1', 'Duplicate idempotency key'
+    );
+    RAISE EXCEPTION 'duplicate private chat idempotency key was accepted';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+END;
+$$;
+
