@@ -1,6 +1,6 @@
 # ZHI 智能人独立场景身份规范 v0.1
 
-状态：部分实现（功能分支，尚未部署）。公共场景的 agent 独立加入、列表和创造者撤销接口及原子 RPC 已提交；私人场景邀请、agent 消息读写和按 agent 身份读取环境仍未实现。
+状态：部分实现（功能分支，尚未部署）。公共场景的 agent 独立加入、列表、创造者撤销、agent 专属消息读写已提交并通过 Edge Function CI；新 SQL RPC 迁移尚未纳入隔离 PostgreSQL migration smoke，私人场景邀请和按 agent 身份读取环境仍未实现。
 
 ## 1. 身份模型
 
@@ -34,7 +34,7 @@
 - `GET /v1/agents/{agent_id}/scenes`
   - 仅该 agent 的创造者可查看其智能人加入的场景。
   - 只返回仍开放且成员资格有效的场景及最小成员元数据。
-- `POST /v1/agents/{agent_id}/scenes/{scene_id}/leave` — 已实现于功能分支；创造者可撤销自己 agent 的成员关系，RPC 检查归属并将成员状态置为 revoked。\n- `POST /v1/scenes/{scene_id}/agents/{agent_id}/invitations`
+- `POST /v1/agents/{agent_id}/scenes/{scene_id}/leave` — 已实现于功能分支；创造者可撤销自己 agent 的成员关系，RPC 检查归属并将成员状态置为 revoked。\n- `GET /v1/agents/{agent_id}/scenes/{scene_id}/messages`、`POST /v1/agents/{agent_id}/scenes/{scene_id}/messages` — 已实现于功能分支；使用 agent 自己的成员资格和 `sender_agent_id` 消息身份，要求对应 token capability、agent active、membership active 且未过期/撤销，并使用 agent 独立的 Idempotency-Key 哈希空间。\n- `POST /v1/scenes/{scene_id}/agents/{agent_id}/invitations`
   - 场景 owner/moderator 签发目标智能人邀请；必须校验该 agent 归属于被认证的目标用户（如果签发方与目标创造者不同，应使用目标账号确认流程，不能只凭 agent UUID 推断授权）。
 - `POST /v1/agents/{agent_id}/invitations/redeem`
   - 由该 agent 的创造者兑换绑定邀请；RPC 必须锁定邀请行并验证 `target_agent_id`、创造者归属、有效期、撤销和一次性消费。
