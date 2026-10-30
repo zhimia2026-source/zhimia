@@ -83,7 +83,7 @@ export function computeSceneEnvironment(raw: unknown, now = new Date()) {
     if (/^[a-z][a-z0-9_]{0,39}$/.test(key) && weight !== null) behaviorWeights[key] = weight;
   }
 
-  const configuredEvents = Array.isArray(state.events) ? state.events : [];
+  const configuredEvents = Array.isArray(state.events) ? state.events.slice(0, 100) : [];
   const activeEvents = configuredEvents.map(record)
     .filter((event) => eventActive(event, now, localTime))
     .sort((a, b) => String(a.id ?? "").localeCompare(String(b.id ?? "")))
