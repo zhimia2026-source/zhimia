@@ -1,5 +1,9 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { isMembershipAuthorized, type MembershipAuthorizationRecord } from "./access_helpers.ts";
+import {
+  isMembershipAuthorized,
+  privilegesForPublicRejoin,
+  type MembershipAuthorizationRecord,
+} from "./access_helpers.ts";
 
 const active: MembershipAuthorizationRecord = {
   principal_user_id: "user-a", status: "active", revoked_at: null, agent_id: null,
@@ -27,9 +31,29 @@ Deno.test("denies missing capability and missing membership", () => {
   assertEquals(isMembershipAuthorized(null, "user-a", "message:read"), false);
 });
 
-
 Deno.test("fails closed when membership expiry is malformed", () => {
   assertEquals(isMembershipAuthorized(
     { ...active, expires_at: "not-a-date" }, "user-a", "message:read",
   ), false);
+});
+
+Deno.test("public rejoin downgrades revoked or expired moderators to ordinary members", () => {
+  assertEquals(privilegesForPublicRejoin("moderator", ["scene:manage", "message:send", "message:read"]), {
+    membership_role: "member",
+    capabilities: ["message:send", "message:read"],
+  });
+});
+
+Deno.test("public rejoin never restores arbitrary elevated capabilities to members", () => {
+  assertEquals(privilegesForPublicRejoin("member", ["scene:manage", "message:send"]), {
+    membership_role: "member",
+    capabilities: ["message:send", "message:read"],
+  });
+});
+
+Deno.test("public rejoin preserves creator ownership", () => {
+  assertEquals(privilegesForPublicRejoin("owner", ["scene:manage", "message:send", "message:read"]), {
+    membership_role: "owner",
+    capabilities: ["scene:manage", "message:send", "message:read"],
+  });
 });
