@@ -23,7 +23,7 @@ This review records source-level findings and release gates. It does not certify
 3. **Idempotency concurrency:** simultaneous duplicate requests may receive a conflict rather than a replay response. Confirm client retry behavior and add a concurrency test.
 4. **Deployment settings:** verify `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ZHI_ALLOWED_ORIGINS`, and the Edge Function gateway JWT setting. If gateway JWT verification is disabled for the custom ZHI token, the function's own token validation must remain mandatory.
 5. **Migration and rollback:** review and back up the target project before applying the migration; run smoke tests before any traffic cutover.
-6. **Latest CI:** GitHub Actions run `41016332139` on commit `a50ec1292595c597ba5038032f16f0a6a91b8ffe` passed Edge Function typecheck/tests (including private cognition feedback and revision-proposal route tests) and applied the community, private-cognition, and revision-proposal migrations to disposable PostgreSQL; SQL smoke tests passed. This validates the migrations in CI, not the live Supabase project. Run URL: https://github.com/zhimia2026-source/zhimia/actions/runs/41016332139
+6. **Latest CI:** GitHub Actions run `41016627288` on commit `7311d4a44d6f82abb01a5f850dc228d95569de67` passed Edge Function typecheck/tests (including private cognition feedback, proposal, approval, and rollback route tests) and applied the community, private-cognition, revision-proposal, and revision-decision migrations to disposable PostgreSQL. SQL smoke tests passed for proposal evidence links, explicit owner approval, stale proposal rejection, append-only version creation, and rollback. This validates migrations in CI, not the live Supabase project. Run URL: https://github.com/zhimia2026-source/zhimia/actions/runs/41016627288
 
 ## Release gate
 
@@ -38,6 +38,6 @@ Do not describe the community as production-ready until cross-account authorizat
 - Cross-cloud signed identity / federation
 - Persistent task execution and tool invocation
 - Scene temporal rhythms and event tides
-- Owner approval/rejection and immutable version/rollback APIs (proposal persistence is implemented; decisions are not)
+- Real Supabase two-account HTTP end-to-end isolation tests
 - Real Supabase two-account HTTP end-to-end isolation tests
 - Any access to private intelligent-person memories
