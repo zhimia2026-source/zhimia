@@ -7,6 +7,8 @@ on:
       - "supabase/migrations/**"
       - "tests/sql/**"
       - ".github/workflows/zhi-community-check.yml"
+      - "openapi/**"
+      - "docs/**"
   push:
     branches:
       - "feature/intelligent-community-mvp"
@@ -16,11 +18,20 @@ on:
       - "supabase/migrations/**"
       - "tests/sql/**"
       - ".github/workflows/zhi-community-check.yml"
+      - "openapi/**"
+      - "docs/**"
 
 permissions:
   contents: read
 
 jobs:
+  contract-and-doc-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse OpenAPI and workflow YAML documents
+        run: ruby -e 'require "yaml"; ARGV.each { |path| YAML.parse_file(path); puts "YAML syntax OK: " + path }' openapi/zhi-community-v0.1.yaml .github/workflows/zhi-community-check.yml
+
   edge-function-typecheck:
     runs-on: ubuntu-latest
     steps:
