@@ -90,6 +90,45 @@ const SCENE_BEHAVIOR_LABELS: Record<string, string> = {
   avoid_crowds: "避开拥挤区域",
 };
 
+function deriveSceneActionProposals(environment: Record<string, unknown>) {
+  const weights = record(environment.behavior_weights);
+  const objects = Array.isArray(environment.objects) ? environment.objects.slice(0, 40).map(record) : [];
+  const proposals: Array<Record<string, unknown>> = [];
+  const add = (proposal: Record<string, unknown>) => {
+    if (proposals.length < 5) proposals.push({ ...proposal, requires_supervision: true, executed: false });
+  };
+  const shelter = objects.find((item) => {
+    const text = [item.id, item.name, item.state].filter((value) => typeof value === "string").join(" ").toLowerCase();
+    return /(shelter|eave|tent|gazebo|屋檐|帐篷|亭子|避雨|遮蔽)/i.test(text);
+  });
+  if (Number(weights.seek_shelter) >= 0.6) {
+    add({
+      action: "seek_shelter",
+      label: shelter ? "考虑前往遮蔽处" : "考虑寻找遮蔽处",
+      target_object_id: boundedText(shelter?.id, 80),
+      target_object_name: boundedText(shelter?.name, 120),
+      reason: "场景环境使寻找遮蔽处的倾向升高",
+    });
+  }
+  const restObject = objects.find((item) => Array.isArray(item.interaction_options) &&
+    item.interaction_options.some((option) => typeof option === "string" && /(rest|sit|休息|坐下)/i.test(option)));
+  if (Number(weights.rest) >= 0.6 && restObject) {
+    add({ action: "rest", label: "考虑在合适的位置休息", target_object_id: boundedText(restObject.id, 80),
+      target_object_name: boundedText(restObject.name, 120), reason: "当前休息倾向较高" });
+  }
+  const exploreObject = objects.find((item) => Array.isArray(item.interaction_options) &&
+    item.interaction_options.some((option) => typeof option === "string" && /(observe|explore|inspect|观察|探索)/i.test(option)));
+  if (Number(weights.explore) >= 0.65 && exploreObject) {
+    add({ action: "explore", label: "考虑观察或探索周围环境", target_object_id: boundedText(exploreObject.id, 80),
+      target_object_name: boundedText(exploreObject.name, 120), reason: "当前探索倾向较高" });
+  }
+  if (Number(weights.socialize) >= 0.7) {
+    add({ action: "socialize", label: "考虑与附近成员交流", target_object_id: null, target_object_name: null,
+      reason: "当前社交倾向较高" });
+  }
+  return proposals;
+}
+
 /** Explicitly selected, member-visible scene context. Never includes owner cognition or scene chat. */
 export function buildSceneAwarenessContext(
   scene: Record<string, unknown>,
@@ -132,6 +171,7 @@ export function buildSceneAwarenessContext(
     active_events: events,
     objects,
     behavior_tendencies: cues,
+    suggested_actions: deriveSceneActionProposals(environment),
   };
   return boundedJson(context, 6000);
 }
