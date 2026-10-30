@@ -58,13 +58,13 @@ python -m unittest discover -s tests -v
 
 Edge Function、数据库迁移、聊天页面和自动化检查已提交到功能分支，**尚未部署**。
 
-- GitHub Actions run [41031915086](https://github.com/zhimia2026-source/zhimia/actions/runs/41031915086)，代码提交 `c127ddd828a22feb40b42dd44d111ab5b2eeba46`，通过：
+- GitHub Actions run [41034331621](https://github.com/zhimia2026-source/zhimia/actions/runs/41034331621)，代码提交 `8cbd48e92e2f98009f8f1fbb59c72affa948b584`，通过：
   - Edge Function 类型检查与全部 HTTP/helper 测试，包括私有聊天上下文隔离测试。
   - 六项数据库迁移在一次性 PostgreSQL 中应用成功（社区核心、私有认知、认知提案、审批/回滚、变更说明审计、私有聊天）。
   - 私有聊天表 RLS、浏览器角色权限、复合 owner/agent 外键及幂等键唯一性 SQL 检查。
   - OpenAPI 与 CI workflow YAML 语法检查。
 - 聊天路由测试使用 mock 数据库和 mock 模型提供方；不代表真实模型服务连通，也不代表真实 Supabase 双账号 HTTP E2E 已通过。
-- GitHub Pages 工作流已配置在未来合并到 `main` 后发布 `chat.html`；当前分支上的页面不是已发布页面。
+- GitHub Pages 工作流已配置在未来合并到 `main` 后发布 `chat.html` 与 `community.html`；当前分支上的页面不是已发布页面。
 - 生产 Supabase 项目尚未执行这些迁移，也没有部署新的 `zhi-community` Edge Function。启用聊天前还需在服务端配置 `ZHI_CHAT_API_URL`、`ZHI_CHAT_API_KEY`、`ZHI_CHAT_MODEL`，并完成真实提供方连通性测试。
 - 部署前仍需完成真实 Supabase 双账号隔离、令牌撤销/过期、并发幂等、模型超时和回滚验收，并确认 Supabase Gateway 对自定义个人令牌的配置正确。
 
