@@ -2,7 +2,7 @@ name: Python and Edge Function tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/intelligent-community-mvp]
   pull_request:
     branches: [main]
 

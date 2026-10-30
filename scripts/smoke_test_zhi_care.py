@@ -70,7 +70,7 @@ def main() -> int:
         print("Set ZHI_ACCESS_TOKEN to a valid Supabase access token.", file=sys.stderr)
         return 2
     if not PUBLISHABLE_KEY:
-        print("Set SUPABASE_PUBLISHABLE_KEY (or SUPABASE_ANON_KEY) to the project's public API key.", file=sys.stderr)
+        print("Set SUPABASE_PUBLISHABLE_KEY (or SUPABASE_ANON_KEY) to the project public API key.", file=sys.stderr)
         return 2
 
     care_id = f"smoke:{secrets.token_hex(8)}"
@@ -115,15 +115,74 @@ def main() -> int:
     expect(status == 200 and transitioned.get("care", {}).get("state") == "understanding",
            "valid state transition succeeds")
 
-    status, blocked = call(ACCESS_TOKEN, {
-        "action": "transition",
-        "care_id": care_id,
-        "to_state": "in_progress",
+    status, goal = call(ACCESS_TOKEN, {
+        "action": "transition", "care_id": care_id, "to_state": "goal_set",
         "reason_code": "api_smoke_test",
-        "approved": True,
     })
-    expect(status == 403 and blocked.get("error") == "supervised_action_gate_not_integrated",
+    expect(status == 200 and goal.get("care", {}).get("state") == "goal_set",
+           "transition to goal_set succeeds")
+
+    status, review = call(ACCESS_TOKEN, {
+        "action": "transition", "care_id": care_id, "to_state": "action_review",
+        "reason_code": "api_smoke_test",
+    })
+    expect(status == 200 and review.get("care", {}).get("state") == "action_review",
+           "transition to action_review succeeds")
+
+    status, blocked = call(ACCESS_TOKEN, {
+        "action": "transition", "care_id": care_id, "to_state": "in_progress",
+        "reason_code": "api_smoke_test", "approved": True,
+    })
+    expect(status == 403 and blocked.get("error") == "approved_ticket_required",
            "client-supplied approval cannot bypass the supervised action gate")
+
+    status, requested = call(ACCESS_TOKEN, {"action": "request_approval", "care_id": care_id})
+    expect(status == 201 and requested.get("ticket", {}).get("status") == "pending",
+           "approval request creates a pending, scoped ticket")
+    ticket_id = requested["ticket"]["ticket_id"]
+
+    status, approved = call(ACCESS_TOKEN, {"action": "approve_action", "ticket_id": ticket_id})
+    expect(status == 200 and approved.get("ticket", {}).get("status") == "approved",
+           "explicit approval changes ticket status to approved")
+
+    status, started = call(ACCESS_TOKEN, {
+        "action": "transition", "care_id": care_id, "to_state": "in_progress",
+        "ticket_id": ticket_id, "reason_code": "human_approved",
+    })
+    expect(status == 200 and started.get("care", {}).get("state") == "in_progress",
+           "valid approved ticket permits the scoped workflow transition")
+
+    # Move through a valid cycle back to action_review so the replay reaches
+    # the ticket validation path rather than failing only on the state machine.
+    status, feedback = call(ACCESS_TOKEN, {
+        "action": "transition", "care_id": care_id, "to_state": "feedback_review",
+        "reason_code": "api_smoke_test",
+    })
+    expect(status == 200 and feedback.get("care", {}).get("state") == "feedback_review",
+           "post-action feedback review transition succeeds")
+
+    status, goal_again = call(ACCESS_TOKEN, {
+        "action": "transition", "care_id": care_id, "to_state": "goal_set",
+        "reason_code": "api_smoke_test",
+    })
+    expect(status == 200 and goal_again.get("care", {}).get("state") == "goal_set",
+           "feedback review can return to goal setting")
+
+    status, review_again = call(ACCESS_TOKEN, {
+        "action": "transition", "care_id": care_id, "to_state": "action_review",
+        "reason_code": "api_smoke_test",
+    })
+    expect(status == 200 and review_again.get("care", {}).get("state") == "action_review",
+           "workflow can return to action review")
+
+    status, replay = call(ACCESS_TOKEN, {
+        "action": "transition", "care_id": care_id, "to_state": "in_progress",
+        "ticket_id": ticket_id, "reason_code": "ticket_replay_test",
+    })
+    expect(status == 409 and replay.get("error") in {
+        "approved_ticket_invalid_or_expired", "care_revision_conflict"
+    },
+           "consumed or stale-revision ticket is rejected by the atomic gate")
 
     status, duplicate = call(ACCESS_TOKEN, {
         "action": "create",
