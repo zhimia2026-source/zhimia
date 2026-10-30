@@ -1,12 +1,12 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
-import { tokenTouchSucceeded } from "./auth_helpers.ts";
+import { tokenHasCapability, tokenTouchSucceeded } from "./auth_helpers.ts";
 import { isMembershipAuthorized } from "./access_helpers.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const MAX_BODY_BYTES = 64_000;
 
-type Actor = { userId: string };
+type Actor = { userId: string; capabilities: string[] };
 type JsonObject = Record<string, unknown>;
 
 function json(data: unknown, status = 200, extra: Record<string, string> = {}) {
@@ -51,7 +51,7 @@ async function authenticate(db: SupabaseClient, req: Request): Promise<Actor | n
   if (!token || token.length > 4096) return null;
   const hash = await sha256(token);
   const { data, error } = await db.from("zhi_personal_access_tokens")
-    .select("id,user_id,expires_at,revoked_at")
+    .select("id,user_id,expires_at,revoked_at,capabilities")
     .eq("token_hash", hash)
     .maybeSingle();
   if (error || !data || data.revoked_at) return null;
@@ -64,7 +64,7 @@ async function authenticate(db: SupabaseClient, req: Request): Promise<Actor | n
     .select("id")
     .maybeSingle();
   if (!tokenTouchSucceeded({ data: touched, error: touchError })) return null;
-  return { userId: data.user_id };
+  return { userId: data.user_id, capabilities: Array.isArray(data.capabilities) ? data.capabilities : [] };
 }
 
 async function readBody(req: Request): Promise<JsonObject> {
@@ -107,8 +107,11 @@ Deno.serve(async (req: Request) => {
     const marker = "/functions/v1/zhi-community";
     const path = url.pathname.includes(marker) ? url.pathname.slice(url.pathname.indexOf(marker) + marker.length) : url.pathname;
     const parts = path.split("/").filter(Boolean);
+    const requireCapability = (required: string) => tokenHasCapability(actor.capabilities, required);
+
 
     if (req.method === "GET" && path === "/v1/scenes") {
+      if (!requireCapability("community.scene.discover")) return reply({ error: "insufficient_capability", required: "community.scene.discover" }, 403);
       const { data, error } = await db.from("zhi_worlds")
         .select("id,name,description,visibility,entry_policy,status,rules_version,created_at")
         .eq("visibility", "public").eq("entry_policy", "open").eq("status", "open").order("created_at", { ascending: false }).limit(100);
@@ -117,6 +120,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (req.method === "POST" && path === "/v1/scenes") {
+      if (!requireCapability("community.scene.create")) return reply({ error: "insufficient_capability", required: "community.scene.create" }, 403);
       const body = await readBody(req);
       if (!isText(body.name, 160) || !["public", "private"].includes(String(body.visibility))) {
         return reply({ error: "invalid_argument", detail: "name_and_visibility_required" }, 400);
@@ -144,6 +148,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (req.method === "POST" && parts.length === 4 && parts[0] === "v1" && parts[1] === "scenes" && parts[3] === "invitations") {
+      if (!requireCapability("community.scene.invite")) return reply({ error: "insufficient_capability", required: "community.scene.invite" }, 403);
       const sceneId = parts[2];
       const body = await readBody(req);
       if (!isUuid(sceneId) || !isUuid(body.target_user_id)) {
@@ -174,6 +179,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (req.method === "POST" && path === "/v1/invitations/redeem") {
+      if (!requireCapability("community.scene.enter")) return reply({ error: "insufficient_capability", required: "community.scene.enter" }, 403);
       const body = await readBody(req);
       if (!isText(body.token, 128) || !/^[0-9a-f]{64}$/i.test(body.token)) {
         return reply({ error: "invalid_argument", detail: "token_required" }, 400);
@@ -193,6 +199,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (req.method === "POST" && parts.length === 4 && parts[0] === "v1" && parts[1] === "scenes" && parts[3] === "join") {
+      if (!requireCapability("community.scene.enter")) return reply({ error: "insufficient_capability", required: "community.scene.enter" }, 403);
       const sceneId = parts[2];
       if (!isUuid(sceneId)) return reply({ error: "invalid_argument", detail: "scene_id_must_be_uuid" }, 400);
       const { data: result, error } = await db.rpc("zhi_join_public_world", {
@@ -209,6 +216,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (req.method === "GET" && parts.length === 4 && parts[0] === "v1" && parts[1] === "scenes" && parts[3] === "messages") {
+      if (!requireCapability("community.message.read")) return reply({ error: "insufficient_capability", required: "community.message.read" }, 403);
       const sceneId = parts[2];
       const { data: readWorld, error: readWorldError } = await db.from("zhi_worlds")
         .select("id,status").eq("id", sceneId).maybeSingle();
@@ -237,6 +245,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (req.method === "POST" && parts.length === 4 && parts[0] === "v1" && parts[1] === "scenes" && parts[3] === "messages") {
+      if (!requireCapability("community.message.send")) return reply({ error: "insufficient_capability", required: "community.message.send" }, 403);
       const sceneId = parts[2];
       const body = await readBody(req);
       if (!isText(body.body, 8000)) return reply({ error: "invalid_argument" }, 400);
