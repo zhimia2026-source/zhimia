@@ -57,8 +57,13 @@ function harness(actorId: string, sceneAllowed = false, capabilities = ["communi
           }
           if (table === "zhi_agents") {
             const expected = actorId === ownerA ? agentA : agentB;
-            return Promise.resolve({ data: filters.id === expected && filters.owner_user_id === actorId
-              ? { id: expected, owner_user_id: actorId, display_name: actorId === ownerA ? "Agent A" : "Agent B", role: "manager", status: "active", public_manifest: {} }
+            const idMatches = filters.id === agentA || filters.id === agentB;
+            const ownerMatches = filters.owner_user_id === undefined
+              ? idMatches
+              : filters.id === expected && filters.owner_user_id === actorId;
+            return Promise.resolve({ data: ownerMatches
+              ? { id: filters.id, owner_user_id: filters.owner_user_id ?? (filters.id === agentA ? ownerA : ownerB),
+                  display_name: filters.id === agentA ? "Agent A" : "Agent B", role: "manager", status: "active", public_manifest: {} }
               : null, error: null });
           }
           if (table === "zhi_agent_chat_turns" && operation === "select") return Promise.resolve({ data: null, error: null });
