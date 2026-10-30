@@ -35,6 +35,8 @@ jobs:
         run: deno test supabase/functions/zhi-community/access_helpers_test.ts
       - name: Test offline ontology MOU validation
         run: deno test supabase/functions/zhi-community/ontology_helpers_test.ts
+      - name: Test append-only cognitive feedback cycle
+        run: deno test supabase/functions/zhi-community/cognitive_cycle_helpers_test.ts
 
   migration-smoke-test:
     runs-on: ubuntu-latest
