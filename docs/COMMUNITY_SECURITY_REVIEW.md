@@ -37,6 +37,9 @@ This review records source-level findings and CI evidence. It does not certify p
 - The model provider is mocked in CI. No real provider key or external model request is used in CI.
 - This remains mocked route-level and disposable-database evidence, not real Supabase Auth / two-account HTTP E2E.
 
+
+- Follow-up GitHub Actions run [41032468164](https://github.com/zhimia2026-source/zhimia/actions/runs/41032468164), branch head `a64a8dfa80a53932970f174b0d187f1845f6bcc6`, also passed. It additionally validates the private chat page's embedded JavaScript syntax and static security contract (personal token in sessionStorage; no legacy broadcast/Core references or server secrets in the page).
+
 ## Required before production
 
 1. **Real cross-account isolation:** use two real test accounts and tokens against an isolated Supabase test project. Prove account A cannot read account B's cognition or private conversation, redeem an invitation targeted to B, or use a revoked/expired token. Include negative tests for wrong agent IDs and inactive memberships.
