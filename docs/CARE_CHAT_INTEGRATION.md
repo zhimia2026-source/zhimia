@@ -11,8 +11,9 @@
 已核实：
 - `zhi-care` Edge Function 为 ACTIVE v6，`verify_jwt=true`，通过 Supabase Auth `getUser(token)` 验证 JWT。
 - CareState 数据表为 `zhi_care_states`、`zhi_care_events`、`zhi_care_approval_tickets`；均启用 RLS，未开放 anon/authenticated 直连策略。
-- `zhi-community` 的仓库实现使用 `zhi_personal_access_tokens.token_hash` 验证个人令牌，但该函数当前不在目标项目已部署函数清单中。
-- `zhi_personal_access_tokens` 当前列只有 id、user_id、token_hash、label、created_at、expires_at、revoked_at、last_used_at、family_id；**没有 token scopes / capabilities 字段**。
+- 个人令牌路径由已部署的 `zhi-token-gateway` 验证 opaque token（SHA-256 哈希查表）；令牌记录现有 `capabilities` 字段，包含 `care.read`、`care.write`、`care.approve` 等细粒度能力。
+- 独立的 `zhi-care-personal` 适配器已提交到仓库，但**尚未部署**；它从令牌记录派生 user_id，不信任请求体身份字段。JWT-only 的 `zhi-care` 保持原样，不关闭 JWT 验证。
+- Care 审批申请/批准现由两个原子 RPC 在同一事务写入票据与审计事件；数据库回滚式集成测试已覆盖成功、过期和 revision 失效路径。HTTP 个人令牌、跨账号隔离和 CI 类型检查仍待完成。
 - 当前仓库未检索到 `agent-talk.html` 等聊天前端源文件；聊天接入审计依赖用户此前上传的旧 ZIP 静态检查结果，不能据此直接改写线上聊天页面。
 
 ## 2. 必须先解决的身份协议不匹配
@@ -95,3 +96,11 @@
 当前不是 Care 状态机或数据库缺失，而是**聊天 UI 源码与真实身份链尚未接入**。仓库没有找到可直接修改的聊天前端文件，且 Care API 与个人 opaque token 的认证模式不同。
 
 下一步必须取得当前聊天入口的源文件/仓库路径和真实聊天 API 资源映射，再按本契约做适配。不得通过放宽 JWT 验证、信任客户端 user_id/agent_id 或开放 Care 表直连权限来绕过阻塞。
+
+
+## 8. 个人令牌 Care 适配器进度（2026-10-30）
+
+- 新增数据库 RPC：`zhi_care_request_approval_atomic`、`zhi_care_approve_action_atomic`；两者均为 SECURITY INVOKER，仅 service_role 可执行。
+- 新增审批审计事件：`approval_requested`、`approval_granted`、`approval_expired`、`approval_invalidated`。
+- 已在目标 Supabase 项目完成回滚式 SQL 集成测试，覆盖申请、批准、一次性消费、审计完整性、过期与 revision 失效；测试事务已回滚，不留合成数据。
+- 不得把适配器标记为生产可用：Edge Function 尚未部署，个人令牌 HTTP 测试与两个独立账号隔离验收尚未完成。
