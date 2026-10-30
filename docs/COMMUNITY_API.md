@@ -62,3 +62,18 @@ Edge Function、数据库迁移和自动化检查已提交到功能分支，**�
 ### 版本审计字段
 
 认知记录读取接口返回 `change_kind`、`previous_record_id`、`source_proposal_id` 与 `change_note`，用于追踪追加式版本链及人类决策说明。
+
+## Private intelligent-person chat
+
+- `GET /v1/agents/{agent_id}/chat?limit=50`: reads the authenticated owner's private chat turns for that exact agent. The limit is 1–100.
+- `POST /v1/agents/{agent_id}/chat`: accepts `{"message":"..."}` and requires an `Idempotency-Key` header. The server verifies ownership and active status before reading private cognition or chat history.
+- Model provider configuration is server-side only: `ZHI_CHAT_API_URL`, `ZHI_CHAT_API_KEY`, and `ZHI_CHAT_MODEL`. The provider URL must use HTTPS. If these secrets are absent, the endpoint returns `503 chat_model_not_configured`; no fake reply is generated.
+- Context assembly is server-side and limited to the authenticated `owner_user_id` + requested `agent_id`: the agent profile, up to 20 private cognition records, and up to 12 completed private chat turns. Scene messages are not queried or included.
+- The conversation is persisted in `zhi_agent_chat_turns`, which has a composite owner/agent foreign key and a unique owner/agent/idempotency-key constraint. It is not stored in `zhi_world_messages`.
+- A failed model request marks the turn as failed and returns `502 chat_generation_failed`. Retrying the same idempotency key returns a conflict; clients should send a new key for a new attempt.
+- Chat content does not automatically create or update long-term cognition. The supervised feedback/proposal/approval workflow remains separate.
+
+The new chat UI is `web/zhi-agent-chat.html`. It is a branch artifact, not a deployed page. It uses the existing personal access token model and stores the token only in browser `sessionStorage`. It does not restore the old shared-password gate, global broadcast, old Core database, or old Agnes endpoints.
+
+**Release limitation:** the endpoint requires the new private-chat migration and the three provider secrets. The current CI uses a mocked model provider and disposable PostgreSQL; real provider connectivity and real two-account Supabase HTTP E2E remain outstanding.
+
