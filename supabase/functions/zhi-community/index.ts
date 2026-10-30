@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { tokenHasCapability, tokenTouchSucceeded } from "./auth_helpers.ts";
 import { isMembershipAuthorized } from "./access_helpers.ts";
+import { computeSceneEnvironment } from "./environment_helpers.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -213,6 +214,23 @@ Deno.serve(async (req: Request) => {
         throw new Error("database_error");
       }
       return reply(result, 200);
+    }
+
+    if (req.method === "GET" && parts.length === 4 && parts[0] === "v1" && parts[1] === "scenes" && parts[3] === "environment") {
+      if (!requireCapability("community.message.read")) return reply({ error: "insufficient_capability", required: "community.message.read" }, 403);
+      const sceneId = parts[2];
+      const { data: world, error: worldError } = await db.from("zhi_worlds")
+        .select("id,status,environment_state").eq("id", sceneId).maybeSingle();
+      if (worldError) throw new Error("database_error");
+      if (!world) return reply({ error: "not_found" }, 404);
+      if (world.status !== "open") return reply({ error: "conflict", detail: "scene_not_open" }, 409);
+      const { data: membership, error: membershipError } = await db.from("zhi_world_memberships")
+        .select("id,principal_user_id,status,revoked_at,agent_id,expires_at,capabilities")
+        .eq("world_id", sceneId).eq("principal_user_id", actor.userId)
+        .eq("status", "active").is("revoked_at", null).is("agent_id", null).maybeSingle();
+      if (membershipError) throw new Error("database_error");
+      if (!isMembershipAuthorized(membership, actor.userId, "message:read")) return reply({ error: "forbidden" }, 403);
+      return reply({ scene_id: sceneId, environment: computeSceneEnvironment(world.environment_state) });
     }
 
     if (req.method === "GET" && parts.length === 4 && parts[0] === "v1" && parts[1] === "scenes" && parts[3] === "messages") {
