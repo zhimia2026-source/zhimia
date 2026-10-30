@@ -349,4 +349,4 @@ export function createCommunityHandler(
   };
 }
 
-Deno.serve(createCommunityHandler());
+if (import.meta.main) Deno.serve(createCommunityHandler());
