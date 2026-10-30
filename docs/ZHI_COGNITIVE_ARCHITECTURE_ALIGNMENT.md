@@ -216,3 +216,18 @@ MOU 是工程功能闭环，不是意识或主观体验的证明。
 - 索引按 owner + agent + 时间/对象版本组织，支持严格隔离后的检索。
 
 **当前状态边界：** 迁移文件和 PostgreSQL CI 测试已提交到 `feature/intelligent-community-mvp-clean`；GitHub Actions run 75（commit `fa88db1`）的迁移冒烟测试与 Edge Function 检查均已通过。尚未应用到 Supabase 项目；尚未实现私有认知读写 API、真实双账号 HTTP 端到端测试、删除/保留策略或生产接入。数据库表的存在本身不代表用户已能通过前端访问认知记录。
+
+
+## 13. 私有认知 API 与反馈闭环增量（2026-10-30）
+
+本节更新第 11、12 节中“尚未实现真实 API 路由”的状态说明；此前关于“无数据库写入的纯函数模块”的描述仍适用于 helper 本身，但不再完整代表当前分支的 API 状态。
+
+- 已提交 GET/POST /v1/agents：列出/创建当前认证用户自己的智能人；默认角色 manager、默认可见性 private。
+- 已提交 GET/POST /v1/agents/{agent_id}/cognition：私有 MOU 记录读写；服务端从令牌确定 owner，并同时校验 owner 与 agent。
+- 新增 POST /v1/agents/{agent_id}/cognition/{record_id}/feedback：只允许所属用户针对自己智能人的假设记录追加反馈；要求原记录确实为带预测的 hypothesis；反馈保存为独立的 feedback/observation MOU 记录，引用原假设、来源、事件时间、记录时间与置信度，不覆盖原假设。
+- 新增 feedback_routes_test.ts：覆盖追加成功、其他账号访问返回 not_found、无效证据拒绝写入。该测试使用注入式 mock DB，是 HTTP handler 级测试，不是真实 Supabase 双账号端到端测试。
+- GitHub Actions run 41013979071（commit e83d81be49f9f874f9278277b637bfbeb53753e3）的 Edge Function 检查和 disposable PostgreSQL 迁移冒烟测试均通过；其中包括新的反馈 API 测试、两项迁移和原子场景创建 RPC 检查。
+
+**尚未实现：** 持久化的修订提案表与 API、所有者审批/拒绝 API、认知版本快照与回滚 API、真实 Supabase 双账号 HTTP E2E、前端聊天接入。现有 cognitive_cycle_helpers.ts 与 cognitive_version_helpers.ts 仍是纯函数参考逻辑，不能视为这些流程已持久化或已上线。
+
+**安全边界：** 反馈只是新的观察记录，不会自动改变智能体人格、长期记忆策略、提示词、权限或模型。任何后续认知修订必须保留证据链、由所有者明确批准、产生新版本并支持审计/回滚；场景共享消息仍不得自动进入私有认知记录。
