@@ -49,10 +49,10 @@ BEGIN
     RAISE EXCEPTION 'service_role must execute scene creation RPC';
   END IF;
 END;
-$;
+$$;
 
 -- Database-level scene policy must match the only enabled API flows.
-DO $
+DO $$
 BEGIN
   BEGIN
     INSERT INTO public.zhi_worlds (creator_user_id, name, visibility, entry_policy)
@@ -70,7 +70,7 @@ BEGIN
     NULL;
   END;
 END;
-$;
+$$;
 
 -- Force the second insert to fail and prove the first insert rolls back too.
 CREATE FUNCTION public.zhi_test_reject_membership_insert()
