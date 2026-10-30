@@ -4,6 +4,7 @@ on:
   push:
     branches: [feature/intelligent-community-mvp]
     paths:
+      - "supabase/functions/zhi-care/**"
       - "supabase/functions/zhi-care-personal/**"
       - ".github/workflows/care-adapter-check.yml"
   pull_request:
@@ -22,5 +23,7 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+      - name: Type-check JWT Care Edge Function
+        run: deno check supabase/functions/zhi-care/index.ts
       - name: Type-check Care personal-token adapter
         run: deno check supabase/functions/zhi-care-personal/index.ts
