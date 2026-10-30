@@ -2,7 +2,7 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { isTokenExpiryValid, tokenTouchSucceeded } from "./auth_helpers.ts";
 import { isMembershipAuthorized, privilegesForPublicRejoin } from "./access_helpers.ts";
 import { validateMouRecord } from "./ontology_helpers.ts";
-import { buildFeedbackRecord } from "./cognitive_cycle_helpers.ts";
+import { buildFeedbackRecord, buildRevisionProposal } from "./cognitive_cycle_helpers.ts";
 
 const MAX_BODY_BYTES = 64_000;
 
@@ -148,6 +148,83 @@ export function createCommunityHandler(
       }).select("id,owner_user_id,display_name,role,visibility,manifest_version,public_manifest,status,created_at,updated_at").single();
       if (error || !agent) throw new Error("database_error");
       return reply({ agent }, 201);
+    }
+
+    // Persisted revision proposals remain shadow-only until a separate owner decision endpoint.
+    if (parts.length === 5 && parts[0] === "v1" && parts[1] === "agents" &&
+        parts[3] === "cognition" && parts[4] === "proposals" && req.method === "GET") {
+      const agentId = parts[2];
+      if (!isUuid(agentId)) return reply({ error: "invalid_argument", detail: "agent_id_must_be_uuid" }, 400);
+      const { data: agent, error: agentError } = await db.from("zhi_agents")
+        .select("id,owner_user_id,status").eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
+      if (agentError) throw new Error("database_error");
+      if (!agent) return reply({ error: "not_found" }, 404);
+      if (agent.status !== "active") return reply({ error: "conflict", detail: "agent_not_active" }, 409);
+      const { data: proposals, error } = await db.from("zhi_cognition_revision_proposals")
+        .select("id,owner_user_id,agent_id,target_object_type,target_object_id,based_on_record_id,based_on_version,proposed_state,status,requires_human_review,created_at,decided_at,reviewer_user_id,decision_note")
+        .eq("owner_user_id", actor.userId).eq("agent_id", agentId)
+        .order("created_at", { ascending: false }).limit(100);
+      if (error) throw new Error("database_error");
+      return reply({ items: proposals ?? [] });
+    }
+
+    if (parts.length === 6 && parts[0] === "v1" && parts[1] === "agents" &&
+        parts[3] === "cognition" && parts[5] === "proposals" && req.method === "POST") {
+      const agentId = parts[2];
+      const baseRecordId = parts[4];
+      if (!isUuid(agentId) || !isUuid(baseRecordId)) {
+        return reply({ error: "invalid_argument", detail: "agent_and_record_ids_must_be_uuids" }, 400);
+      }
+      const { data: agent, error: agentError } = await db.from("zhi_agents")
+        .select("id,owner_user_id,status").eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
+      if (agentError) throw new Error("database_error");
+      if (!agent) return reply({ error: "not_found" }, 404);
+      if (agent.status !== "active") return reply({ error: "conflict", detail: "agent_not_active" }, 409);
+
+      const body = await readBody(req);
+      const feedbackIds = body.feedback_record_ids;
+      if (!Array.isArray(feedbackIds) || feedbackIds.length < 1 || feedbackIds.length > 20 ||
+          feedbackIds.some((id) => !isUuid(id)) || new Set(feedbackIds).size !== feedbackIds.length) {
+        return reply({ error: "invalid_argument", detail: "feedback_record_ids_must_be_1_to_20_unique_uuids" }, 400);
+      }
+      const proposedState = body.proposed_state;
+      if (!proposedState || typeof proposedState !== "object" || Array.isArray(proposedState)) {
+        return reply({ error: "invalid_argument", detail: "proposed_state_must_be_object" }, 400);
+      }
+
+      const columns = "id,owner_user_id,agent_id,object_type,object_id,state,relation_ids,evidence_kind,source_ids,confidence,event_time,recorded_at,inferred_at,hypothesis,prediction,version";
+      const { data: baseRecord, error: baseError } = await db.from("zhi_agent_cognition_records")
+        .select(columns).eq("id", baseRecordId).eq("owner_user_id", actor.userId)
+        .eq("agent_id", agentId).maybeSingle();
+      if (baseError) throw new Error("database_error");
+      if (!baseRecord) return reply({ error: "not_found" }, 404);
+      const { data: feedbackRecords, error: feedbackError } = await db.from("zhi_agent_cognition_records")
+        .select(columns).in("id", feedbackIds).eq("owner_user_id", actor.userId).eq("agent_id", agentId);
+      if (feedbackError) throw new Error("database_error");
+      if (!feedbackRecords || feedbackRecords.length !== feedbackIds.length) {
+        return reply({ error: "invalid_argument", detail: "feedback_records_not_found_in_private_scope" }, 400);
+      }
+
+      let proposal;
+      try {
+        proposal = buildRevisionProposal(baseRecord, {
+          id: crypto.randomUUID(),
+          feedback_records: feedbackRecords,
+          proposed_state: proposedState as Record<string, unknown>,
+          created_at: new Date().toISOString(),
+        });
+      } catch (error) {
+        return reply({ error: "invalid_argument", detail: error instanceof Error ? error.message : "invalid_revision_proposal" }, 400);
+      }
+      const { data: persisted, error } = await db.rpc("zhi_create_cognition_revision_proposal", {
+        p_owner_user_id: actor.userId,
+        p_agent_id: agentId,
+        p_based_on_record_id: baseRecordId,
+        p_feedback_record_ids: feedbackIds,
+        p_proposed_state: proposal.proposed_state,
+      });
+      if (error || !persisted) throw new Error("database_error");
+      return reply({ proposal: persisted }, 201);
     }
 
     // Feedback is append-only: it records an observed outcome against an owned hypothesis.
