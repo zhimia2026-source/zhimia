@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { computeSceneEnvironment } from "./environment_helpers.ts";
+import { computeSceneEnvironment, normalizeSceneEnvironmentConfig } from "./environment_helpers.ts";
 
 Deno.test("computes local temporal rhythm using the scene timezone", () => {
   const result = computeSceneEnvironment({ timezone: "Asia/Singapore" }, new Date("2026-10-30T22:30:00.000Z"));
@@ -47,4 +47,28 @@ Deno.test("falls back safely for invalid timezone and clamps behavior weights", 
   const result = computeSceneEnvironment({ timezone: "Not/A_Timezone", behavior_weights: { seek_shelter: 9 } }, new Date("2026-10-30T06:00:00.000Z"));
   assertEquals(result.scene_time.timezone, "UTC");
   assertEquals(result.behavior_weights.seek_shelter, 1);
+});
+
+Deno.test("normalizes only the public environment schema and rejects private fields", () => {
+  const normalized = normalizeSceneEnvironmentConfig({
+    timezone: "Asia/Singapore",
+    objects: [{ id: "bench", name: "长椅", state: "dry", interaction_options: ["sit"] }],
+    events: [{ id: "rain", type: "rain", label: "阵雨", daily_window: { start: "14:00", end: "16:00" }, state_delta: { object_states: { bench: "wet" } }, behavior_weights: { seek_shelter: 0.8 } }],
+  });
+  assertEquals(normalized.timezone, "Asia/Singapore");
+  assertEquals((normalized.events as Array<Record<string, unknown>>)[0].id, "rain");
+  let rejected = false;
+  try { normalizeSceneEnvironmentConfig({ timezone: "UTC", private_memory: ["secret"] }); } catch { rejected = true; }
+  assertEquals(rejected, true);
+});
+
+Deno.test("rejects invalid timezones and malformed event windows", () => {
+  let timezoneRejected = false;
+  let windowRejected = false;
+  try { normalizeSceneEnvironmentConfig({ timezone: "Mars/Olympus" }); } catch { timezoneRejected = true; }
+  try {
+    normalizeSceneEnvironmentConfig({ events: [{ id: "bad", type: "rain", label: "bad", daily_window: { start: "25:00", end: "26:00" } }] });
+  } catch { windowRejected = true; }
+  assertEquals(timezoneRejected, true);
+  assertEquals(windowRejected, true);
 });
