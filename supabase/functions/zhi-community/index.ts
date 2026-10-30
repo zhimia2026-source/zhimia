@@ -8,7 +8,7 @@ import { computeSceneEnvironment, normalizeSceneEnvironmentConfig } from "./envi
 
 const MAX_BODY_BYTES = 64_000;
 
-type Actor = { userId: string };
+type Actor = { userId: string; capabilities?: string[] };
 type JsonObject = Record<string, unknown>;
 
 function json(data: unknown, status = 200, extra: Record<string, string> = {}) {
@@ -55,7 +55,7 @@ async function authenticate(db: SupabaseClient, req: Request): Promise<Actor | n
   if (!token || token.length > 4096) return null;
   const hash = await sha256(token);
   const { data, error } = await db.from("zhi_personal_access_tokens")
-    .select("id,user_id,expires_at,revoked_at")
+    .select("id,user_id,expires_at,revoked_at,capabilities")
     .eq("token_hash", hash)
     .maybeSingle();
   if (error || !data || data.revoked_at) return null;
@@ -68,7 +68,7 @@ async function authenticate(db: SupabaseClient, req: Request): Promise<Actor | n
     .select("id")
     .maybeSingle();
   if (!tokenTouchSucceeded({ data: touched, error: touchError })) return null;
-  return { userId: data.user_id };
+  return { userId: data.user_id, capabilities: Array.isArray(data.capabilities) ? data.capabilities : [] };
 }
 
 async function readBody(req: Request): Promise<JsonObject> {
@@ -81,7 +81,7 @@ async function readBody(req: Request): Promise<JsonObject> {
   return value as JsonObject;
 }
 
-function isText(value: unknown, max: number): value is string {
+function hasCapability(actor: Actor, capability: string): boolean {\n  return Array.isArray(actor.capabilities) && actor.capabilities.includes(capability);\n}\n\nfunction isText(value: unknown, max: number): value is string {
   return typeof value === "string" && value.trim().length > 0 && value.length <= max;
 }
 
@@ -546,6 +546,73 @@ export function createCommunityHandler(
         .maybeSingle();
       if (completeError || !completed) throw new Error("database_error");
       return reply({ turn: completed, idempotent_replay: false }, 201);
+    }
+
+    // Agent scene membership is independent from the creator's human membership.
+    // The authenticated creator must own the agent; public join is an explicit action.
+    if (parts.length === 4 && parts[0] === "v1" && parts[1] === "agents" &&
+        parts[3] === "scenes" && req.method === "GET") {
+      if (!hasCapability(actor, "community.scene.discover")) return reply({ error: "forbidden", detail: "capability_required" }, 403);
+      const agentId = parts[2];
+      if (!isUuid(agentId)) return reply({ error: "invalid_argument", detail: "agent_id_must_be_uuid" }, 400);
+      const { data: agent, error: agentError } = await db.from("zhi_agents")
+        .select("id,owner_user_id,status").eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
+      if (agentError) throw new Error("database_error");
+      if (!agent) return reply({ error: "not_found" }, 404);
+      if (agent.status !== "active") return reply({ error: "conflict", detail: "agent_not_active" }, 409);
+      const { data: memberships, error: membershipError } = await db.from("zhi_world_memberships")
+        .select("world_id,membership_role,capabilities,expires_at")
+        .eq("principal_user_id", actor.userId).eq("agent_id", agentId)
+        .eq("status", "active").is("revoked_at", null).order("joined_at", { ascending: false }).limit(100);
+      if (membershipError) throw new Error("database_error");
+      const valid = (memberships ?? []).filter((m: { expires_at?: string | null }) =>
+        !m.expires_at || Date.parse(m.expires_at) > Date.now());
+      const worldIds = valid.map((m: { world_id: string }) => m.world_id);
+      if (!worldIds.length) return reply({ items: [] });
+      const { data: worlds, error: worldsError } = await db.from("zhi_worlds")
+        .select("id,name,description,visibility,entry_policy,status,rules_version,created_at")
+        .in("id", worldIds).eq("status", "open").order("created_at", { ascending: false }).limit(100);
+      if (worldsError) throw new Error("database_error");
+      const byWorld = new Map(valid.map((m: { world_id: string; membership_role: string; capabilities: string[] }) => [m.world_id, m]));
+      return reply({ items: (worlds ?? []).map((world: { id: string }) => ({
+        ...world, actor_type: "agent",
+        membership_role: byWorld.get(world.id)?.membership_role ?? "member",
+        capabilities: byWorld.get(world.id)?.capabilities ?? [],
+      })) });
+    }
+
+    if (parts.length === 6 && parts[0] === "v1" && parts[1] === "agents" &&
+        parts[3] === "scenes" && (parts[5] === "join" || parts[5] === "leave") && req.method === "POST") {
+      if (!hasCapability(actor, "community.scene.enter")) return reply({ error: "forbidden", detail: "capability_required" }, 403);
+      const agentId = parts[2];
+      const sceneId = parts[4];
+      if (!isUuid(agentId) || !isUuid(sceneId)) return reply({ error: "invalid_argument", detail: "agent_and_scene_ids_must_be_uuids" }, 400);
+      const { data: agent, error: agentError } = await db.from("zhi_agents")
+        .select("id,owner_user_id,status").eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
+      if (agentError) throw new Error("database_error");
+      if (!agent) return reply({ error: "not_found" }, 404);
+      if (agent.status !== "active") return reply({ error: "conflict", detail: "agent_not_active" }, 409);
+      if (parts[5] === "join") {
+        const { data: result, error } = await db.rpc("zhi_join_public_world_agent", {
+          p_world_id: sceneId, p_owner_user_id: actor.userId, p_agent_id: agentId,
+        });
+        if (error || !result) {
+          if (error?.code === "42501") return reply({ error: "forbidden" }, 403);
+          if (error?.code === "P0002") return reply({ error: "not_found" }, 404);
+          if (error?.code === "22023") return reply({ error: "conflict", detail: "scene_not_open_for_agent_join_or_agent_inactive" }, 409);
+          throw new Error("database_error");
+        }
+        return reply(result, 200);
+      }
+      const { data: result, error } = await db.rpc("zhi_revoke_agent_world_membership", {
+        p_world_id: sceneId, p_owner_user_id: actor.userId, p_agent_id: agentId,
+      });
+      if (error || !result) {
+        if (error?.code === "42501") return reply({ error: "forbidden" }, 403);
+        if (error?.code === "P0002") return reply({ error: "not_found" }, 404);
+        throw new Error("database_error");
+      }
+      return reply(result, 200);
     }
 
     if (req.method === "GET" && path === "/v1/scenes") {
