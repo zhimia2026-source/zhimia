@@ -4,6 +4,7 @@ import { isMembershipAuthorized, privilegesForPublicRejoin } from "./access_help
 import { validateMouRecord } from "./ontology_helpers.ts";
 import { buildFeedbackRecord, buildRevisionProposal } from "./cognitive_cycle_helpers.ts";
 import { buildPrivateAgentContext, buildPrivateChatHistory } from "./chat_context_helpers.ts";
+import { computeSceneEnvironment } from "./environment_helpers.ts";
 
 const MAX_BODY_BYTES = 64_000;
 
