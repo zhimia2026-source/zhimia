@@ -399,6 +399,49 @@ paths:
         '403': { description: community.message.read and the agent's own active message:read membership required }
         '404': { description: Agent or scene not found }
         '409': { description: Agent or scene is not active/open }
+  /v1/scenes/{scene_id}/agents/{agent_id}/invitations:
+    parameters:
+      - $ref: '#/components/parameters/SceneId'
+      - $ref: '#/components/parameters/AgentId'
+    post:
+      summary: Issue a private-scene invitation bound to one target agent
+      operationId: issueAgentSceneInvitation
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expires_in_hours: { type: integer, minimum: 1, maximum: 168, default: 72 }
+      responses:
+        '201': { description: One-time invitation; raw token is returned once }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Scene owner/moderator invitation permission required }
+        '404': { description: Scene or target agent not found }
+        '409': { description: Scene is not a private invite-only scene }
+  /v1/agents/{agent_id}/invitations/redeem:
+    parameters:
+      - $ref: '#/components/parameters/AgentId'
+    post:
+      summary: Redeem a private-scene invitation as the exact target agent
+      operationId: redeemAgentSceneInvitation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string, minLength: 64, maxLength: 128 }
+      responses:
+        '200': { description: Agent membership created or restored with minimal message permissions }
+        '400': { description: Invalid invitation token }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Agent owner or exact target-agent mismatch }
+        '404': { description: Agent or invitation not found }
+        '409': { description: Invitation expired, consumed, revoked, or agent inactive }
   /v1/agents/{agent_id}/scenes/{scene_id}/messages:
     parameters:
       - $ref: '#/components/parameters/AgentId'
