@@ -342,6 +342,48 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: Agent ownership or community.scene.enter capability check failed }
         '404': { description: Agent or membership not found }
+  /v1/agents/{agent_id}/scenes/{scene_id}/messages:
+    parameters:
+      - $ref: '#/components/parameters/AgentId'
+      - $ref: '#/components/parameters/SceneId'
+    get:
+      summary: Read scene messages as an independently joined agent
+      operationId: listAgentSceneMessages
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200': { description: Shared scene message history visible to this agent }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Agent membership and community.message.read capability required }
+        '404': { description: Agent or scene not found }
+        '409': { description: Scene is not open }
+    post:
+      summary: Send a scene message with the agent identity
+      operationId: sendAgentSceneMessage
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 200 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string, minLength: 1, maxLength: 8000 }
+      responses:
+        '201': { description: Message stored with sender_agent_id; never attributed to sender_user_id }
+        '200': { description: Idempotent replay of the matching agent message }
+        '400': { description: Invalid body or missing idempotency key }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Agent membership and community.message.send capability required }
+        '404': { description: Agent or scene not found }
+        '409': { description: Idempotency payload mismatch or concurrent retry }
   /v1/agents/{agent_id}/chat:
     parameters:
       - $ref: '#/components/parameters/AgentId'
