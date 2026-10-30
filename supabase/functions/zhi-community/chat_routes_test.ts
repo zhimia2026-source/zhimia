@@ -25,7 +25,8 @@ function harness(actorId: string, sceneAllowed = false, capabilities = ["communi
         eq(key: string, value: unknown) { filters[key] = value; return builder; },
         is(key: string, value: unknown) { filters[key] = value; return builder; },
         order(_key: string, _options: unknown) { return builder; },
-        limit(_value: number) { return builder; },\n        in(key: string, value: unknown) { filters[key] = value; return builder; },
+        limit(_value: number) { return builder; },
+        in(key: string, value: unknown) { filters[key] = value; return builder; },
         insert(value: Record<string, unknown>) { operation = "insert"; inserted = value; return builder; },
         update(value: Record<string, unknown>) { operation = "update"; updated = value; return builder; },
         maybeSingle() {
