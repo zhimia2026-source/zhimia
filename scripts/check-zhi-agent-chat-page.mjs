@@ -13,7 +13,7 @@ new Script(scripts[0], { filename: path });
 for (const required of [
   'https://lvxmygrgqtmzqgailmyl.supabase.co/functions/v1/zhi-community',
   'sessionStorage.setItem(TOKEN_KEY, token)',
-  'Idempotency-Key',
+  'idempotency-key',
   '/chat?limit=50',
 ]) {
   if (!html.includes(required)) throw new Error("Missing required chat UI contract: " + required);
