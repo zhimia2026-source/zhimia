@@ -40,10 +40,30 @@ This review records source-level findings and CI evidence. It does not certify p
 
 - Follow-up GitHub Actions run [41032468164](https://github.com/zhimia2026-source/zhimia/actions/runs/41032468164), branch head `a64a8dfa80a53932970f174b0d187f1845f6bcc6`, also passed. It additionally validates the private chat page's embedded JavaScript syntax and static security contract (personal token in sessionStorage; no legacy broadcast/Core references or server secrets in the page).
 
+
+- GitHub Actions run [41033336226](https://github.com/zhimia2026-source/zhimia/actions/runs/41033336226), commit `8f48925135f1d6c54be5dc3d1dbfd98158d84900`, passed all three jobs. It adds private-chat context hardening:
+  - The model prompt now receives only agent display name/role, not arbitrary `public_manifest` content.
+  - Cognition context is limited to 12 records; state and evidence text are bounded.
+  - Conversation replay is limited to the latest 8 completed turns, with each user/assistant message capped at 2,500 characters.
+  - Prompt-injection-like strings in stored cognition are tested as untrusted data; context and history limits have dedicated unit tests.
+  - Edge Function type-check, route isolation tests, disposable PostgreSQL migration smoke tests, OpenAPI/workflow validation, and static chat-page checks all pass.
+
+
+## Live Supabase read-only snapshot (2026-10-30)
+
+Target project `lvxmygrgqtmzqgailmyl` was inspected without making changes:
+- Project is `ACTIVE_HEALTHY`, region `ap-southeast-1`, PostgreSQL 17.
+- Live migration history currently contains only health-advisor, personal-token/refresh-credential, and ZHI Care migrations. No ZHI Community/private cognition/private chat migrations are present.
+- Live Edge Functions are `zhi-health-advisor`, `zhi-token-gateway`, `zhi-token-admin`, and `zhi-care`. No `zhi-community` function is deployed.
+- The live public schema has no `zhi_agents`, `zhi_worlds`, `zhi_agent_cognition_records`, or `zhi_agent_chat_turns` tables.
+- A read-only privilege query confirmed that `anon` and `authenticated` have no direct privileges on the inspected token, refresh-credential, and Care tables; `service_role` has the server-side privileges. Supabase Advisor's “RLS enabled, no policy” findings on these tables are consistent with this service-only access model; do not resolve them by granting browser access.
+- Supabase Advisor also warns that leaked-password protection is disabled. This setting has not been changed.
+- No production migration, permission change, Edge Function deployment, or Auth setting change was performed.
+
 ## Required before production
 
 1. **Real cross-account isolation:** use two real test accounts and tokens against an isolated Supabase test project. Prove account A cannot read account B's cognition or private conversation, redeem an invitation targeted to B, or use a revoked/expired token. Include negative tests for wrong agent IDs and inactive memberships.
-2. **Chat context boundary:** when integrating cognition into chat, prove that the context builder filters by the authenticated `owner_user_id` and selected `agent_id`; shared scene messages must remain a separate context source and must never be silently persisted as private cognition.
+2. **Chat context boundary:** the current private-chat context builder filters by authenticated `owner_user_id` and selected `agent_id`, bounds cognition/history, and excludes scene messages. Before release, add a real Supabase two-account HTTP E2E proof that these boundaries hold against deployed storage; never silently persist scene messages as private cognition.
 3. **Idempotency concurrency:** simultaneous duplicate requests may receive a conflict rather than a replay response. Confirm client retry behavior and add a concurrency test.
 4. **Deployment settings:** verify `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ZHI_ALLOWED_ORIGINS`, and the Edge Function gateway JWT setting. If gateway JWT verification is disabled for the custom ZHI token, the function's own token validation must remain mandatory.
 5. **Migration and rollback:** review and back up the target project before applying migrations; run smoke tests before any traffic cutover.
@@ -55,7 +75,7 @@ Do not describe the community as production-ready until real cross-account autho
 
 ## Not implemented or not yet verified in this slice
 
-- Private one-to-one messaging.
+- Private agent chat is implemented on the feature branch and CI-tested, but is not deployed or verified against a real model provider.
 - Invitation revocation endpoint.
 - Approval queue workflow.
 - Realtime delivery.
@@ -63,5 +83,5 @@ Do not describe the community as production-ready until real cross-account autho
 - Persistent task execution and trusted tool invocation.
 - Scene temporal rhythms and event tides.
 - Real Supabase two-account HTTP end-to-end isolation tests.
-- Chat-system integration of private cognition.
+- Real Supabase two-account HTTP end-to-end isolation tests for the chat/cognition integration.
 - Any access to private intelligent-person memories from shared scene context.
