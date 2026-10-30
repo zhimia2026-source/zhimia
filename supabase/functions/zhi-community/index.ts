@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { isTokenExpiryValid, tokenTouchSucceeded } from "./auth_helpers.ts";
-import { isMembershipAuthorized, privilegesForPublicRejoin } from "./access_helpers.ts";
+import { isMembershipAuthorized, isAgentMembershipAuthorized, privilegesForPublicRejoin } from "./access_helpers.ts";
 import { validateMouRecord } from "./ontology_helpers.ts";
 import { buildFeedbackRecord, buildRevisionProposal } from "./cognitive_cycle_helpers.ts";
 import { buildPrivateAgentContext, buildPrivateChatHistory, buildSceneAwarenessContext, buildSceneBehaviorGuidance } from "./chat_context_helpers.ts";
@@ -826,6 +826,98 @@ export function createCommunityHandler(
         throw new Error("database_error");
       }
       return reply(result);
+    }
+
+    // Agent messages use the agent's own membership and sender_agent_id namespace.
+    // The creator's human membership is never substituted for agent membership.
+    if (parts.length === 6 && parts[0] === "v1" && parts[1] === "agents" &&
+        parts[3] === "scenes" && parts[5] === "messages" &&
+        (req.method === "GET" || req.method === "POST")) {
+      const agentId = parts[2];
+      const sceneId = parts[4];
+      if (!isUuid(agentId) || !isUuid(sceneId)) return reply({ error: "invalid_argument" }, 400);
+      const neededTokenCapability = req.method === "GET" ? "community.message.read" : "community.message.send";
+      const neededMembershipCapability = req.method === "GET" ? "message:read" : "message:send";
+      if (!hasCapability(actor, neededTokenCapability)) return reply({ error: "forbidden", detail: "capability_required" }, 403);
+
+      const { data: agent, error: agentError } = await db.from("zhi_agents")
+        .select("id,owner_user_id,status").eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
+      if (agentError) throw new Error("database_error");
+      if (!agent) return reply({ error: "not_found" }, 404);
+      if (agent.status !== "active") return reply({ error: "conflict", detail: "agent_not_active" }, 409);
+
+      const { data: world, error: worldError } = await db.from("zhi_worlds")
+        .select("id,status").eq("id", sceneId).maybeSingle();
+      if (worldError) throw new Error("database_error");
+      if (!world) return reply({ error: "not_found" }, 404);
+      if (world.status !== "open") return reply({ error: "conflict", detail: "scene_not_open" }, 409);
+
+      const { data: membership, error: membershipError } = await db.from("zhi_world_memberships")
+        .select("id,principal_user_id,status,revoked_at,agent_id,expires_at,capabilities")
+        .eq("world_id", sceneId).eq("principal_user_id", actor.userId).eq("agent_id", agentId)
+        .eq("status", "active").is("revoked_at", null).maybeSingle();
+      if (membershipError) throw new Error("database_error");
+      if (!isAgentMembershipAuthorized(membership, actor.userId, agentId, neededMembershipCapability)) {
+        return reply({ error: "forbidden", detail: "agent_scene_membership_required" }, 403);
+      }
+
+      const limitRaw = Number(url.searchParams.get("limit") ?? "50");
+      if (req.method === "GET" && (!Number.isInteger(limitRaw) || limitRaw < 1 || limitRaw > 100)) {
+        return reply({ error: "invalid_argument", detail: "limit_must_be_1_to_100" }, 400);
+      }
+
+      let { data: conversation, error: convError } = await db.from("zhi_world_conversations")
+        .select("id").eq("world_id", sceneId).eq("visibility", "members").eq("status", "open")
+        .order("created_at", { ascending: true }).limit(1).maybeSingle();
+      if (convError) throw new Error("database_error");
+
+      if (req.method === "GET") {
+        if (!conversation) return reply({ items: [] });
+        const { data: messages, error: messageError } = await db.from("zhi_world_messages")
+          .select("id,conversation_id,sender_user_id,sender_agent_id,message_kind,payload,created_at")
+          .eq("conversation_id", conversation.id).order("created_at", { ascending: false }).limit(limitRaw);
+        if (messageError) throw new Error("database_error");
+        return reply({ items: messages ?? [] });
+      }
+
+      const body = await readBody(req);
+      if (!isText(body.body, 8000)) return reply({ error: "invalid_argument", detail: "body_required" }, 400);
+      const requestId = req.headers.get("idempotency-key")?.trim();
+      if (!requestId || requestId.length > 200) return reply({ error: "invalid_argument", detail: "idempotency_key_required" }, 400);
+      if (!conversation) {
+        const created = await db.from("zhi_world_conversations").insert({
+          world_id: sceneId, created_by_user_id: actor.userId, visibility: "members", status: "open",
+        }).select("id").single();
+        if (!created.error && created.data) conversation = created.data;
+        else if (created.error?.code === "23505") {
+          const retry = await db.from("zhi_world_conversations")
+            .select("id").eq("world_id", sceneId).eq("visibility", "members").eq("status", "open").maybeSingle();
+          if (retry.error || !retry.data) throw new Error("database_error");
+          conversation = retry.data;
+        } else throw new Error("database_error");
+      }
+
+      const requestHash = await sha256(agentId + ":" + conversation.id + ":" + requestId);
+      const requestUuid = requestHash.slice(0, 8) + "-" + requestHash.slice(8, 12) + "-4" +
+        requestHash.slice(13, 16) + "-a" + requestHash.slice(17, 20) + "-" + requestHash.slice(20, 32);
+      const { data: existingMessage, error: existingMessageError } = await db.from("zhi_world_messages")
+        .select("id,conversation_id,sender_agent_id,message_kind,payload,created_at")
+        .eq("conversation_id", conversation.id).eq("sender_agent_id", agentId)
+        .eq("request_id", requestUuid).maybeSingle();
+      if (existingMessageError) throw new Error("database_error");
+      if (existingMessage) {
+        if (existingMessage.payload?.body !== body.body.trim()) return reply({ error: "conflict", detail: "idempotency_key_payload_mismatch" }, 409);
+        return reply({ message: existingMessage, idempotent_replay: true }, 200);
+      }
+      const { data: message, error: messageError } = await db.from("zhi_world_messages").insert({
+        conversation_id: conversation.id, sender_user_id: null, sender_agent_id: agentId,
+        request_id: requestUuid, message_kind: "text", payload: { body: body.body.trim() },
+      }).select("id,conversation_id,sender_user_id,sender_agent_id,message_kind,payload,created_at").single();
+      if (messageError || !message) {
+        if (messageError?.code === "23505") return reply({ error: "conflict", detail: "idempotency_race_retry" }, 409);
+        throw new Error("database_error");
+      }
+      return reply({ message, idempotent_replay: false }, 201);
     }
 
     if (req.method === "GET" && parts.length === 4 && parts[0] === "v1" && parts[1] === "scenes" && parts[3] === "messages") {
