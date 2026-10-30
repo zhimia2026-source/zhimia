@@ -4,7 +4,8 @@ on:
   pull_request:
     paths:
       - "supabase/migrations/20261028140000_zhi_community_core.sql"
-      - "supabase/migrations/20261030153000_zhi_agent_public_scene_membership.sql"\n      - "supabase/migrations/20261030160000_zhi_agent_private_scene_invitations.sql"
+      - "supabase/migrations/20261030153000_zhi_agent_public_scene_membership.sql"
+      - "supabase/migrations/20261030160000_zhi_agent_private_scene_invitations.sql"
       - "supabase/tests/zhi_agent_public_scene_membership_smoke.sql"
       - ".github/workflows/zhi-agent-scene-migration.yml"
   push:
