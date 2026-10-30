@@ -11,7 +11,7 @@
 button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#fff;border-radius:11px;padding:10px 14px;color:var(--ink);font-weight:700;cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .wrap{max-width:1400px;margin:auto;padding:22px}.header{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:18px}.brand{font-size:25px;font-weight:900;color:#173e49}.sub,.muted{color:var(--muted);font-size:12px}
 .layout{display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 12px 32px #163b480a}.head{padding:15px 17px;border-bottom:1px solid var(--line);font-weight:850}.body{padding:15px}.field{display:grid;gap:6px;margin-bottom:12px}.field label{font-size:12px;color:var(--muted);font-weight:700}input,textarea{width:100%;border:1px solid #d5e1e5;border-radius:11px;padding:11px;background:#fbfdfe;color:var(--ink);outline:none}input:focus,textarea:focus{border-color:#69aaa5;box-shadow:0 0 0 3px #147d7917}
-.agentList{max-height:65vh;overflow:auto;padding:8px}.agent{display:block;width:100%;text-align:left;background:transparent;border-color:transparent;margin-bottom:4px}.agent.selected{background:var(--soft);border-color:#b7dcd6}.agent strong,.agent span{display:block}.agent span{font-size:11px;color:var(--muted);margin-top:3px}
+.agentList{max-height:65vh;overflow:auto;padding:8px}.agent{display:block;width:100%;text-align:left;background:transparent;border-color:transparent;margin-bottom:4px}.agent.selected{background:var(--soft);border-color:#b7dcd6}.agent strong,.agent span{display:block}.createAgent{width:100%;margin-top:4px}.createAgent:disabled{opacity:.5}.agent span{font-size:11px;color:var(--muted);margin-top:3px}
 .chat{min-height:680px;display:flex;flex-direction:column}.chatHead{padding:16px 19px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px}.chatTitle{font-size:19px;font-weight:900}.log{padding:20px;display:flex;flex-direction:column;gap:13px;flex:1;min-height:350px;max-height:62vh;overflow:auto;background:#f9fcfd}.welcome{margin:auto;max-width:460px;text-align:center;color:var(--muted);line-height:1.9}.bubble{max-width:min(80%,700px);padding:12px 15px;border-radius:16px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}.bubble.user{align-self:flex-end;background:#def2ed;border:1px solid #c4e6de;border-bottom-right-radius:4px}.bubble.agent{align-self:flex-start;background:#fff;border:1px solid var(--line);border-bottom-left-radius:4px}.bubble .who{font-size:11px;font-weight:800;color:var(--accent);margin-bottom:4px}.bubble .time{font-size:10px;color:#829198;margin-top:6px}
 .composer{padding:14px;border-top:1px solid var(--line);display:grid;grid-template-columns:minmax(0,1fr) 100px;gap:10px}.composer textarea{min-height:54px;max-height:180px;resize:vertical}.composer button{align-self:end;min-height:50px}.status{white-space:pre-wrap;color:var(--muted);font-size:12px;min-height:20px}.status.error{color:var(--danger)}.status.good{color:#16734a}.foot{padding:0 16px 14px;color:var(--muted);font-size:11px}
 .gate{max-width:430px;margin:8vh auto;background:#fff;border:1px solid var(--line);border-radius:18px;padding:24px}.hidden{display:none!important}
@@ -33,7 +33,7 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
 <section id="app" class="layout hidden">
 <aside class="panel side">
 <div class="head">我的智能人</div>
-<div class="body"><div class="field"><label for="search">搜索</label><input id="search" placeholder="搜索智能人"></div><div id="status" class="status">正在读取智能人列表…</div></div>
+<div class="body"><div class="field"><label for="search">搜索</label><input id="search" placeholder="搜索智能人"></div><div class="field"><label for="newAgentName">创建第一位管理型智能人</label><input id="newAgentName" maxlength="120" placeholder="输入智能人的名字"></div><button id="createAgent" class="primary createAgent" type="button">＋ 创建管理型智能人</button><div id="status" class="status">正在读取智能人列表…</div></div>
 <div id="agents" class="agentList"></div>
 </aside>
 <section class="panel chat">
@@ -135,6 +135,30 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
       $("log").replaceChildren(); const msg = document.createElement("div"); msg.className = "welcome"; msg.textContent = "历史读取失败：" + error.message; $("log").append(msg);
     }
   }
+  async function createAgent() {
+    const name = $("newAgentName").value.trim();
+    if (!name) { setStatus("请先填写智能人的名字。", "error"); return; }
+    const button = $("createAgent");
+    button.disabled = true;
+    setStatus("正在创建你的管理型智能人…");
+    try {
+      const result = await api("/v1/agents", {
+        method: "POST",
+        body: JSON.stringify({ display_name: name, role: "manager", visibility: "private", public_manifest: {} }),
+      });
+      const agent = result.agent;
+      if (!agent?.id) throw new Error("agent_create_failed");
+      $("newAgentName").value = "";
+      if (!agents.some(item => item.id === agent.id)) agents.unshift(agent);
+      renderAgents();
+      await choose(agent);
+      setStatus("已创建私人管理型智能人：" + agent.display_name, "good");
+    } catch (error) {
+      setStatus("创建失败：" + error.message, "error");
+    } finally {
+      button.disabled = false;
+    }
+  }
   async function connect() {
     token = $("token").value.trim();
     if (!token) return;
@@ -172,6 +196,8 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
   $("composer").addEventListener("submit", sendMessage);
   $("message").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("composer").requestSubmit(); } });
   $("search").addEventListener("input", renderAgents);
+  $("createAgent").addEventListener("click", createAgent);
+  $("newAgentName").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); createAgent(); } });
   $("refresh").addEventListener("click", () => selected ? choose(selected) : loadAgents());
   $("logout").addEventListener("click", () => { sessionStorage.removeItem(TOKEN_KEY); token = ""; agents = []; selected = null; showGate(); });
   if (token) { showApp(); loadAgents(); } else showGate();
