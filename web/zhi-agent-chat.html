@@ -12,7 +12,7 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
 .wrap{max-width:1400px;margin:auto;padding:22px}.header{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:18px}.brand{font-size:25px;font-weight:900;color:#173e49}.sub,.muted{color:var(--muted);font-size:12px}
 .layout{display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 12px 32px #163b480a}.head{padding:15px 17px;border-bottom:1px solid var(--line);font-weight:850}.body{padding:15px}.field{display:grid;gap:6px;margin-bottom:12px}.field label{font-size:12px;color:var(--muted);font-weight:700}input,textarea{width:100%;border:1px solid #d5e1e5;border-radius:11px;padding:11px;background:#fbfdfe;color:var(--ink);outline:none}input:focus,textarea:focus{border-color:#69aaa5;box-shadow:0 0 0 3px #147d7917}
 .agentList{max-height:65vh;overflow:auto;padding:8px}.agent{display:block;width:100%;text-align:left;background:transparent;border-color:transparent;margin-bottom:4px}.agent.selected{background:var(--soft);border-color:#b7dcd6}.agent strong,.agent span{display:block}.createAgent{width:100%;margin-top:4px}.createAgent:disabled{opacity:.5}.agent span{font-size:11px;color:var(--muted);margin-top:3px}
-.chat{min-height:680px;display:flex;flex-direction:column}.chatHead{padding:16px 19px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px}.chatTitle{font-size:19px;font-weight:900}.log{padding:20px;display:flex;flex-direction:column;gap:13px;flex:1;min-height:350px;max-height:62vh;overflow:auto;background:#f9fcfd}.welcome{margin:auto;max-width:460px;text-align:center;color:var(--muted);line-height:1.9}.bubble{max-width:min(80%,700px);padding:12px 15px;border-radius:16px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}.bubble.user{align-self:flex-end;background:#def2ed;border:1px solid #c4e6de;border-bottom-right-radius:4px}.bubble.agent{align-self:flex-start;background:#fff;border:1px solid var(--line);border-bottom-left-radius:4px}.bubble .who{font-size:11px;font-weight:800;color:var(--accent);margin-bottom:4px}.bubble .time{font-size:10px;color:#829198;margin-top:6px}
+.chat{min-height:680px;display:flex;flex-direction:column}.sceneContext{padding:10px 16px;border-bottom:1px solid var(--line);background:#f8fcfb;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px}.sceneContext label{font-size:12px;font-weight:800;color:var(--muted)}.sceneContext select{width:100%;margin-top:4px;border:1px solid #d5e1e5;border-radius:10px;padding:8px;background:#fff;color:var(--ink)}.sceneHint{font-size:11px;color:var(--muted)}.chatHead{padding:16px 19px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px}.chatTitle{font-size:19px;font-weight:900}.log{padding:20px;display:flex;flex-direction:column;gap:13px;flex:1;min-height:350px;max-height:62vh;overflow:auto;background:#f9fcfd}.welcome{margin:auto;max-width:460px;text-align:center;color:var(--muted);line-height:1.9}.bubble{max-width:min(80%,700px);padding:12px 15px;border-radius:16px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}.bubble.user{align-self:flex-end;background:#def2ed;border:1px solid #c4e6de;border-bottom-right-radius:4px}.bubble.agent{align-self:flex-start;background:#fff;border:1px solid var(--line);border-bottom-left-radius:4px}.bubble .who{font-size:11px;font-weight:800;color:var(--accent);margin-bottom:4px}.bubble .time{font-size:10px;color:#829198;margin-top:6px}
 .composer{padding:14px;border-top:1px solid var(--line);display:grid;grid-template-columns:minmax(0,1fr) 100px;gap:10px}.composer textarea{min-height:54px;max-height:180px;resize:vertical}.composer button{align-self:end;min-height:50px}.status{white-space:pre-wrap;color:var(--muted);font-size:12px;min-height:20px}.status.error{color:var(--danger)}.status.good{color:#16734a}.foot{padding:0 16px 14px;color:var(--muted);font-size:11px}
 .gate{max-width:430px;margin:8vh auto;background:#fff;border:1px solid var(--line);border-radius:18px;padding:24px}.hidden{display:none!important}
 @media(max-width:760px){.wrap{padding:10px}.layout{display:flex;flex-direction:column}.chat{min-height:0;order:0}.side{order:1}.chatHead{padding:12px}.log{height:43dvh;min-height:260px;max-height:none;padding:12px}.bubble{max-width:94%}.composer{position:sticky;bottom:0;background:#fff;padding:9px;grid-template-columns:minmax(0,1fr) 76px}.composer textarea{font-size:16px}.agentList{display:flex;overflow-x:auto;max-height:none}.agent{flex:0 0 155px}.header{margin-bottom:10px}.brand{font-size:20px}}
@@ -38,6 +38,7 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
 </aside>
 <section class="panel chat">
 <div class="chatHead"><div><div class="chatTitle" id="chatTitle">选择一位智能人</div><div class="sub" id="chatMeta">只读取当前身份拥有的私有对话与认知</div></div><button id="refresh" type="button">刷新历史</button></div>
+<div class="sceneContext"><div><label for="sceneSelect">让智能人感知当前场景（可选）</label><select id="sceneSelect"><option value="">不提供场景上下文</option></select></div><div class="sceneHint" id="sceneHint">只读取你已加入场景的公开环境状态，不读取场景聊天记录。</div></div>
 <div id="log" class="log"><div class="welcome">选择左侧智能人，开始一对一交流。<br>私有认知不会与场景共享消息混合。</div></div>
 <form id="composer" class="composer"><textarea id="message" maxlength="8000" placeholder="写下你想说的话……（Enter 发送，Shift+Enter 换行）" disabled></textarea><button id="send" class="primary" disabled>发送 ↗</button></form>
 <div class="foot">对话会保存为当前用户与当前智能人的私有会话。聊天内容不会自动写入长期认知；长期认知需经过来源记录和所有者审批。</div>
@@ -51,6 +52,8 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
   const $ = (id) => document.getElementById(id);
   let token = sessionStorage.getItem(TOKEN_KEY) || "";
   let agents = [];
+  let scenes = [];
+  let selectedSceneId = "";
   let selected = null;
   let busy = false;
   const setStatus = (message, kind = "") => { $("status").textContent = message; $("status").className = "status " + kind; };
@@ -94,6 +97,28 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
       button.append(name, meta); button.addEventListener("click", () => choose(agent)); $("agents").append(button);
     }
     if (!rows.length) { const empty = document.createElement("div"); empty.className = "body muted"; empty.textContent = "没有找到智能人"; $("agents").append(empty); }
+  }
+  async function loadScenes() {
+    try {
+      const result = await api("/v1/scenes/mine");
+      scenes = result.items || [];
+      const select = $("sceneSelect");
+      const previous = selectedSceneId;
+      select.replaceChildren();
+      const none = document.createElement("option"); none.value = ""; none.textContent = "不提供场景上下文"; select.append(none);
+      for (const scene of scenes) {
+        const option = document.createElement("option"); option.value = scene.id;
+        option.textContent = (scene.name || "未命名场景") + (scene.visibility === "private" ? " · 私人" : " · 公共");
+        select.append(option);
+      }
+      selectedSceneId = scenes.some(scene => scene.id === previous) ? previous : "";
+      select.value = selectedSceneId;
+      $("sceneHint").textContent = scenes.length
+        ? "仅向智能人提供所选场景的环境节律和物件状态；不会读取场景消息或写入私人认知。"
+        : "你还没有加入可用场景；可以先在智能社区加入一个场景。";
+    } catch (error) {
+      $("sceneHint").textContent = "场景列表读取失败：" + error.message;
+    }
   }
   async function loadAgents() {
     setStatus("正在读取智能人列表…");
@@ -163,7 +188,7 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
     token = $("token").value.trim();
     if (!token) return;
     sessionStorage.setItem(TOKEN_KEY, token);
-    try { await api("/v1/agents"); $("loginStatus").textContent = ""; showApp(); await loadAgents(); }
+    try { await api("/v1/agents"); $("loginStatus").textContent = ""; showApp(); await Promise.all([loadAgents(), loadScenes()]); }
     catch (error) { sessionStorage.removeItem(TOKEN_KEY); token = ""; $("loginStatus").textContent = "连接失败：" + error.message; }
   }
   async function sendMessage(event) {
@@ -175,7 +200,7 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
     $("message").value = "";
     try {
       const result = await api("/v1/agents/" + encodeURIComponent(selected.id) + "/chat", {
-        method: "POST", headers: { "idempotency-key": crypto.randomUUID() }, body: JSON.stringify({ message }),
+        method: "POST", headers: { "idempotency-key": crypto.randomUUID() }, body: JSON.stringify({ message, scene_id: selectedSceneId || null }),
       });
       temporary.remove();
       bubble("user", result.turn.user_message, result.turn.created_at);
@@ -196,11 +221,12 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
   $("composer").addEventListener("submit", sendMessage);
   $("message").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("composer").requestSubmit(); } });
   $("search").addEventListener("input", renderAgents);
+  $("sceneSelect").addEventListener("change", () => { selectedSceneId = $("sceneSelect").value; const scene = scenes.find(item => item.id === selectedSceneId); $("sceneHint").textContent = scene ? "已选择：" + scene.name + "。智能人将依据当前环境作出场景内回应。" : "当前为纯私聊，不提供场景上下文。"; });
   $("createAgent").addEventListener("click", createAgent);
   $("newAgentName").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); createAgent(); } });
   $("refresh").addEventListener("click", () => selected ? choose(selected) : loadAgents());
   $("logout").addEventListener("click", () => { sessionStorage.removeItem(TOKEN_KEY); token = ""; agents = []; selected = null; showGate(); });
-  if (token) { showApp(); loadAgents(); } else showGate();
+  if (token) { showApp(); Promise.all([loadAgents(), loadScenes()]); } else showGate();
 })();
 </script>
 </body>
