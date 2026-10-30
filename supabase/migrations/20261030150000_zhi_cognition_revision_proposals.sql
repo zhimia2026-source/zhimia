@@ -24,6 +24,7 @@ create table if not exists public.zhi_cognition_revision_proposals (
   decided_at timestamptz,
   reviewer_user_id uuid references auth.users(id) on delete set null,
   decision_note text,
+  constraint zhi_revision_proposal_id_owner_agent_unique unique (id, owner_user_id, agent_id),
   constraint zhi_revision_proposal_owner_agent_fk
     foreign key (agent_id, owner_user_id)
     references public.zhi_agents (id, owner_user_id) on delete cascade,
@@ -117,7 +118,7 @@ begin
   end if;
 
   if cardinality(p_feedback_record_ids) <> (
-    select count(distinct x) from unnest(p_feedback_record_ids) as x
+    select count(distinct feedback_id) from unnest(p_feedback_record_ids) as ids(feedback_id)
   ) then
     raise exception 'duplicate_feedback_records' using errcode = '22023';
   end if;
@@ -129,6 +130,9 @@ begin
     and agent_id = p_agent_id
   for share;
   if not found then raise exception 'base_record_not_found' using errcode = 'P0002'; end if;
+  if v_base.evidence_kind <> 'hypothesis' or nullif(btrim(v_base.prediction), '') is null then
+    raise exception 'base_record_must_be_predictive_hypothesis' using errcode = '22023';
+  end if;
 
   select count(*) into v_feedback_count
   from public.zhi_agent_cognition_records f
