@@ -60,6 +60,9 @@ Target project `lvxmygrgqtmzqgailmyl` was inspected without making changes:
 - Supabase Advisor also warns that leaked-password protection is disabled. This setting has not been changed.
 - No production migration, permission change, Edge Function deployment, or Auth setting change was performed.
 
+
+- GitHub Actions run [41034331621](https://github.com/zhimia2026-source/zhimia/actions/runs/41034331621), commit `8cbd48e92e2f98009f8f1fbb59c72affa948b584`, passed all jobs after adding the authenticated `GET /v1/scenes/mine` route and community scene lobby. It covers active owner/member scene listing, expiry filtering, and verifies the UI scripts for both private chat and community scene pages.
+
 ## Required before production
 
 1. **Real cross-account isolation:** use two real test accounts and tokens against an isolated Supabase test project. Prove account A cannot read account B's cognition or private conversation, redeem an invitation targeted to B, or use a revoked/expired token. Include negative tests for wrong agent IDs and inactive memberships.
