@@ -276,3 +276,92 @@ BEGIN
   END;
 END;
 $$;
+
+
+-- Persistent cognition proposals are owner-scoped, evidence-linked, and shadow-only.
+DO $$
+DECLARE
+  v_hypothesis_id uuid := 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  v_feedback_id uuid := 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+  v_result jsonb;
+  v_proposal_id uuid;
+  v_link_count integer;
+BEGIN
+  INSERT INTO public.zhi_agent_cognition_records (
+    id, owner_user_id, agent_id, object_type, object_id, state,
+    evidence_kind, source_ids, confidence, inferred_at, hypothesis,
+    prediction, version
+  ) VALUES (
+    v_hypothesis_id,
+    '11111111-1111-4111-8111-111111111111',
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    'world', 'forest-1', '{"weather":"rain"}',
+    'hypothesis', ARRAY['forecast-source'], 0.7, now(),
+    'Rain may begin soon', 'Rain within one hour', 2
+  );
+
+  INSERT INTO public.zhi_agent_cognition_records (
+    id, owner_user_id, agent_id, object_type, object_id, state,
+    relation_ids, evidence_kind, source_ids, confidence, event_time
+  ) VALUES (
+    v_feedback_id,
+    '11111111-1111-4111-8111-111111111111',
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    'feedback', 'forest-1',
+    jsonb_build_object('hypothesis_id', v_hypothesis_id::text, 'observed_outcome', 'No rain'),
+    ARRAY[v_hypothesis_id::text], 'observation', ARRAY['weather-observation'],
+    0.95, now()
+  );
+
+  v_result := public.zhi_create_cognition_revision_proposal(
+    '11111111-1111-4111-8111-111111111111',
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    v_hypothesis_id,
+    ARRAY[v_feedback_id],
+    '{"weather_expectation":"lower_confidence"}'::jsonb
+  );
+  v_proposal_id := (v_result ->> 'id')::uuid;
+
+  IF v_result ->> 'status' <> 'shadow_proposed'
+     OR v_result ->> 'requires_human_review' <> 'true' THEN
+    RAISE EXCEPTION 'revision proposal must remain pending human review';
+  END IF;
+
+  SELECT count(*) INTO v_link_count
+  FROM public.zhi_cognition_revision_proposal_feedback
+  WHERE proposal_id = v_proposal_id
+    AND owner_user_id = '11111111-1111-4111-8111-111111111111'
+    AND agent_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    AND feedback_record_id = v_feedback_id;
+  IF v_link_count <> 1 THEN
+    RAISE EXCEPTION 'proposal evidence link missing';
+  END IF;
+
+  IF has_table_privilege('anon', 'public.zhi_cognition_revision_proposals', 'SELECT')
+     OR has_table_privilege('authenticated', 'public.zhi_cognition_revision_proposals', 'SELECT') THEN
+    RAISE EXCEPTION 'browser roles must not directly read private revision proposals';
+  END IF;
+  IF has_function_privilege('anon', 'public.zhi_create_cognition_revision_proposal(uuid,uuid,uuid,uuid[],jsonb)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.zhi_create_cognition_revision_proposal(uuid,uuid,uuid,uuid[],jsonb)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'browser roles must not execute proposal persistence RPC';
+  END IF;
+  IF NOT has_function_privilege('service_role', 'public.zhi_create_cognition_revision_proposal(uuid,uuid,uuid,uuid[],jsonb)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'service_role must execute proposal persistence RPC';
+  END IF;
+
+  -- A caller cannot attach another principal's base record to a proposal.
+  BEGIN
+    PERFORM public.zhi_create_cognition_revision_proposal(
+      '22222222-2222-4222-8222-222222222222',
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      v_hypothesis_id,
+      ARRAY[v_feedback_id],
+      '{"spoofed":true}'::jsonb
+    );
+    RAISE EXCEPTION 'cross-owner proposal was accepted';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM = 'cross-owner proposal was accepted' THEN RAISE; END IF;
+    IF SQLERRM <> 'base_record_not_found' THEN RAISE; END IF;
+  END;
+END;
+$$;
