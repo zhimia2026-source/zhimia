@@ -11,3 +11,8 @@ export type TokenTouchResult = {
 export function tokenTouchSucceeded(result: TokenTouchResult): boolean {
   return result.error == null && result.data != null;
 }
+
+/** A valid token is not enough: every community route also requires its own scope. */
+export function tokenHasCapability(capabilities: unknown, required: string): boolean {
+  return Array.isArray(capabilities) && capabilities.includes(required);
+}
