@@ -1,6 +1,7 @@
 import { assertEquals } from "jsr:@std/assert@1";
 import {
   isMembershipAuthorized,
+  isAgentMembershipAuthorized,
   privilegesForPublicRejoin,
   type MembershipAuthorizationRecord,
 } from "./access_helpers.ts";
@@ -56,4 +57,21 @@ Deno.test("public rejoin preserves creator ownership", () => {
     membership_role: "owner",
     capabilities: ["scene:manage", "message:send", "message:read"],
   });
+});
+
+
+Deno.test("agent membership requires exact owner, agent, status, expiry and capability", () => {
+  const agentMembership: MembershipAuthorizationRecord = {
+    principal_user_id: "owner-a", agent_id: "agent-a", status: "active", revoked_at: null,
+    expires_at: "2099-01-01T00:00:00.000Z", capabilities: ["message:read", "message:send"],
+  };
+  const now = Date.parse("2026-01-01T00:00:00Z");
+  assertEquals(isAgentMembershipAuthorized(agentMembership, "owner-a", "agent-a", "message:read", now), true);
+  assertEquals(isAgentMembershipAuthorized(agentMembership, "owner-b", "agent-a", "message:read", now), false);
+  assertEquals(isAgentMembershipAuthorized(agentMembership, "owner-a", "agent-b", "message:read", now), false);
+  assertEquals(isAgentMembershipAuthorized({ ...agentMembership, agent_id: null }, "owner-a", "agent-a", "message:read", now), false);
+  assertEquals(isAgentMembershipAuthorized({ ...agentMembership, status: "revoked" }, "owner-a", "agent-a", "message:read", now), false);
+  assertEquals(isAgentMembershipAuthorized({ ...agentMembership, revoked_at: "2025-12-01T00:00:00Z" }, "owner-a", "agent-a", "message:read", now), false);
+  assertEquals(isAgentMembershipAuthorized({ ...agentMembership, expires_at: "2025-12-31T00:00:00Z" }, "owner-a", "agent-a", "message:read", now), false);
+  assertEquals(isAgentMembershipAuthorized(agentMembership, "owner-a", "agent-a", "tool.execute", now), false);
 });
