@@ -13,6 +13,7 @@
 - `POST /v1/scenes/{scene_id}/invitations`：仅场景有效 owner/moderator 且具有 `scene:manage` 能力时可签发目标用户邀请；有效期 1–168 小时（默认 72 小时）。高熵原始 token 仅在签发响应中返回一次，数据库只存 SHA-256 哈希。
 - `POST /v1/invitations/redeem`：当前仅支持绑定到用户账号的私人场景邀请。数据库 RPC 对邀请行加锁，在一个事务中校验目标用户、有效期、撤销/消费状态和场景状态，创建/恢复成员资格并标记邀请已消费。重复兑换会被拒绝。
 - `POST /v1/scenes/{scene_id}/join`：加入开放公共场景；检查场景状态。私人场景仍不能通过普通 join 路径进入，必须兑换绑定的邀请。
+- `GET /v1/scenes/{scene_id}/environment`：检查有效成员关系及 `message:read` 能力，按场景时区计算昼夜节律、事件潮汐、环境氛围、物件微状态与智能人行为权重；只读计算，不读写私有记忆。
 - `GET /v1/scenes/{scene_id}/messages`：检查有效成员关系后读取场景公开成员会话消息。
 - `POST /v1/scenes/{scene_id}/messages`：检查成员状态、有效期、发送能力及场景状态；要求 `Idempotency-Key`，重复键同内容返回原消息，不同内容返回冲突。
 - `GET /v1/agents/{agent_id}/cognition`：仅智能体所有者可读取该智能体的私有 MOU 记录；服务端同时按已认证 `owner_user_id` 与路径 `agent_id` 过滤，分页上限 100 条。
@@ -99,3 +100,40 @@ The new chat UI is `web/zhi-agent-chat.html`; it also allows creating the first 
 
 **Release limitation:** the endpoint requires the new private-chat migration and the three provider secrets. The current CI uses a mocked model provider and disposable PostgreSQL; real provider connectivity and real two-account Supabase HTTP E2E remain outstanding. The context helper has explicit size limits and tests for prompt-injection-like strings in stored cognition data.
 
+
+
+## 场景环境状态引擎（增量实现）
+
+配置复用现有 `zhi_worlds.environment_state` JSONB，不新增表。建议结构：
+
+```json
+{
+  "timezone": "Asia/Singapore",
+  "lighting": "natural",
+  "soundscape": "forest_ambient",
+  "atmosphere_tags": ["forest", "calm"],
+  "objects": [
+    { "id": "oak-shelter", "name": "橡树屋檐", "state": "dry", "interaction_options": ["rest", "observe"] }
+  ],
+  "events": [
+    {
+      "id": "forest-rain",
+      "type": "rain",
+      "label": "林间阵雨",
+      "daily_window": { "start": "14:00", "end": "16:00" },
+      "state_delta": {
+        "lighting": "overcast",
+        "soundscape": "rain_on_leaves",
+        "atmosphere_tags": ["rain", "cool"],
+        "object_states": { "oak-shelter": "wet_roof" }
+      },
+      "behavior_weights": { "seek_shelter": 0.9 }
+    }
+  ],
+  "behavior_weights": { "explore": 0.5, "socialize": 0.5, "seek_shelter": 0.05, "rest": 0.2 }
+}
+```
+
+昼夜状态按 IANA 时区计算：dawn 05:00–08:00、morning 08:00–11:00、afternoon 11:00–17:00、evening 17:00–20:00、night 为其余时段。事件支持每日时间窗（含跨午夜）及带偏移绝对时间窗；事件叠加只影响环境、物件状态和行为权重。行为权重限制为 0–1。物件交互选项不因状态变化而丢失。
+
+此版本采用按需确定性计算，不依赖 cron，不修改数据库 schema；环境读取仅限有效场景成员且具有 `message:read`。环境配置写入 API 与聊天页面呈现仍待实现。
