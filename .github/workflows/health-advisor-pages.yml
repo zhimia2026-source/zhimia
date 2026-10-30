@@ -37,7 +37,7 @@ jobs:
           test -s _site/zhi-health-advisor-client.js
           test -s _site/token-admin.html
           test -s _site/chat.html
-          ! grep -Eiq '(service_role|SUPABASE_SERVICE_ROLE_KEY|AGNES_API_KEY|sk-[A-Za-z0-9]{20,})' _site/index.html _site/token-admin.html _site/zhi-health-advisor-client.js
+          ! grep -Eiq '(service_role|SUPABASE_SERVICE_ROLE_KEY|AGNES_API_KEY|sk-[A-Za-z0-9]{20,})' _site/index.html _site/token-admin.html _site/zhi-health-advisor-client.js _site/chat.html
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
