@@ -32,6 +32,8 @@ jobs:
         run: deno check supabase/functions/zhi-community/index.ts
       - name: Test token authentication guard
         run: deno test supabase/functions/zhi-community/auth_helpers_test.ts
+      - name: Test HTTP principal binding and request authorization
+        run: deno test supabase/functions/zhi-community/http_handler_test.ts
       - name: Test scene membership isolation guard
         run: deno test supabase/functions/zhi-community/access_helpers_test.ts
       - name: Test offline ontology MOU validation
