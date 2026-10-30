@@ -23,7 +23,7 @@ This review records source-level findings and release gates. It does not certify
 3. **Idempotency concurrency:** simultaneous duplicate requests may receive a conflict rather than a replay response. Confirm client retry behavior and add a concurrency test.
 4. **Deployment settings:** verify `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ZHI_ALLOWED_ORIGINS`, and the Edge Function gateway JWT setting. If gateway JWT verification is disabled for the custom ZHI token, the function's own token validation must remain mandatory.
 5. **Migration and rollback:** review and back up the target project before applying the migration; run smoke tests before any traffic cutover.
-6. **Latest CI:** GitHub Actions run `41013979071` on commit `e83d81be49f9f874f9278277b637bfbeb53753e3` passed Edge Function typecheck/tests (including the new private cognition feedback route tests) and applied both community and private-cognition migrations to disposable PostgreSQL; SQL smoke tests passed. This validates the migration in CI, not the live Supabase project. Run URL: https://github.com/zhimia2026-source/zhimia/actions/runs/41013979071
+6. **Latest CI:** GitHub Actions run `41016332139` on commit `a50ec1292595c597ba5038032f16f0a6a91b8ffe` passed Edge Function typecheck/tests (including private cognition feedback and revision-proposal route tests) and applied the community, private-cognition, and revision-proposal migrations to disposable PostgreSQL; SQL smoke tests passed. This validates the migrations in CI, not the live Supabase project. Run URL: https://github.com/zhimia2026-source/zhimia/actions/runs/41016332139
 
 ## Release gate
 
