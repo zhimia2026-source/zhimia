@@ -27,6 +27,16 @@ This review records source-level findings and CI evidence. It does not certify p
 - This is **not** a real two-account Supabase Auth + personal-token HTTP end-to-end test. The SQL migrations are tested against disposable PostgreSQL in CI, not against the configured live Supabase project.
 - A later documentation-only commit `6c4427f452be0ea1fdbc85a1353f3a5674923c3a` updated API documentation after the cited code CI run; it did not change executable code. Documentation/OpenAPI validation is being added to CI separately.
 
+## Latest private chat CI evidence
+
+- GitHub Actions run [41031915086](https://github.com/zhimia2026-source/zhimia/actions/runs/41031915086), commit `c127ddd828a22feb40b42dd44d111ab5b2eeba46`, passed:
+  - Edge Function type-check and private chat route tests.
+  - Chat-context tests proving owner+agent filtering, rejecting another owner's agent, rejecting a different agent under the same owner, and excluding scene-message queries from private chat context.
+  - Disposable PostgreSQL application of the new private chat migration, plus SQL checks for RLS, browser-role denial, composite owner/agent binding, and idempotency uniqueness.
+  - OpenAPI and workflow YAML syntax validation.
+- The model provider is mocked in CI. No real provider key or external model request is used in CI.
+- This remains mocked route-level and disposable-database evidence, not real Supabase Auth / two-account HTTP E2E.
+
 ## Required before production
 
 1. **Real cross-account isolation:** use two real test accounts and tokens against an isolated Supabase test project. Prove account A cannot read account B's cognition or private conversation, redeem an invitation targeted to B, or use a revoked/expired token. Include negative tests for wrong agent IDs and inactive memberships.
