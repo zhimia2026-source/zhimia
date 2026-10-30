@@ -10,10 +10,19 @@ const base: MouRecord = {
   confidence: 0.9, event_time: null, recorded_at: "2026-10-30T10:00:00Z",
   inferred_at: null, hypothesis: null, prediction: null, version: 1,
 };
+const feedback: MouRecord = {
+  id: "feedback-1", owner_user_id: "owner-a", agent_id: "agent-a",
+  object_type: "feedback", object_id: "self",
+  state: { hypothesis_id: "mou-1", prediction: "test", observed_outcome: "observed" },
+  relation_ids: ["mou-1"], evidence_kind: "observation", source_ids: ["source-1"],
+  confidence: 0.8, event_time: "2026-10-30T10:01:00Z",
+  recorded_at: "2026-10-30T10:02:00Z", inferred_at: null,
+  hypothesis: null, prediction: null, version: 1,
+};
 
 const current = toInitialVersion(base);
 const proposal = buildRevisionProposal(base, {
-  id: "proposal-1", feedback_record_ids: ["feedback-1"],
+  id: "proposal-1", feedback_records: [feedback],
   proposed_state: { style: "more_curious" }, created_at: "2026-10-30T11:00:00Z",
 });
 
