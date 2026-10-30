@@ -31,7 +31,7 @@ BEGIN
 END;
 $community_capability_test$;
 
-DO $
+DO $community_repaired_1$
 DECLARE
   v_result jsonb;
   v_scene_id uuid;
@@ -74,7 +74,7 @@ BEGIN
     RAISE EXCEPTION 'service_role must execute scene creation RPC';
   END IF;
 END;
-$$;
+$community_repaired_1$;
 
 -- Database-level scene policy must match the only enabled API flows.
 DO $$
