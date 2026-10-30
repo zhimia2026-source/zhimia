@@ -100,7 +100,7 @@ let selectedInviteToken="";
 let pendingMessageKey="";
 let pendingMessageBody="";
 function setStatus(id,message){$(id).textContent=message;}
-function clearCredential(){accessToken="";$("personalToken").value="";$("communityPanels").classList.add("hidden");setStatus("connectionStatus","令牌已清除，当前页面不再持有该凭证。");}
+function clearCredential(){accessToken="";selectedInviteToken="";pendingMessageKey="";pendingMessageBody="";$("personalToken").value="";$("inviteToken").textContent="";$("inviteResult").classList.add("hidden");$("communityPanels").classList.add("hidden");setStatus("connectionStatus","令牌已清除，当前页面不再持有该凭证。");}
 async function request(path,{method="GET",body=null,idempotencyKey=""}={}){
   if(!accessToken)throw new Error("请先连接个人访问令牌。");
   const headers={"apikey":SUPABASE_PUBLISHABLE_KEY,"authorization":"Bearer "+accessToken};
