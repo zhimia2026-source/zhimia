@@ -76,7 +76,7 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405, cors);
 
-  const bearer = req.headers.get("authorization")?.match(/^Bearer\\s+(.+)$/i)?.[1] ?? "";
+  const bearer = req.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1] ?? "";
   if (!bearer || bearer.length < 40 || bearer.length > 160) return json({ error: "authentication_required" }, 401, cors);
   if (!URL || !SERVICE_KEY) return json({ error: "server_configuration_missing" }, 503, cors);
   const db = createClient(URL, SERVICE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
