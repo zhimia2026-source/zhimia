@@ -36,6 +36,8 @@ jobs:
         run: deno test --allow-env=ZHI_ALLOWED_ORIGINS supabase/functions/zhi-community/http_handler_test.ts
       - name: Test intelligent agent ownership routes
         run: deno test --allow-env=ZHI_ALLOWED_ORIGINS supabase/functions/zhi-community/agent_routes_test.ts
+      - name: Test two-owner private cognition read isolation
+        run: deno test --allow-env=ZHI_ALLOWED_ORIGINS supabase/functions/zhi-community/cognition_routes_test.ts
       - name: Test scene membership isolation guard
         run: deno test supabase/functions/zhi-community/access_helpers_test.ts
       - name: Test offline ontology MOU validation
