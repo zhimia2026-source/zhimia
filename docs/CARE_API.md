@@ -136,3 +136,15 @@ python scripts/smoke_test_zhi_care.py
 ```
 
 脚本不会输出 access token。不要把令牌提交到 GitHub 或粘贴到聊天中。
+
+
+## 个人令牌适配器（独立路径，尚未部署）
+
+截至 2026-10-30，仓库另有 `zhi-care-personal` 适配器源码，使用 opaque personal token 的 SHA-256 哈希查表验证身份，并从令牌记录派生 `user_id`；它不接受请求体中的身份字段。该适配器尚未部署，不能与已部署的 JWT-only `zhi-care` 混为同一个入口。
+
+- 能力门禁：`care.read`、`care.write`、`care.approve` 分别控制读取、写入和显式审批。
+- 新增数据库 RPC：`zhi_care_request_approval_atomic` 与 `zhi_care_approve_action_atomic`，以单事务写入票据变更和审计事件。
+- 新增事件类型：`approval_requested`、`approval_granted`、`approval_expired`、`approval_invalidated`。
+- 两个 RPC 均为 `SECURITY INVOKER`；已核实只有 `service_role` 可执行，`anon` 与 `authenticated` 无执行权限。
+- 已在 Supabase 上执行回滚式数据库集成测试：正常申请/批准/消费、审批事件完整性、过期票据、revision 过期失效均通过；测试记录在事务末尾回滚。
+- GitHub Actions Deno 类型检查尚无可确认的成功运行结果；适配器尚未部署，HTTP 令牌/跨账号测试仍待完成。
