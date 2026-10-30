@@ -146,32 +146,34 @@ Deno.serve(async (req: Request) => {
 
   if (action === "request_approval") {
     if (!validText(body.care_id)) return json({ error: "care_id_required" }, 400, cors);
-    const { data: care, error } = await db.from("zhi_care_states").select("care_id,state,revision").eq("user_id", user.id).eq("care_id", body.care_id).maybeSingle();
-    if (error) return json({ error: "care_read_failed" }, 503, cors);
-    if (!care) return json({ error: "care_not_found" }, 404, cors);
-    if (care.state !== "action_review") return json({ error: "care_not_ready_for_approval" }, 409, cors);
-    const { data: ticket, error: ticketError } = await db.from("zhi_care_approval_tickets").insert({
-      user_id: user.id, care_id: care.care_id, expected_revision: care.revision,
-      action_scope: "transition:in_progress", status: "pending",
-      expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-    }).select("ticket_id,care_id,expected_revision,action_scope,status,expires_at").single();
-    if (ticketError || !ticket) return json({ error: "approval_ticket_create_failed" }, 503, cors);
+    const { data: ticket, error } = await db.rpc("zhi_care_request_approval_atomic", {
+      p_user_id: user.id, p_care_id: body.care_id.trim(),
+    });
+    if (error) {
+      const detail = error.message ?? "";
+      if (detail.includes("care_not_found")) return json({ error: "care_not_found" }, 404, cors);
+      if (detail.includes("care_not_ready_for_approval")) return json({ error: "care_not_ready_for_approval" }, 409, cors);
+      return json({ error: "approval_ticket_create_failed" }, 503, cors);
+    }
+    if (!ticket) return json({ error: "approval_ticket_create_failed" }, 503, cors);
     return json({ ticket }, 201, cors);
   }
   if (action === "approve_action") {
     if (!validUuid(body.ticket_id)) return json({ error: "valid_ticket_id_required" }, 400, cors);
-    const { data: ticket, error } = await db.from("zhi_care_approval_tickets").select("ticket_id,care_id,expected_revision,action_scope,status,expires_at").eq("user_id", user.id).eq("ticket_id", body.ticket_id).maybeSingle();
-    if (error) return json({ error: "approval_ticket_read_failed" }, 503, cors);
-    if (!ticket) return json({ error: "approval_ticket_not_found" }, 404, cors);
-    if (ticket.status !== "pending") return json({ error: "approval_ticket_not_pending" }, 409, cors);
-    if (Date.parse(ticket.expires_at) <= Date.now()) {
-      await db.from("zhi_care_approval_tickets").update({ status: "expired" }).eq("user_id", user.id).eq("ticket_id", ticket.ticket_id).eq("status", "pending");
-      return json({ error: "approval_ticket_expired" }, 409, cors);
+    const { data: ticket, error } = await db.rpc("zhi_care_approve_action_atomic", {
+      p_user_id: user.id, p_ticket_id: body.ticket_id,
+    });
+    if (error) {
+      const detail = error.message ?? "";
+      if (detail.includes("approval_ticket_not_found")) return json({ error: "approval_ticket_not_found" }, 404, cors);
+      if (detail.includes("approval_ticket_not_pending")) return json({ error: "approval_ticket_not_pending" }, 409, cors);
+      if (detail.includes("care_not_found")) return json({ error: "care_not_found" }, 404, cors);
+      return json({ error: "approval_ticket_approve_failed" }, 503, cors);
     }
-    const { data: approved, error: approveError } = await db.from("zhi_care_approval_tickets").update({ status: "approved", approved_by: user.id, approved_at: new Date().toISOString() }).eq("user_id", user.id).eq("ticket_id", ticket.ticket_id).eq("status", "pending").select("ticket_id,care_id,expected_revision,action_scope,status,expires_at,approved_at").maybeSingle();
-    if (approveError) return json({ error: "approval_ticket_approve_failed" }, 503, cors);
-    if (!approved) return json({ error: "approval_ticket_race_conflict" }, 409, cors);
-    return json({ ticket: approved }, 200, cors);
+    if (ticket?.error === "approval_ticket_expired") return json({ error: "approval_ticket_expired" }, 409, cors);
+    if (ticket?.error === "approval_ticket_stale") return json({ error: "approval_ticket_stale" }, 409, cors);
+    if (!ticket) return json({ error: "approval_ticket_race_conflict" }, 409, cors);
+    return json({ ticket }, 200, cors);
   }
 
   if (action === "get" || action === "transition" || action === "add_evidence") {
