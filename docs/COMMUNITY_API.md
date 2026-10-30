@@ -68,6 +68,19 @@ Edge Function、数据库迁移、聊天页面和自动化检查已提交到功�
 - 生产 Supabase 项目尚未执行这些迁移，也没有部署新的 `zhi-community` Edge Function。启用聊天前还需在服务端配置 `ZHI_CHAT_API_URL`、`ZHI_CHAT_API_KEY`、`ZHI_CHAT_MODEL`，并完成真实提供方连通性测试。
 - 部署前仍需完成真实 Supabase 双账号隔离、令牌撤销/过期、并发幂等、模型超时和回滚验收，并确认 Supabase Gateway 对自定义个人令牌的配置正确。
 
+
+### 生产 Supabase 只读核查（2026-10-30）
+
+对目标项目 `lvxmygrgqtmzqgailmyl` 做了只读核查：
+- 项目状态为 ACTIVE_HEALTHY，区域为 ap-southeast-1，PostgreSQL 17。
+- 当前迁移历史仅包含健康顾问、个人令牌/刷新凭证及 ZHI Care 相关迁移；尚未包含本分支的社区、私有认知和私聊迁移。
+- 当前 Edge Functions 包含 `zhi-health-advisor`、`zhi-token-gateway`、`zhi-token-admin`、`zhi-care`；尚未部署 `zhi-community`。
+- 当前 public schema 中没有 `zhi_agents`、`zhi_worlds`、`zhi_agent_cognition_records` 或 `zhi_agent_chat_turns`。
+- 对现有个人令牌、刷新凭证和 Care 表，已核实 `anon` 与 `authenticated` 没有直接表权限，`service_role` 持有服务端操作权限。Supabase Advisor 报告这些表启用 RLS 但没有策略；在当前无浏览器角色表权限的设计下，这是服务端专用访问模式，不应为了消除提示而开放浏览器访问。
+- Advisor 另提示 Auth 的泄露密码保护未启用；尚未更改该设置。
+
+以上仅为只读核查，没有在生产数据库执行迁移、修改权限、部署函数或更改 Auth 设置。
+
 ### 版本审计字段
 
 认知记录读取接口返回 `change_kind`、`previous_record_id`、`source_proposal_id` 与 `change_note`，用于追踪追加式版本链及人类决策说明。
@@ -77,12 +90,12 @@ Edge Function、数据库迁移、聊天页面和自动化检查已提交到功�
 - `GET /v1/agents/{agent_id}/chat?limit=50`: reads the authenticated owner's private chat turns for that exact agent. The limit is 1–100.
 - `POST /v1/agents/{agent_id}/chat`: accepts `{"message":"..."}` and requires an `Idempotency-Key` header. The server verifies ownership and active status before reading private cognition or chat history.
 - Model provider configuration is server-side only: `ZHI_CHAT_API_URL`, `ZHI_CHAT_API_KEY`, and `ZHI_CHAT_MODEL`. The provider URL must use HTTPS. If these secrets are absent, the endpoint returns `503 chat_model_not_configured`; no fake reply is generated.
-- Context assembly is server-side and limited to the authenticated `owner_user_id` + requested `agent_id`: the agent profile, up to 20 private cognition records, and up to 12 completed private chat turns. Scene messages are not queried or included.
+- Context assembly is server-side and limited to the authenticated `owner_user_id` + requested `agent_id`: the authenticated owner + agent profile fields (display name and role only), up to 12 bounded private cognition records, and up to 8 completed private chat turns (each user/assistant message is capped at 2,500 characters). Public manifest content is deliberately excluded from the model prompt. Context values are treated as untrusted data, and scene messages are not queried or included.
 - The conversation is persisted in `zhi_agent_chat_turns`, which has a composite owner/agent foreign key and a unique owner/agent/idempotency-key constraint. It is not stored in `zhi_world_messages`.
 - A failed model request marks the turn as failed and returns `502 chat_generation_failed`. Retrying the same idempotency key returns a conflict; clients should send a new key for a new attempt.
 - Chat content does not automatically create or update long-term cognition. The supervised feedback/proposal/approval workflow remains separate.
 
 The new chat UI is `web/zhi-agent-chat.html`. It is a branch artifact, not a deployed page. It uses the existing personal access token model and stores the token only in browser `sessionStorage`. It does not restore the old shared-password gate, global broadcast, old Core database, or old Agnes endpoints.
 
-**Release limitation:** the endpoint requires the new private-chat migration and the three provider secrets. The current CI uses a mocked model provider and disposable PostgreSQL; real provider connectivity and real two-account Supabase HTTP E2E remain outstanding.
+**Release limitation:** the endpoint requires the new private-chat migration and the three provider secrets. The current CI uses a mocked model provider and disposable PostgreSQL; real provider connectivity and real two-account Supabase HTTP E2E remain outstanding. The context helper has explicit size limits and tests for prompt-injection-like strings in stored cognition data.
 
