@@ -76,3 +76,22 @@ Deno.test("scene behavior guidance turns high weights into soft tendencies, not 
   assertStringIncludes(guidance, "概率倾向");
   assertStringIncludes(guidance, "不得声称已实际移动");
 });
+
+
+Deno.test("scene decision layer proposes shelter options but never executes them", () => {
+  const context = JSON.parse(buildSceneAwarenessContext(
+    { name: "林间社区", visibility: "public" },
+    {
+      behavior_weights: { seek_shelter: 0.9, rest: 0.8 },
+      objects: [
+        { id: "oak-eave", name: "橡树屋檐", state: "wet", interaction_options: ["rest", "observe"] },
+        { id: "bench", name: "长椅", state: "dry", interaction_options: ["sit"] },
+      ],
+    },
+  ));
+  assertEquals(context.suggested_actions[0].action, "seek_shelter");
+  assertEquals(context.suggested_actions[0].target_object_id, "oak-eave");
+  assertEquals(context.suggested_actions[0].requires_supervision, true);
+  assertEquals(context.suggested_actions[0].executed, false);
+  assertEquals(context.suggested_actions.some((item: Record<string, unknown>) => item.action === "rest"), true);
+});
