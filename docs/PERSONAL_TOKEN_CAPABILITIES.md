@@ -17,6 +17,7 @@
 | health.history.delete | 删除本人聊天历史 | 网关已执行 |
 | health.consent.manage | 读取/修改本人聊天保存同意 | 网关已执行 |
 | care.read / care.write | 访问本人 CareState | 已登记；个人令牌适配器未开放 |
+| care.approve | 审批本人 Care 动作票据 | 已登记；个人令牌适配器未开放 |
 | agent.feed.read | 读取授权智能人的主动消息 | 已登记；接口未开放 |
 | broadcast.send | 发起广播 | 已登记；接口未开放 |
 | tool.execute | 调用外部工具 | 已登记；监督审批和执行网关未接通 |
