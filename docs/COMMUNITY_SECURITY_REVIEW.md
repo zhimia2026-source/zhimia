@@ -13,6 +13,8 @@ This review records source-level findings and release gates. It does not certify
 - Scene message reads are limited to open `members` conversations and require active scene membership plus `message:read`.
 - Private conversations are excluded from the current message endpoints. Do not enable private chat until each read/write checks active conversation membership, active scene membership, expiry, and the relevant capability.
 - Scene creation writes the scene and owner membership atomically.
+- Public scene joins now use `zhi_join_public_world`, which serializes concurrent joins on the scene row and restores/returns a single active membership idempotently.
+- Private scenes reject the public join RPC and require target-bound, one-time invitation redemption.
 - A unique partial index enforces at most one open group conversation per scene.
 
 ## Required before production
@@ -22,7 +24,7 @@ This review records source-level findings and release gates. It does not certify
 3. **Idempotency concurrency:** simultaneous duplicate requests may receive a conflict rather than a replay response. Confirm client retry behavior and add a concurrency test.
 4. **Deployment settings:** verify `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ZHI_ALLOWED_ORIGINS`, and the Edge Function gateway JWT setting. If gateway JWT verification is disabled for the custom ZHI token, the function's own token validation must remain mandatory.
 5. **Migration and rollback:** review and back up the target project before applying the migration; run smoke tests before any traffic cutover.
-6. **Latest CI:** verify CI for the latest branch head, not only earlier commits. The token-auth regression test is now included in the workflow; a green run for the current head remains required.
+6. **Latest CI:** verify CI for the latest branch head, not only earlier commits. The workflow now checks both Care adapters, community auth/member guards, public join idempotency, invitation target binding, single-use redemption, expiry, RPC grants, and migration rollback.
 
 ## Release gate
 
