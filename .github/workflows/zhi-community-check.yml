@@ -87,5 +87,7 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261028140000_zhi_community_core.sql
       - name: Apply private cognition migration to disposable PostgreSQL
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030120000_zhi_private_cognition_records.sql
+      - name: Apply cognition revision proposals migration to disposable PostgreSQL
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030150000_zhi_cognition_revision_proposals.sql
       - name: Smoke-test atomic scene creation RPC and access grants
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/zhi_community_migration_test.sql
