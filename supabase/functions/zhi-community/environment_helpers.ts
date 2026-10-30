@@ -120,6 +120,8 @@ export function computeSceneEnvironment(raw: unknown, now = new Date()) {
     })),
     behavior_weights: behaviorWeights,
   };
+  if (new TextEncoder().encode(JSON.stringify(normalized)).length > 32768) throw new Error("environment_config_too_large");
+  return normalized;
 }
 
 
@@ -194,7 +196,7 @@ export function normalizeSceneEnvironmentConfig(raw: unknown): JsonRecord {
     const weight = clampWeight(value);
     if (/^[a-z][a-z0-9_]{0,39}$/.test(key) && weight !== null) behaviorWeights[key] = weight;
   }
-  return {
+  const normalized: JsonRecord = {
     timezone,
     lighting: boundedText(input.lighting, 80) ?? "natural",
     soundscape: boundedText(input.soundscape, 80) ?? "ambient",
