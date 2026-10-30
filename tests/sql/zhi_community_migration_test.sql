@@ -536,3 +536,68 @@ BEGIN
 END;
 $$;
 
+
+-- Scene environment configuration is owner-controlled, atomic and server-only.
+DO $zhi_environment_config_test$
+DECLARE
+  v_result jsonb;
+  v_scene_id uuid;
+  v_config jsonb := '{"timezone":"Asia/Singapore","lighting":"natural","soundscape":"forest_ambient","events":[]}'::jsonb;
+BEGIN
+  v_result := public.zhi_create_world_with_owner(
+    '11111111-1111-4111-8111-111111111111',
+    'CI Environment Scene',
+    'Scene environment configuration test',
+    'public',
+    'open'
+  );
+  v_scene_id := (v_result #>> '{scene,id}')::uuid;
+
+  v_result := public.zhi_update_world_environment(
+    v_scene_id,
+    '11111111-1111-4111-8111-111111111111',
+    v_config
+  );
+  IF v_result #>> '{environment_state,timezone}' <> 'Asia/Singapore' THEN
+    RAISE EXCEPTION 'owner environment update did not persist timezone';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.zhi_worlds
+    WHERE id = v_scene_id AND environment_state = v_config
+  ) THEN
+    RAISE EXCEPTION 'scene environment configuration was not stored atomically';
+  END IF;
+
+  BEGIN
+    PERFORM public.zhi_update_world_environment(
+      v_scene_id,
+      '22222222-2222-4222-8222-222222222222',
+      '{"timezone":"UTC"}'::jsonb
+    );
+    RAISE EXCEPTION 'non-owner environment update was accepted';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM = 'non-owner environment update was accepted' THEN RAISE; END IF;
+    IF SQLERRM <> 'environment_management_forbidden' THEN RAISE; END IF;
+  END;
+
+  BEGIN
+    PERFORM public.zhi_update_world_environment(
+      v_scene_id,
+      '11111111-1111-4111-8111-111111111111',
+      '[]'::jsonb
+    );
+    RAISE EXCEPTION 'non-object environment configuration was accepted';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM = 'non-object environment configuration was accepted' THEN RAISE; END IF;
+    IF SQLERRM <> 'invalid_environment_arguments' THEN RAISE; END IF;
+  END;
+
+  IF has_function_privilege('anon', 'public.zhi_update_world_environment(uuid,uuid,jsonb)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.zhi_update_world_environment(uuid,uuid,jsonb)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'browser roles must not execute environment update RPC';
+  END IF;
+  IF NOT has_function_privilege('service_role', 'public.zhi_update_world_environment(uuid,uuid,jsonb)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'service_role must execute environment update RPC';
+  END IF;
+END;
+$zhi_environment_config_test$;
