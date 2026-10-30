@@ -91,7 +91,18 @@ function randomToken(bytes = 32): string {
 }
 
 
-Deno.serve(async (req: Request) => {
+export type CommunityHandlerDependencies = {
+  dbClient?: () => SupabaseClient;
+  authenticate?: (db: SupabaseClient, req: Request) => Promise<Actor | null>;
+};
+
+/** Exported request handler enables HTTP-level tests with isolated dependencies. */
+export function createCommunityHandler(
+  dependencies: CommunityHandlerDependencies = {},
+): (req: Request) => Promise<Response> {
+  const getDb = dependencies.dbClient ?? dbClient;
+  const authenticateRequest = dependencies.authenticate ?? authenticate;
+  return async (req: Request) => {
   const cors = corsHeaders(req);
   if (!cors) return json({ error: "origin_not_allowed" }, 403);
   const reply = (data: unknown, status = 200) => json(data, status, cors);
@@ -99,8 +110,8 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "GET" && req.method !== "POST") return reply({ error: "method_not_allowed" }, 405);
 
   try {
-    const db = dbClient();
-    const actor = await authenticate(db, req);
+    const db = getDb();
+    const actor = await authenticateRequest(db, req);
     if (!actor) return reply({ error: "invalid_token" }, 401);
 
     const url = new URL(req.url);
@@ -335,4 +346,7 @@ Deno.serve(async (req: Request) => {
     // Avoid returning database or credential details to callers.
     return reply({ error: "internal_error" }, 500);
   }
-});
+  };
+}
+
+Deno.serve(createCommunityHandler());
