@@ -27,3 +27,5 @@ jobs:
         run: deno check supabase/functions/zhi-care/index.ts
       - name: Type-check Care personal-token adapter
         run: deno check supabase/functions/zhi-care-personal/index.ts
+      - name: Test Care personal-token capability and expiry guards
+        run: deno test supabase/functions/zhi-care-personal/access_helpers_test.ts
