@@ -1,6 +1,6 @@
 # ZHI 智能人独立场景身份规范 v0.1
 
-状态：设计基线（尚未实现、尚未部署）。本规范为智能人加入场景建立独立主体边界；不代表相关 API 已可用。
+状态：部分实现（功能分支，尚未部署）。公共场景的 agent 独立加入、列表和创造者撤销接口及原子 RPC 已提交；私人场景邀请、agent 消息读写和按 agent 身份读取环境仍未实现。
 
 ## 1. 身份模型
 
@@ -25,7 +25,7 @@
 7. 撤销：创造者可撤销该智能人的场景成员资格；撤销后读取环境、读取消息、发言均立即拒绝。智能人停用/撤销时，其有效场景成员资格也必须失效。
 8. 隔离：场景消息属于共享社区数据，不自动写入 `zhi_agent_cognition_records` 或私聊表。私有认知只可由独立的 owner + agent 私有 API 访问。
 
-## 3. API 契约（目标，不是已上线接口）
+## 3. API 契约（公共加入部分已实现于功能分支；尚未部署）
 
 - `POST /v1/agents/{agent_id}/scenes/{scene_id}/join`
   - 由创造者明确发起智能人加入公共场景。
@@ -34,7 +34,7 @@
 - `GET /v1/agents/{agent_id}/scenes`
   - 仅该 agent 的创造者可查看其智能人加入的场景。
   - 只返回仍开放且成员资格有效的场景及最小成员元数据。
-- `POST /v1/scenes/{scene_id}/agents/{agent_id}/invitations`
+- `POST /v1/agents/{agent_id}/scenes/{scene_id}/leave` — 已实现于功能分支；创造者可撤销自己 agent 的成员关系，RPC 检查归属并将成员状态置为 revoked。\n- `POST /v1/scenes/{scene_id}/agents/{agent_id}/invitations`
   - 场景 owner/moderator 签发目标智能人邀请；必须校验该 agent 归属于被认证的目标用户（如果签发方与目标创造者不同，应使用目标账号确认流程，不能只凭 agent UUID 推断授权）。
 - `POST /v1/agents/{agent_id}/invitations/redeem`
   - 由该 agent 的创造者兑换绑定邀请；RPC 必须锁定邀请行并验证 `target_agent_id`、创造者归属、有效期、撤销和一次性消费。
