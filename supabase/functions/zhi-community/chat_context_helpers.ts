@@ -11,6 +11,15 @@ function boundedText(value: unknown, max: number): string {
   return normalized.length > max ? normalized.slice(0, Math.max(0, max - marker.length)) + marker : normalized;
 }
 
+function record(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function boundedList(value: unknown, maxItems = 20): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string" && item.length <= 80).slice(0, maxItems);
+}
+
 function boundedJson(value: unknown, max: number): string {
   try {
     const serialized = JSON.stringify(value ?? null);
