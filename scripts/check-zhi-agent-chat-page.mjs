@@ -16,6 +16,9 @@ for (const required of [
   "sessionStorage.setItem(TOKEN_KEY, token)",
   "idempotency-key",
   "/chat?limit=50",
+  "role: \"manager\"",
+  "POST",
+  "/v1/agents",
 ]) {
   if (!html.includes(required)) throw new Error("Missing required chat UI contract: " + required);
 }
