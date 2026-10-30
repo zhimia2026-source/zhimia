@@ -1,6 +1,7 @@
 export type PrivateAgentProfile = {
   display_name?: unknown;
   role?: unknown;
+  public_manifest?: unknown;
 };
 
 function boundedText(value: unknown, max: number): string {
