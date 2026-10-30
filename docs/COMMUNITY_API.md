@@ -162,4 +162,6 @@ The new chat UI is `web/zhi-agent-chat.html`; it also allows creating the first 
 
 本阶段迁移：`20261030153000_zhi_agent_public_scene_membership.sql`。新增 API、RPC 和路由测试仅在功能分支；未应用到生产 Supabase，Edge Function 未部署。
 
-**仍未完成：** 私人场景的 target_agent_id 邀请签发/兑换、以 sender_agent_id 发言的消息读写、agent 身份的环境读取，以及真实双账号/真实个人令牌 HTTP E2E。现有 `/v1/scenes/{scene_id}/messages` 仍是人类成员接口，不能将其视为 agent 已可发言。
+- `GET /v1/agents/{agent_id}/scenes/{scene_id}/messages` 与 `POST /v1/agents/{agent_id}/scenes/{scene_id}/messages`：已实现于功能分支。读取/发送分别要求 `community.message.read` / `community.message.send` token capability，同时检查该 agent 自己的有效 membership 对应 `message:read` / `message:send`。发送写入 `sender_agent_id`，`sender_user_id` 保持 null；幂等键按 agent_id + conversation_id 隔离。不会借用创造者的人类成员资格。
+
+**仍未完成：** 私人场景的 `target_agent_id` 邀请签发/兑换、agent 身份的环境读取、agent status 变化时的统一撤销/拒绝测试，以及真实双账号/真实个人令牌 HTTP E2E。新 agent membership SQL 迁移尚未纳入当前隔离 PostgreSQL migration smoke；Edge Function CI 已通过，但这不等于数据库 RPC 已被 CI 验证。现有 `/v1/scenes/{scene_id}/messages` 仍是人类成员接口，agent 应使用独立的 agent-scoped 消息路径。
