@@ -13,6 +13,10 @@ on:
       - "web/zhi-agent-chat.html"
       - "scripts/check-zhi-community-page.mjs"
       - "scripts/check-zhi-agent-chat-page.mjs"
+      - "web/zhi-community.html"
+      - "web/zhi-agent-chat.html"
+      - "scripts/check-zhi-community-page.mjs"
+      - "scripts/check-zhi-agent-chat-page.mjs"
   push:
     branches:
       - "feature/intelligent-community-mvp"
@@ -59,6 +63,8 @@ jobs:
         run: deno test --allow-env=ZHI_ALLOWED_ORIGINS supabase/functions/zhi-community/cognition_routes_test.ts
       - name: Test scene membership isolation guard
         run: deno test supabase/functions/zhi-community/access_helpers_test.ts
+      - name: Test authenticated scene membership listing
+        run: deno test --allow-env=ZHI_ALLOWED_ORIGINS supabase/functions/zhi-community/scene_routes_test.ts
       - name: Test offline ontology MOU validation
         run: deno test supabase/functions/zhi-community/ontology_helpers_test.ts
       - name: Test append-only cognitive feedback cycle
