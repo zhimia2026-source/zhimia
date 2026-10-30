@@ -107,11 +107,6 @@ export function createCommunityHandler(
   const getDb = dependencies.dbClient ?? dbClient;
   const authenticateRequest = dependencies.authenticate ?? authenticate;
   const callModel = dependencies.fetchModel ?? fetch;
-  const chatConfig = dependencies.chatConfig ?? {
-    apiUrl: Deno.env.get("ZHI_CHAT_API_URL") ?? "",
-    apiKey: Deno.env.get("ZHI_CHAT_API_KEY") ?? "",
-    model: Deno.env.get("ZHI_CHAT_MODEL") ?? "",
-  };
   return async (req: Request) => {
   const cors = corsHeaders(req);
   if (!cors) return json({ error: "origin_not_allowed" }, 403);
@@ -435,9 +430,14 @@ export function createCommunityHandler(
       if (!requestKey || requestKey.length > 200) {
         return reply({ error: "invalid_argument", detail: "idempotency_key_required" }, 400);
       }
-      const providerUrl = chatConfig.apiUrl;
-      const providerKey = chatConfig.apiKey;
-      const providerModel = chatConfig.model;
+      const providerConfig = dependencies.chatConfig ?? {
+        apiUrl: Deno.env.get("ZHI_CHAT_API_URL") ?? "",
+        apiKey: Deno.env.get("ZHI_CHAT_API_KEY") ?? "",
+        model: Deno.env.get("ZHI_CHAT_MODEL") ?? "",
+      };
+      const providerUrl = providerConfig.apiUrl;
+      const providerKey = providerConfig.apiKey;
+      const providerModel = providerConfig.model;
       if (!providerUrl.startsWith("https://") || !providerKey || !providerModel) {
         return reply({ error: "chat_model_not_configured" }, 503);
       }
