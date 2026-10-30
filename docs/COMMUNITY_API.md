@@ -54,4 +54,4 @@ python -m unittest discover -s tests -v
 
 ## 部署状态
 
-Edge Function、数据库迁移和自动化检查已提交到功能分支，**尚未部署**。GitHub Actions run `41013979071`（commit `e83d81be49f9f874f9278277b637bfbeb53753e3`）的 Edge Function 类型检查与全部 helper/HTTP route 测试通过；社区核心迁移和私有认知迁移也已在一次性 PostgreSQL 中应用并通过冒烟测试。该结果不代表 live Supabase 已迁移或已部署。部署前仍需完成真实 Supabase 双账号端到端隔离、消息幂等性验收，并确认 Supabase Gateway 不会在函数代码执行前把自定义个人令牌误判为 Supabase Auth JWT。当前私有认知、反馈与提案 API 测试使用 mock DB；提案持久化 RPC 与三项迁移另在一次性 PostgreSQL CI 中验证。这不等同于真实 Supabase 双账号验收。
+Edge Function、数据库迁移和自动化检查已提交到功能分支，**尚未部署**。GitHub Actions run `41013979071`（commit `e83d81be49f9f874f9278277b637bfbeb53753e3`）的 Edge Function 类型检查与全部 helper/HTTP route 测试通过；社区核心迁移和私有认知迁移也已在一次性 PostgreSQL 中应用并通过冒烟测试。该结果不代表 live Supabase 已迁移或已部署。部署前仍需完成真实 Supabase 双账号端到端隔离、消息幂等性验收，并确认 Supabase Gateway 不会在函数代码执行前把自定义个人令牌误判为 Supabase Auth JWT。当前私有认知、反馈与提案 API 测试使用 mock DB；提案持久化 RPC 与三项迁移另在一次性 PostgreSQL CI 中验证。GitHub Actions run `41016332139` 已通过 Edge Function 测试与三项迁移冒烟测试。这不等同于真实 Supabase 双账号验收。
