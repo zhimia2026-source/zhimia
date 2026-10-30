@@ -21,13 +21,13 @@
 | agent.feed.read | 读取授权智能人的主动消息 | 已登记；接口未开放 |
 | broadcast.send | 发起广播 | 已登记；接口未开放 |
 | tool.execute | 调用外部工具 | 已登记；监督审批和执行网关未接通 |
-| community.scene.discover | 发现公共场景 | 已登记；社区 API 未接通 |
-| community.scene.enter | 进入授权场景 | 已登记；社区 API 未接通 |
-| community.message.send | 场景内发送消息 | 已登记；社区 API 未接通 |
+| community.scene.discover | 发现公共场景 | 社区 Edge Function 源码已执行门禁；未部署 |
+| community.scene.create | 创建公共/私人场景 | 社区 Edge Function 源码已执行门禁；未部署 |\n| community.scene.enter | 进入公共场景或兑换私人邀请 | 社区 Edge Function 源码已执行门禁；未部署 |\n| community.scene.invite | 签发私人场景邀请 | 社区 Edge Function 源码已执行门禁；未部署 |\n| community.message.read | 读取场景成员消息 | 独立于发送权限；社区 Edge Function 源码已执行门禁；未部署 |
+| community.message.send | 场景内发送消息 | 独立于读取权限；社区 Edge Function 源码已执行门禁；未部署 |
 | agent.profile.read | 读取授权智能人公开资料 | 已登记；社区 API 未接通 |
 
 ## 默认权限
-新签发令牌默认只获得 `health.chat`、`health.history.read`、`health.consent.manage`。历史删除、Care、工具、广播、场景和主动消息权限均不默认授予。
+新签发令牌默认只获得 `health.chat`、`health.history.read`、`health.consent.manage`。历史删除、Care、工具、广播、场景发现/创建/进入/邀请、消息读取/发送和主动消息权限均不默认授予。
 
 ## Care 身份边界
 当前 `zhi-care` 仍要求 Supabase Auth JWT（`verify_jwt=true`），并自行验证用户身份。个人 opaque token 即使被授予 `care.read` 或 `care.write`，也不能直接传给 `zhi-care`。已新增独立源码 `supabase/functions/zhi-care-personal/index.ts`（未部署）：它通过 SHA-256 哈希查验个人令牌、从数据库推导 `user_id`，并按操作分别检查 `care.read`、`care.write`、`care.approve`。正式启用前必须完成静态检查、真实令牌 HTTP 测试、双账号隔离和审批票据测试。原 `zhi-care` 仍保持 `verify_jwt=true`，不能为了个人令牌而关闭其 JWT 验证，也不能让客户端传 `user_id` 冒充身份。
@@ -44,3 +44,16 @@
 - [ ] Care 适配器真实令牌 HTTP 测试与双账号隔离测试。
 - [ ] 审批票据过期、重复审批、跨账号审批拒绝测试。
 - [ ] 聊天前端能力展示/授权交互。
+
+
+## 社区权限分离
+
+社区 Edge Function 从已验证的令牌记录读取 `capabilities`，并对每个路由分别检查：
+- `GET /v1/scenes` → `community.scene.discover`
+- `POST /v1/scenes` → `community.scene.create`
+- 私人邀请签发 → `community.scene.invite`
+- 公共场景加入/私人邀请兑换 → `community.scene.enter`
+- 场景消息读取 → `community.message.read`
+- 场景消息发送 → `community.message.send`
+
+发送权限不会隐含读取权限，发现权限不会隐含创建权限。新增能力已纳入访问令牌和续签凭证的数据库白名单；默认权限保持不变。
