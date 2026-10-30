@@ -12,7 +12,7 @@
 - `POST /v1/scenes`：创建场景，必须明确提交 `visibility`；当前公共场景仅支持 `entry_policy=open`，私人场景仅接受 `entry_policy=invite_only`。场景与所有者成员关系通过 `zhi_create_world_with_owner` 在同一数据库事务内创建。该 RPC 使用 `SECURITY INVOKER`，仅 `service_role` 获得执行权限。
 - `POST /v1/scenes/{scene_id}/invitations`：仅场景有效 owner/moderator 且具有 `scene:manage` 能力时可签发目标用户邀请；有效期 1–168 小时（默认 72 小时）。高熵原始 token 仅在签发响应中返回一次，数据库只存 SHA-256 哈希。
 - `POST /v1/invitations/redeem`：当前仅支持绑定到用户账号的私人场景邀请。数据库 RPC 对邀请行加锁，在一个事务中校验目标用户、有效期、撤销/消费状态和场景状态，创建/恢复成员资格并标记邀请已消费。重复兑换会被拒绝。
-- `POST /v1/scenes/{scene_id}/join`：加入开放公共场景；检查场景状态。私人场景仍不能通过普通 join 路径进入，必须兑换绑定的邀请。
+- `POST /v1/scenes/{scene_id}/join`：通过 `zhi_join_public_world` 原子加入开放公共场景；场景行锁串行化并发加入，重复请求恢复/返回同一成员关系。私人场景不能通过普通 join 进入，必须兑换绑定的邀请。
 - `GET /v1/scenes/{scene_id}/messages`：检查有效成员关系后读取场景公开成员会话消息。
 - `POST /v1/scenes/{scene_id}/messages`：检查成员状态、有效期、发送能力及场景状态；要求 `Idempotency-Key`，重复键同内容返回原消息，不同内容返回冲突。
 
@@ -45,4 +45,4 @@ python -m unittest discover -s tests -v
 
 ## 部署状态
 
-Edge Function、数据库迁移和自动化检查已提交到功能分支，**尚未部署**。CI 工作流拟执行 `deno check`，并在一次性 PostgreSQL 中验证迁移、RPC 权限、RLS 和成员插入失败时的事务回滚；须以 GitHub Actions 实际运行结果为准。部署前还需验证个人令牌认证、双账号隔离和消息幂等性，并确认 Supabase Gateway 不会在函数代码执行前把自定义个人令牌误判为 Supabase Auth JWT。
+Edge Function、数据库迁移和自动化检查已提交到功能分支，**尚未部署**。CI 工作流执行 `deno check`、认证/成员隔离测试，并在一次性 PostgreSQL 中验证迁移、场景创建、公共场景幂等加入、私人场景拒绝公开加入、邀请目标绑定/一次性消费/过期和 RPC 权限。仍须以最新 GitHub Actions 运行结果为准。部署前还需验证个人令牌认证、双账号隔离和消息幂等性，并确认 Supabase Gateway 不会在函数代码执行前把自定义个人令牌误判为 Supabase Auth JWT。
