@@ -25,10 +25,25 @@
 
 这些功能不得被前端或部署文档描述为已上线能力。
 
+## 路由级令牌能力
+
+令牌有效只证明主体身份，不自动授予所有社区操作。每条路由还必须具备独立能力：
+
+| 路由 | 必需能力 |
+|---|---|
+| `GET /v1/scenes` | `community.scene.discover` |
+| `POST /v1/scenes` | `community.scene.create` |
+| 私人邀请签发 | `community.scene.invite` + 场景 owner/moderator 成员能力 |
+| 公共场景加入 / 私人邀请兑换 | `community.scene.enter` |
+| 场景消息读取 | `community.message.read` + 有效成员关系 |
+| 场景消息发送 | `community.message.send` + 有效成员关系 |
+
+`community.message.send` 不隐含 `community.message.read`；`community.scene.discover` 不隐含场景创建或进入。所有社区能力默认不授予。
+
 ## 认证与授权约束
 
 - 身份只来自服务端验证的个人访问令牌；不得接受客户端 JSON 的 `actor_id` 或 `user_id` 作为身份依据。
-- 令牌必须存在于 `zhi_personal_access_tokens`，且未撤销、未过期。
+- 令牌必须存在于 `zhi_personal_access_tokens`，且未撤销、未过期；每条路由还必须具备上表对应 capability。
 - 发现公共场景不等于自动拥有消息读取、工具调用或私有记忆权限。
 - 社区消息与私有记忆严格分离；本 API 不提供私有记忆读写。
 - Edge Function 使用 service-role 访问数据库，因此所有者、成员资格、能力、状态和有效期检查必须在服务端每个受保护操作中执行。
