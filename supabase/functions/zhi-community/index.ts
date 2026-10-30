@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { isTokenExpiryValid, tokenTouchSucceeded } from "./auth_helpers.ts";
 import { isMembershipAuthorized, privilegesForPublicRejoin } from "./access_helpers.ts";
 import { validateMouRecord } from "./ontology_helpers.ts";
+import { buildFeedbackRecord } from "./cognitive_cycle_helpers.ts";
 
 const MAX_BODY_BYTES = 64_000;
 
@@ -147,6 +148,50 @@ export function createCommunityHandler(
       }).select("id,owner_user_id,display_name,role,visibility,manifest_version,public_manifest,status,created_at,updated_at").single();
       if (error || !agent) throw new Error("database_error");
       return reply({ agent }, 201);
+    }
+
+    // Feedback is append-only: it records an observed outcome against an owned hypothesis.
+    if (req.method === "POST" && parts.length === 6 && parts[0] === "v1" &&
+        parts[1] === "agents" && parts[3] === "cognition" && parts[5] === "feedback") {
+      const agentId = parts[2];
+      const hypothesisId = parts[4];
+      if (!isUuid(agentId) || !isUuid(hypothesisId)) {
+        return reply({ error: "invalid_argument", detail: "agent_and_record_ids_must_be_uuids" }, 400);
+      }
+      const { data: agent, error: agentError } = await db.from("zhi_agents")
+        .select("id,owner_user_id,status").eq("id", agentId)
+        .eq("owner_user_id", actor.userId).maybeSingle();
+      if (agentError) throw new Error("database_error");
+      if (!agent) return reply({ error: "not_found" }, 404);
+      if (agent.status !== "active") return reply({ error: "conflict", detail: "agent_not_active" }, 409);
+
+      const { data: hypothesis, error: hypothesisError } = await db.from("zhi_agent_cognition_records")
+        .select("id,owner_user_id,agent_id,object_type,object_id,state,relation_ids,evidence_kind,source_ids,confidence,event_time,recorded_at,inferred_at,hypothesis,prediction,version")
+        .eq("id", hypothesisId).eq("owner_user_id", actor.userId).eq("agent_id", agentId).maybeSingle();
+      if (hypothesisError) throw new Error("database_error");
+      if (!hypothesis) return reply({ error: "not_found" }, 404);
+
+      const body = await readBody(req);
+      const feedbackInput = {
+        id: crypto.randomUUID(),
+        source_id: body.source_id,
+        event_time: body.event_time,
+        recorded_at: new Date().toISOString(),
+        observed_outcome: body.observed_outcome,
+        confidence: body.confidence,
+      };
+      let feedback;
+      try {
+        feedback = buildFeedbackRecord(hypothesis, feedbackInput);
+      } catch (error) {
+        return reply({ error: "invalid_argument", detail: error instanceof Error ? error.message : "invalid_feedback" }, 400);
+      }
+      const { data: inserted, error } = await db.from("zhi_agent_cognition_records")
+        .insert(feedback)
+        .select("id,owner_user_id,agent_id,object_type,object_id,state,relation_ids,evidence_kind,source_ids,confidence,event_time,recorded_at,inferred_at,hypothesis,prediction,version")
+        .single();
+      if (error || !inserted) throw new Error("database_error");
+      return reply({ record: inserted }, 201);
     }
 
     // Private cognition is scoped to the authenticated owner + an agent they own.
