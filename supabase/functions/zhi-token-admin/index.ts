@@ -1,7 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 const URL=Deno.env.get("SUPABASE_URL")??"", SERVICE=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")??"", ADMIN_GITHUB_ID="346064553";
 const origins=()=> (Deno.env.get("ZHI_ALLOWED_ORIGINS")||"https://zhimia2026-source.github.io").split(",").map(x=>x.trim());
-function cors(req:Request){const o=req.headers.get("origin");if(!o)return {};return origins().includes(o)?{"access-control-allow-origin":o,"access-control-allow-headers":"authorization, apikey, content-type","access-control-allow-methods":"POST, OPTIONS","vary":"Origin"}:null;}
+function cors(req:Request):Record<string,string>|null{const o=req.headers.get("origin");if(!o)return {vary:"Origin"};return origins().includes(o)?{"access-control-allow-origin":o,"access-control-allow-headers":"authorization, apikey, content-type","access-control-allow-methods":"POST, OPTIONS","vary":"Origin"}:null;}
 const json=(b:unknown,s=200,h:Record<string,string>={})=>new Response(JSON.stringify(b),{status:s,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store",...h}});
 const ALLOWED_CAPABILITIES=["health.chat","health.history.read","health.history.delete","health.consent.manage","care.read","care.write","care.approve","agent.feed.read","broadcast.send","tool.execute","community.scene.discover","community.scene.create","community.scene.enter","community.scene.invite","community.message.read","community.message.send","agent.profile.read"];const DEFAULT_CAPABILITIES=["health.chat","health.history.read","health.consent.manage"];
 const hash=async(s:string)=>{const d=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));return [...new Uint8Array(d)].map(x=>x.toString(16).padStart(2,"0")).join("");};
