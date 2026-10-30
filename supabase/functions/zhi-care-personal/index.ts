@@ -86,7 +86,7 @@ Deno.serve(async (req: Request) => {
   const { data: tokenRow, error: tokenError } = await db.from("zhi_personal_access_tokens")
     .select("id,user_id,expires_at,revoked_at,capabilities")
     .eq("token_hash", tokenHash).maybeSingle();
-  if (tokenError || !isUsablePersonalToken(tokenRow)) {
+  if (tokenError || !tokenRow || !isUsablePersonalToken(tokenRow)) {
     return json({ error: "invalid_or_expired_token" }, 401, cors);
   }
   const user = { id: tokenRow.user_id };
