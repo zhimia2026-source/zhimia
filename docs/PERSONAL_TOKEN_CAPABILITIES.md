@@ -21,7 +21,7 @@
 | agent.feed.read | 读取授权智能人的主动消息 | 已登记；接口未开放 |
 | broadcast.send | 发起广播 | 已登记；接口未开放 |
 | tool.execute | 调用外部工具 | 已登记；监督审批和执行网关未接通 |
-| community.scene.discover | 发现公共场景 | 社区 Edge Function 源码已执行门禁；未部署 |
+| community.scene.discover | 发现公共场景 | 数据库白名单已部署、token-admin v13 支持签发；社区 Edge Function 源码已执行门禁但未部署 |
 | community.scene.create | 创建公共/私人场景 | 社区 Edge Function 源码已执行门禁；未部署 |
 | community.scene.enter | 进入公共场景或兑换私人邀请 | 社区 Edge Function 源码已执行门禁；未部署 |
 | community.scene.invite | 签发私人场景邀请 | 社区 Edge Function 源码已执行门禁；未部署 |
@@ -59,4 +59,4 @@
 - 场景消息读取 → `community.message.read`
 - 场景消息发送 → `community.message.send`
 
-发送权限不会隐含读取权限，发现权限不会隐含创建权限。新增能力已纳入访问令牌和续签凭证的数据库白名单；默认权限保持不变。
+发送权限不会隐含读取权限，发现权限不会隐含创建权限。新增能力已纳入访问令牌和续签凭证的数据库白名单，迁移已应用到目标 Supabase；`zhi-token-admin` v13 已部署并支持签发这些能力。默认权限保持不变。
