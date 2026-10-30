@@ -47,6 +47,10 @@ button,input,textarea,select{font:inherit}button{border:1px solid #d6e2e5;backgr
       <div class="body"><div id="sceneStatus" class="status">正在读取场景…</div><div id="scenes" class="sceneList"></div><button id="refreshScenes" type="button" style="width:100%;margin-top:8px">刷新列表</button></div>
     </section>
     <section class="panel">
+      <div class="head">我的场景</div>
+      <div class="body"><div id="mySceneStatus" class="status">正在读取我的场景…</div><div id="myScenes" class="sceneList"></div><button id="refreshMyScenes" type="button" style="width:100%;margin-top:8px">刷新我的场景</button></div>
+    </section>
+    <section class="panel">
       <div class="head">兑换私人场景邀请</div>
       <div class="body">
         <div class="field"><label for="inviteToken">一次性邀请令牌</label><input id="inviteToken" autocomplete="off" placeholder="粘贴收到的邀请令牌"></div>
@@ -78,6 +82,7 @@ button,input,textarea,select{font:inherit}button{border:1px solid #d6e2e5;backgr
   const $ = id => document.getElementById(id);
   let token = sessionStorage.getItem(TOKEN_KEY) || "";
   let scenes = [];
+  let myScenes = [];
   let selected = null;
   let busy = false;
   const setStatus = (id, value, kind = "") => { $(id).textContent = value; $(id).className = "status " + kind; };
@@ -104,6 +109,21 @@ button,input,textarea,select{font:inherit}button{border:1px solid #d6e2e5;backgr
       btn.append(name,meta);btn.addEventListener("click",()=>joinAndOpen(scene));wrap.append(btn);$("scenes").append(wrap);
     }
   }
+  function renderMyScenes(){
+    $("myScenes").replaceChildren();
+    if(!myScenes.length){const empty=document.createElement("div");empty.className="muted";empty.textContent="你还没有加入或创建场景。";$("myScenes").append(empty);return;}
+    for(const scene of myScenes){
+      const btn=document.createElement("button");btn.type="button";btn.className="scene"+(selected?.id===scene.id?" selected":"");
+      const name=document.createElement("strong");name.textContent=scene.name;
+      const meta=document.createElement("span");meta.textContent=(scene.visibility==="private"?"私人":"公共")+" · "+(scene.membership_role==="owner"?"所有者":scene.membership_role==="moderator"?"管理者":"成员");
+      btn.append(name,meta);btn.addEventListener("click",()=>openScene(scene));$("myScenes").append(btn);
+    }
+  }
+  async function loadMyScenes(){
+    setStatus("mySceneStatus","正在读取我的场景…");
+    try{const result=await api("/v1/scenes/mine");myScenes=result.items||[];renderMyScenes();setStatus("mySceneStatus","你已加入 "+myScenes.length+" 个场景。","good");}
+    catch(error){setStatus("mySceneStatus","读取失败："+error.message,"error");}
+  }
   function bubble(message){
     const node=document.createElement("div");node.className="bubble";
     const who=document.createElement("div");who.className="who";who.textContent=message.sender_user_id ? "成员 "+String(message.sender_user_id).slice(0,8) : "社区成员";
@@ -129,8 +149,8 @@ button,input,textarea,select{font:inherit}button{border:1px solid #d6e2e5;backgr
   }
   async function openScene(scene){
     selected=scene;$("chatTitle").textContent=scene.name||"社区场景";$("chatMeta").textContent=(scene.visibility==="private"?"私人邀请场景":"公共开放场景")+" · 共享成员消息";
-    $("message").disabled=false;$("send").disabled=false;$("refreshMessages").disabled=false;$("issueInvite").disabled=scene.visibility!=="private";
-    renderScenes();await loadMessages();
+    $("message").disabled=false;$("send").disabled=false;$("refreshMessages").disabled=false;$("issueInvite").disabled=!(scene.capabilities||[]).includes("scene:manage");
+    renderScenes();renderMyScenes();await loadMessages();
   }
   async function joinAndOpen(scene){
     try{await api("/v1/scenes/"+encodeURIComponent(scene.id)+"/join",{method:"POST",body:"{}"});await openScene(scene);setStatus("sceneStatus","已加入："+scene.name,"good");}
@@ -143,7 +163,8 @@ button,input,textarea,select{font:inherit}button{border:1px solid #d6e2e5;backgr
     try{
       const result=await api("/v1/scenes",{method:"POST",body:JSON.stringify({name,visibility,entry_policy:visibility==="public"?"open":"invite_only"})});
       const scene=result.scene;if(!scene?.id)throw new Error("scene_create_failed");
-      $("sceneName").value="";await loadScenes();await openScene(scene);
+      scene.capabilities=["scene:manage","message:send","message:read"];scene.membership_role="owner";
+      $("sceneName").value="";await loadScenes();await loadMyScenes();await openScene(scene);
       setStatus("sceneStatus","场景创建成功，你已成为所有者。","good");
     }catch(error){setStatus("sceneStatus","创建失败："+error.message,"error");}
     finally{$("createScene").disabled=false;}
@@ -154,7 +175,8 @@ button,input,textarea,select{font:inherit}button{border:1px solid #d6e2e5;backgr
     try{
       const result=await api("/v1/invitations/redeem",{method:"POST",body:JSON.stringify({token:invite})});
       $("inviteToken").value="";
-      const scene={id:result.scene_id,name:"已加入的私人场景",visibility:"private"};
+      await loadMyScenes();
+      const scene=myScenes.find(item=>item.id===result.scene_id)||{id:result.scene_id,name:"已加入的私人场景",visibility:"private",capabilities:["message:send","message:read"]};
       await openScene(scene);setStatus("sceneStatus","邀请兑换成功，已进入私人场景。","good");
     }catch(error){setStatus("sceneStatus","邀请兑换失败："+error.message,"error");}
     finally{$("redeem").disabled=false;}
@@ -183,16 +205,16 @@ button,input,textarea,select{font:inherit}button{border:1px solid #d6e2e5;backgr
   }
   async function connect(){
     token=$("token").value.trim();if(!token)return;sessionStorage.setItem(TOKEN_KEY,token);
-    try{await api("/v1/scenes");$("loginStatus").textContent="";showApp();await loadScenes();}
+    try{await api("/v1/scenes");$("loginStatus").textContent="";showApp();await Promise.all([loadScenes(),loadMyScenes()]);}
     catch(error){sessionStorage.removeItem(TOKEN_KEY);token="";$("loginStatus").textContent="连接失败："+error.message;}
   }
   $("loginForm").addEventListener("submit",e=>{e.preventDefault();connect();});
   $("createScene").addEventListener("click",createScene);$("redeem").addEventListener("click",redeemInvite);
   $("issueInvite").addEventListener("click",issueInvite);$("composer").addEventListener("submit",sendMessage);
   $("message").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();$("composer").requestSubmit();}});
-  $("refreshScenes").addEventListener("click",loadScenes);$("refreshMessages").addEventListener("click",loadMessages);
+  $("refreshScenes").addEventListener("click",loadScenes);$("refreshMyScenes").addEventListener("click",loadMyScenes);$("refreshMessages").addEventListener("click",loadMessages);
   $("logout").addEventListener("click",()=>{sessionStorage.removeItem(TOKEN_KEY);token="";scenes=[];selected=null;showGate();});
-  if(token){showApp();loadScenes();}else showGate();
+  if(token){showApp();Promise.all([loadScenes(),loadMyScenes()]);}else showGate();
 })();
 </script>
 </body>
