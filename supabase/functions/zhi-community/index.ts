@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { isTokenExpiryValid, tokenTouchSucceeded } from "./auth_helpers.ts";
 import { isMembershipAuthorized, privilegesForPublicRejoin } from "./access_helpers.ts";
+import { validateMouRecord } from "./ontology_helpers.ts";
 
 const MAX_BODY_BYTES = 64_000;
 
@@ -118,6 +119,58 @@ export function createCommunityHandler(
     const marker = "/functions/v1/zhi-community";
     const path = url.pathname.includes(marker) ? url.pathname.slice(url.pathname.indexOf(marker) + marker.length) : url.pathname;
     const parts = path.split("/").filter(Boolean);
+
+    // Private cognition is scoped to the authenticated owner + an agent they own.
+    // It is deliberately separate from scene messages and shared conversation context.
+    if (parts.length === 4 && parts[0] === "v1" && parts[1] === "agents" && parts[3] === "cognition" &&
+        (req.method === "GET" || req.method === "POST")) {
+      const agentId = parts[2];
+      if (!isUuid(agentId)) return reply({ error: "invalid_argument", detail: "agent_id_must_be_uuid" }, 400);
+      const { data: agent, error: agentError } = await db.from("zhi_agents")
+        .select("id,owner_user_id,status").eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
+      if (agentError) throw new Error("database_error");
+      if (!agent) return reply({ error: "not_found" }, 404);
+      if (agent.status !== "active") return reply({ error: "conflict", detail: "agent_not_active" }, 409);
+
+      if (req.method === "GET") {
+        const limit = Number(url.searchParams.get("limit") ?? "50");
+        if (!Number.isInteger(limit) || limit < 1 || limit > 100) return reply({ error: "invalid_argument", detail: "limit_must_be_1_to_100" }, 400);
+        const { data: records, error } = await db.from("zhi_agent_cognition_records")
+          .select("id,owner_user_id,agent_id,object_type,object_id,state,relation_ids,evidence_kind,source_ids,confidence,event_time,recorded_at,inferred_at,hypothesis,prediction,version")
+          .eq("owner_user_id", actor.userId).eq("agent_id", agentId)
+          .order("recorded_at", { ascending: false }).limit(limit);
+        if (error) throw new Error("database_error");
+        return reply({ items: records ?? [] });
+      }
+
+      const body = await readBody(req);
+      const record = {
+        id: crypto.randomUUID(),
+        owner_user_id: actor.userId,
+        agent_id: agentId,
+        object_type: body.object_type,
+        object_id: body.object_id,
+        state: body.state,
+        relation_ids: body.relation_ids ?? [],
+        evidence_kind: body.evidence_kind,
+        source_ids: body.source_ids ?? [],
+        confidence: body.confidence ?? null,
+        event_time: body.event_time ?? null,
+        recorded_at: new Date().toISOString(),
+        inferred_at: body.inferred_at ?? null,
+        hypothesis: body.hypothesis ?? null,
+        prediction: body.prediction ?? null,
+        version: 1,
+      };
+      const validation = validateMouRecord(record);
+      if (!validation.valid) return reply({ error: "invalid_argument", detail: "invalid_mou_record", fields: validation.errors }, 400);
+      const { data: inserted, error } = await db.from("zhi_agent_cognition_records")
+        .insert(record)
+        .select("id,owner_user_id,agent_id,object_type,object_id,state,relation_ids,evidence_kind,source_ids,confidence,event_time,recorded_at,inferred_at,hypothesis,prediction,version")
+        .single();
+      if (error || !inserted) throw new Error("database_error");
+      return reply({ record: inserted }, 201);
+    }
 
     if (req.method === "GET" && path === "/v1/scenes") {
       const { data, error } = await db.from("zhi_worlds")
