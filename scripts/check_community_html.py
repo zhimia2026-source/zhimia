@@ -27,7 +27,7 @@ for invariant in ['credentials:"omit"', '"idempotency-key"', 'window.addEventLis
     if invariant not in html:
         raise SystemExit(f"Missing community UI security invariant: {invariant}")
 
-if re.search(r"\\b(?:localStorage|sessionStorage)\\s*\\.", html):
+if re.search(r"\b(?:localStorage|sessionStorage)\s*\.", html):
     raise SystemExit("Community access token must not be persisted in browser storage")
 
 with tempfile.NamedTemporaryFile("w", suffix=".js", encoding="utf-8", delete=False) as temp:
