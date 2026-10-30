@@ -51,3 +51,18 @@ export function buildPrivateAgentContext(
   }));
   return JSON.stringify({ profile, private_cognition_records: records });
 }
+
+/** Keep prompt history bounded to control cost and prevent oversized context replay. */
+export function buildPrivateChatHistory(
+  turns: Array<{ user_message?: unknown; assistant_message?: unknown }>,
+): Array<{ role: "user" | "assistant"; content: string }> {
+  return turns.slice(-8).flatMap((turn) => {
+    const user = boundedText(turn.user_message, 2500);
+    const assistant = boundedText(turn.assistant_message, 2500);
+    if (!user || !assistant) return [];
+    return [
+      { role: "user" as const, content: user },
+      { role: "assistant" as const, content: assistant },
+    ];
+  });
+}
