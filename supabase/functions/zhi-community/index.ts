@@ -2,8 +2,6 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { isTokenExpiryValid, tokenTouchSucceeded } from "./auth_helpers.ts";
 import { isMembershipAuthorized, privilegesForPublicRejoin } from "./access_helpers.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const MAX_BODY_BYTES = 64_000;
 
 type Actor = { userId: string };
@@ -35,8 +33,10 @@ function corsHeaders(req: Request): Record<string, string> | null {
 }
 
 function dbClient(): SupabaseClient {
-  if (!SUPABASE_URL || !SERVICE_KEY) throw new Error("server_configuration_missing");
-  return createClient(SUPABASE_URL, SERVICE_KEY, {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (!supabaseUrl || !serviceKey) throw new Error("server_configuration_missing");
+  return createClient(supabaseUrl, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 }
