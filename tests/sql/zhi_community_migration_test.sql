@@ -365,3 +365,110 @@ BEGIN
   END;
 END;
 $$;
+
+
+-- Explicit owner approval creates an immutable next version; rollback appends another version.
+DO $$
+DECLARE
+  v_hypothesis_id uuid := 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  v_feedback_id uuid := 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+  v_proposal_id uuid;
+  v_result jsonb;
+  v_approved_record_id uuid;
+  v_rollback_record_id uuid;
+  v_stale_proposal_id uuid;
+BEGIN
+  SELECT id INTO v_proposal_id
+  FROM public.zhi_cognition_revision_proposals
+  WHERE owner_user_id = '11111111-1111-4111-8111-111111111111'
+    AND agent_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    AND based_on_record_id = v_hypothesis_id
+    AND status = 'shadow_proposed'
+  ORDER BY created_at
+  LIMIT 1;
+
+  IF v_proposal_id IS NULL THEN
+    RAISE EXCEPTION 'expected pending proposal for approval test';
+  END IF;
+
+  v_result := public.zhi_decide_cognition_revision_proposal(
+    '11111111-1111-4111-8111-111111111111',
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    v_proposal_id,
+    true,
+    'Approved in disposable CI'
+  );
+  IF v_result ->> 'status' <> 'approved' THEN
+    RAISE EXCEPTION 'owner approval did not approve proposal';
+  END IF;
+  v_approved_record_id := (v_result #>> '{record,id}')::uuid;
+
+  IF (v_result #>> '{record,version}')::integer <> 3
+     OR v_result #>> '{record,change_kind}' <> 'approved_revision'
+     OR v_result #>> '{record,previous_record_id}' <> v_hypothesis_id::text
+     OR v_result #>> '{record,source_proposal_id}' <> v_proposal_id::text THEN
+    RAISE EXCEPTION 'approved revision metadata or version chain is invalid';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.zhi_agent_cognition_records
+    WHERE id = v_hypothesis_id AND version = 2
+      AND state = '{"weather":"rain"}'::jsonb
+  ) THEN
+    RAISE EXCEPTION 'approval must not mutate the previous cognition record';
+  END IF;
+
+  v_result := public.zhi_rollback_cognition_version(
+    '11111111-1111-4111-8111-111111111111',
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    v_hypothesis_id,
+    'Restore prior state in disposable CI'
+  );
+  IF v_result ->> 'status' <> 'rolled_back' THEN
+    RAISE EXCEPTION 'rollback RPC did not return rolled_back';
+  END IF;
+  v_rollback_record_id := (v_result #>> '{record,id}')::uuid;
+
+  IF (v_result #>> '{record,version}')::integer <> 4
+     OR v_result #>> '{record,change_kind}' <> 'rollback'
+     OR v_result #>> '{record,previous_record_id}' <> v_approved_record_id::text
+     OR v_result #>> '{record,state}' <> '{"weather":"rain"}'::jsonb::text THEN
+    RAISE EXCEPTION 'rollback did not append a correct restored snapshot';
+  END IF;
+
+  -- A proposal based on the old version cannot overwrite a newer current version.
+  v_result := public.zhi_create_cognition_revision_proposal(
+    '11111111-1111-4111-8111-111111111111',
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    v_hypothesis_id,
+    ARRAY[v_feedback_id],
+    '{"weather_expectation":"stale_change"}'::jsonb
+  );
+  v_stale_proposal_id := (v_result ->> 'id')::uuid;
+
+  v_result := public.zhi_decide_cognition_revision_proposal(
+    '11111111-1111-4111-8111-111111111111',
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    v_stale_proposal_id,
+    true,
+    'Must be rejected as stale'
+  );
+  IF v_result ->> 'status' <> 'stale' THEN
+    RAISE EXCEPTION 'stale proposal was not rejected';
+  END IF;
+
+  IF NOT has_function_privilege('anon', 'public.zhi_decide_cognition_revision_proposal(uuid,uuid,uuid,boolean,text)', 'EXECUTE') = false
+     OR NOT has_function_privilege('authenticated', 'public.zhi_rollback_cognition_version(uuid,uuid,uuid,text)', 'EXECUTE') = false THEN
+    RAISE EXCEPTION 'browser roles must not execute revision decision or rollback RPCs';
+  END IF;
+  IF NOT has_function_privilege('service_role', 'public.zhi_decide_cognition_revision_proposal(uuid,uuid,uuid,boolean,text)', 'EXECUTE')
+     OR NOT has_function_privilege('service_role', 'public.zhi_rollback_cognition_version(uuid,uuid,uuid,text)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'service_role must execute revision decision and rollback RPCs';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM public.zhi_agent_cognition_records WHERE id = v_approved_record_id)
+     OR NOT EXISTS (SELECT 1 FROM public.zhi_agent_cognition_records WHERE id = v_rollback_record_id) THEN
+    RAISE EXCEPTION 'version history must remain append-only';
+  END IF;
+END;
+$$;
