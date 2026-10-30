@@ -22,6 +22,13 @@ for (const required of [
   "sceneSelect",
   "/v1/scenes/mine",
   "scene_id: selectedSceneId || null",
+  "agentCommunity",
+  "joinAgentScene",
+  "redeemAgentInvitation",
+  "leaveAgentScene",
+  "/invitations/redeem",
+  "/messages?limit=50",
+  "sender_agent_id",
 ]) {
   if (!html.includes(required)) throw new Error("Missing required chat UI contract: " + required);
 }
