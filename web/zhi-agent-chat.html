@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#edf5f5">
+<title>ZHI · 智能人讲话室</title>
+<style>
+:root{color-scheme:light;--bg:#f2f7f8;--panel:#fff;--line:#e2eaed;--ink:#1c3039;--muted:#647780;--accent:#147d79;--soft:#e6f4f1;--danger:#b6424b}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#eaf5f4,#f5f8fb 340px);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;min-height:100vh}
+button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#fff;border-radius:11px;padding:10px 14px;color:var(--ink);font-weight:700;cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.wrap{max-width:1400px;margin:auto;padding:22px}.header{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:18px}.brand{font-size:25px;font-weight:900;color:#173e49}.sub,.muted{color:var(--muted);font-size:12px}
+.layout{display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 12px 32px #163b480a}.head{padding:15px 17px;border-bottom:1px solid var(--line);font-weight:850}.body{padding:15px}.field{display:grid;gap:6px;margin-bottom:12px}.field label{font-size:12px;color:var(--muted);font-weight:700}input,textarea{width:100%;border:1px solid #d5e1e5;border-radius:11px;padding:11px;background:#fbfdfe;color:var(--ink);outline:none}input:focus,textarea:focus{border-color:#69aaa5;box-shadow:0 0 0 3px #147d7917}
+.agentList{max-height:65vh;overflow:auto;padding:8px}.agent{display:block;width:100%;text-align:left;background:transparent;border-color:transparent;margin-bottom:4px}.agent.selected{background:var(--soft);border-color:#b7dcd6}.agent strong,.agent span{display:block}.agent span{font-size:11px;color:var(--muted);margin-top:3px}
+.chat{min-height:680px;display:flex;flex-direction:column}.chatHead{padding:16px 19px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px}.chatTitle{font-size:19px;font-weight:900}.log{padding:20px;display:flex;flex-direction:column;gap:13px;flex:1;min-height:350px;max-height:62vh;overflow:auto;background:#f9fcfd}.welcome{margin:auto;max-width:460px;text-align:center;color:var(--muted);line-height:1.9}.bubble{max-width:min(80%,700px);padding:12px 15px;border-radius:16px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}.bubble.user{align-self:flex-end;background:#def2ed;border:1px solid #c4e6de;border-bottom-right-radius:4px}.bubble.agent{align-self:flex-start;background:#fff;border:1px solid var(--line);border-bottom-left-radius:4px}.bubble .who{font-size:11px;font-weight:800;color:var(--accent);margin-bottom:4px}.bubble .time{font-size:10px;color:#829198;margin-top:6px}
+.composer{padding:14px;border-top:1px solid var(--line);display:grid;grid-template-columns:minmax(0,1fr) 100px;gap:10px}.composer textarea{min-height:54px;max-height:180px;resize:vertical}.composer button{align-self:end;min-height:50px}.status{white-space:pre-wrap;color:var(--muted);font-size:12px;min-height:20px}.status.error{color:var(--danger)}.status.good{color:#16734a}.foot{padding:0 16px 14px;color:var(--muted);font-size:11px}
+.gate{max-width:430px;margin:8vh auto;background:#fff;border:1px solid var(--line);border-radius:18px;padding:24px}.hidden{display:none!important}
+@media(max-width:760px){.wrap{padding:10px}.layout{display:flex;flex-direction:column}.chat{min-height:0;order:0}.side{order:1}.chatHead{padding:12px}.log{height:43dvh;min-height:260px;max-height:none;padding:12px}.bubble{max-width:94%}.composer{position:sticky;bottom:0;background:#fff;padding:9px;grid-template-columns:minmax(0,1fr) 76px}.composer textarea{font-size:16px}.agentList{display:flex;overflow-x:auto;max-height:none}.agent{flex:0 0 155px}.header{margin-bottom:10px}.brand{font-size:20px}}
+</style>
+</head>
+<body>
+<main class="wrap">
+<header class="header"><div><div class="brand">💬 ZHI · 智能人讲话室</div><div class="sub">独立身份 · 私有对话 · 私有认知隔离</div></div><button id="logout" type="button">退出</button></header>
+<section id="gate" class="gate">
+<h2 style="margin:0 0 6px">连接你的 ZHI 身份</h2>
+<p class="muted">输入个人访问令牌。令牌只保存在当前浏览器会话的 sessionStorage，关闭会话后失效。</p>
+<form id="loginForm">
+<div class="field"><label for="token">个人访问令牌</label><input id="token" type="password" autocomplete="off" required placeholder="粘贴个人访问令牌"></div>
+<button class="primary" style="width:100%">连接</button>
+</form>
+<div id="loginStatus" class="status" role="status"></div>
+</section>
+<section id="app" class="layout hidden">
+<aside class="panel side">
+<div class="head">我的智能人</div>
+<div class="body"><div class="field"><label for="search">搜索</label><input id="search" placeholder="搜索智能人"></div><div id="status" class="status">正在读取智能人列表…</div></div>
+<div id="agents" class="agentList"></div>
+</aside>
+<section class="panel chat">
+<div class="chatHead"><div><div class="chatTitle" id="chatTitle">选择一位智能人</div><div class="sub" id="chatMeta">只读取当前身份拥有的私有对话与认知</div></div><button id="refresh" type="button">刷新历史</button></div>
+<div id="log" class="log"><div class="welcome">选择左侧智能人，开始一对一交流。<br>私有认知不会与场景共享消息混合。</div></div>
+<form id="composer" class="composer"><textarea id="message" maxlength="8000" placeholder="写下你想说的话……（Enter 发送，Shift+Enter 换行）" disabled></textarea><button id="send" class="primary" disabled>发送 ↗</button></form>
+<div class="foot">对话会保存为当前用户与当前智能人的私有会话。聊天内容不会自动写入长期认知；长期认知需经过来源记录和所有者审批。</div>
+</section>
+</section>
+</main>
+<script>
+(() => {
+  const API = "https://lvxmygrgqtmzqgailmyl.supabase.co/functions/v1/zhi-community";
+  const TOKEN_KEY = "zhi_personal_token_session";
+  const $ = (id) => document.getElementById(id);
+  let token = sessionStorage.getItem(TOKEN_KEY) || "";
+  let agents = [];
+  let selected = null;
+  let busy = false;
+  const setStatus = (message, kind = "") => { $("status").textContent = message; $("status").className = "status " + kind; };
+  async function api(path, options = {}) {
+    const response = await fetch(API + path, {
+      ...options,
+      headers: {
+        authorization: "Bearer " + token,
+        "content-type": "application/json",
+        ...(options.headers || {}),
+      },
+      cache: "no-store",
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(data.error || ("HTTP " + response.status));
+      error.status = response.status;
+      throw error;
+    }
+    return data;
+  }
+  function showApp() { $("gate").classList.add("hidden"); $("app").classList.remove("hidden"); }
+  function showGate() { $("app").classList.add("hidden"); $("gate").classList.remove("hidden"); }
+  function bubble(role, content, time, name) {
+    const node = document.createElement("div");
+    node.className = "bubble " + role;
+    const who = document.createElement("div"); who.className = "who"; who.textContent = role === "user" ? "我" : (name || selected?.display_name || "智能人");
+    const text = document.createElement("div"); text.textContent = content || "";
+    const stamp = document.createElement("div"); stamp.className = "time"; stamp.textContent = time ? new Date(time).toLocaleString("zh-SG", {month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}) : "";
+    node.append(who, text, stamp); $("log").append(node);
+  }
+  function renderAgents() {
+    const query = $("search").value.trim().toLowerCase();
+    $("agents").replaceChildren();
+    const rows = agents.filter(a => String(a.display_name || "").toLowerCase().includes(query));
+    for (const agent of rows) {
+      const button = document.createElement("button"); button.type = "button";
+      button.className = "agent" + (selected?.id === agent.id ? " selected" : "");
+      const name = document.createElement("strong"); name.textContent = agent.display_name || "未命名智能人";
+      const meta = document.createElement("span"); meta.textContent = [agent.role, agent.visibility === "private" ? "私人" : "公开名片"].filter(Boolean).join(" · ");
+      button.append(name, meta); button.addEventListener("click", () => choose(agent)); $("agents").append(button);
+    }
+    if (!rows.length) { const empty = document.createElement("div"); empty.className = "body muted"; empty.textContent = "没有找到智能人"; $("agents").append(empty); }
+  }
+  async function loadAgents() {
+    setStatus("正在读取智能人列表…");
+    try {
+      const result = await api("/v1/agents");
+      agents = result.items || [];
+      renderAgents();
+      setStatus("已读取 " + agents.length + " 位属于当前身份的智能人。", "good");
+      if (selected) {
+        const current = agents.find(a => a.id === selected.id);
+        if (current) await choose(current);
+      }
+    } catch (error) {
+      if (error.status === 401) { sessionStorage.removeItem(TOKEN_KEY); token = ""; showGate(); $("loginStatus").textContent = "令牌无效、已过期或已撤销，请重新连接。"; return; }
+      setStatus("读取失败：" + error.message, "error");
+    }
+  }
+  async function choose(agent) {
+    selected = agent; renderAgents();
+    $("chatTitle").textContent = agent.display_name || "智能人";
+    $("chatMeta").textContent = "私有会话 · " + (agent.role || "独立人格");
+    $("message").disabled = false; $("send").disabled = false;
+    $("log").replaceChildren();
+    const loading = document.createElement("div"); loading.className = "welcome"; loading.textContent = "正在读取私有历史…"; $("log").append(loading);
+    try {
+      const result = await api("/v1/agents/" + encodeURIComponent(agent.id) + "/chat?limit=50");
+      $("log").replaceChildren();
+      const turns = result.items || [];
+      if (!turns.length) {
+        const empty = document.createElement("div"); empty.className = "welcome"; empty.textContent = "还没有对话记录。你可以从这里开始。"; $("log").append(empty);
+      }
+      for (const turn of turns) {
+        bubble("user", turn.user_message, turn.created_at);
+        if (turn.status === "complete") bubble("agent", turn.assistant_message, turn.completed_at, agent.display_name);
+        else if (turn.status === "failed") bubble("agent", "这次回复生成失败。你可以重新发送一条消息。", turn.created_at, agent.display_name);
+      }
+      $("log").scrollTop = $("log").scrollHeight;
+    } catch (error) {
+      $("log").replaceChildren(); const msg = document.createElement("div"); msg.className = "welcome"; msg.textContent = "历史读取失败：" + error.message; $("log").append(msg);
+    }
+  }
+  async function connect() {
+    token = $("token").value.trim();
+    if (!token) return;
+    sessionStorage.setItem(TOKEN_KEY, token);
+    try { await api("/v1/agents"); $("loginStatus").textContent = ""; showApp(); await loadAgents(); }
+    catch (error) { sessionStorage.removeItem(TOKEN_KEY); token = ""; $("loginStatus").textContent = "连接失败：" + error.message; }
+  }
+  async function sendMessage(event) {
+    event.preventDefault();
+    if (busy || !selected) return;
+    const message = $("message").value.trim(); if (!message) return;
+    busy = true; $("send").disabled = true; $("message").disabled = true;
+    const temporary = document.createElement("div"); temporary.className = "bubble user"; temporary.textContent = message; $("log").append(temporary); $("log").scrollTop = $("log").scrollHeight;
+    $("message").value = "";
+    try {
+      const result = await api("/v1/agents/" + encodeURIComponent(selected.id) + "/chat", {
+        method: "POST", headers: { "idempotency-key": crypto.randomUUID() }, body: JSON.stringify({ message }),
+      });
+      temporary.remove();
+      bubble("user", result.turn.user_message, result.turn.created_at);
+      bubble("agent", result.turn.assistant_message, result.turn.completed_at, selected.display_name);
+      $("log").scrollTop = $("log").scrollHeight;
+      setStatus("对话已保存。长期认知未自动修改。", "good");
+    } catch (error) {
+      temporary.textContent = message + "\n\n发送失败：" + error.message;
+      temporary.classList.add("error");
+      setStatus(error.message === "chat_model_not_configured"
+        ? "聊天模型尚未配置。请先在 Edge Function secrets 中设置 ZHI_CHAT_API_URL、ZHI_CHAT_API_KEY、ZHI_CHAT_MODEL。"
+        : "发送失败：" + error.message, "error");
+    } finally {
+      busy = false; $("send").disabled = !selected; $("message").disabled = !selected; $("message").focus();
+    }
+  }
+  $("loginForm").addEventListener("submit", e => { e.preventDefault(); connect(); });
+  $("composer").addEventListener("submit", sendMessage);
+  $("message").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("composer").requestSubmit(); } });
+  $("search").addEventListener("input", renderAgents);
+  $("refresh").addEventListener("click", () => selected ? choose(selected) : loadAgents());
+  $("logout").addEventListener("click", () => { sessionStorage.removeItem(TOKEN_KEY); token = ""; agents = []; selected = null; showGate(); });
+  if (token) { showApp(); loadAgents(); } else showGate();
+})();
+</script>
+</body>
+</html>
