@@ -911,43 +911,6 @@ export function createCommunityHandler(
       return reply(result);
     }
 
-    // Agent scene environment is shared public scene state, gated by the agent's own membership.
-    if (req.method === "GET" && parts.length === 6 && parts[0] === "v1" &&
-        parts[1] === "agents" && parts[3] === "scenes" && parts[5] === "environment") {
-      const agentId = parts[2];
-      const sceneId = parts[4];
-      if (!isUuid(agentId) || !isUuid(sceneId)) return reply({ error: "invalid_argument" }, 400);
-      if (!hasCapability(actor, "community.message.read")) return reply({ error: "forbidden", detail: "capability_required" }, 403);
-
-      const { data: agent, error: agentError } = await db.from("zhi_agents")
-        .select("id,owner_user_id,status").eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
-      if (agentError) throw new Error("database_error");
-      if (!agent) return reply({ error: "not_found" }, 404);
-      if (agent.status !== "active") return reply({ error: "conflict", detail: "agent_not_active" }, 409);
-
-      const { data: world, error: worldError } = await db.from("zhi_worlds")
-        .select("id,name,description,visibility,status,environment_state")
-        .eq("id", sceneId).maybeSingle();
-      if (worldError) throw new Error("database_error");
-      if (!world) return reply({ error: "not_found" }, 404);
-      if (world.status !== "open") return reply({ error: "conflict", detail: "scene_not_open" }, 409);
-
-      const { data: membership, error: membershipError } = await db.from("zhi_world_memberships")
-        .select("id,principal_user_id,status,revoked_at,agent_id,expires_at,capabilities")
-        .eq("world_id", sceneId).eq("principal_user_id", actor.userId).eq("agent_id", agentId)
-        .eq("status", "active").is("revoked_at", null).maybeSingle();
-      if (membershipError) throw new Error("database_error");
-      if (!isAgentMembershipAuthorized(membership, actor.userId, agentId, "message:read")) {
-        return reply({ error: "forbidden", detail: "agent_scene_membership_required" }, 403);
-      }
-
-      return reply({
-        scene: { id: world.id, name: world.name, description: world.description, visibility: world.visibility },
-        environment: computeSceneEnvironment(world.environment_state),
-        access: { principal: "agent", agent_id: agentId, membership: "active" },
-      });
-    }
-
     // Agent messages use the agent's own membership and sender_agent_id namespace.
     // The creator's human membership is never substituted for agent membership.
     if (parts.length === 6 && parts[0] === "v1" && parts[1] === "agents" &&
