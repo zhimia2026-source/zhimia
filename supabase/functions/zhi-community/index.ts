@@ -81,7 +81,11 @@ async function readBody(req: Request): Promise<JsonObject> {
   return value as JsonObject;
 }
 
-function hasCapability(actor: Actor, capability: string): boolean {\n  return Array.isArray(actor.capabilities) && actor.capabilities.includes(capability);\n}\n\nfunction isText(value: unknown, max: number): value is string {
+function hasCapability(actor: Actor, capability: string): boolean {
+  return Array.isArray(actor.capabilities) && actor.capabilities.includes(capability);
+}
+
+function isText(value: unknown, max: number): value is string {
   return typeof value === "string" && value.trim().length > 0 && value.length <= max;
 }
 
