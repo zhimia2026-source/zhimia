@@ -8,6 +8,7 @@ on:
       - "web/zhi-health-advisor-client.js"
       - "web/zhi-token-admin.html"
       - "web/zhi-agent-chat.html"
+      - "web/zhi-community.html"
       - ".github/workflows/health-advisor-pages.yml"
   workflow_dispatch:
 
@@ -33,11 +34,13 @@ jobs:
           cp web/zhi-health-advisor-client.js _site/zhi-health-advisor-client.js
           cp web/zhi-token-admin.html _site/token-admin.html
           cp web/zhi-agent-chat.html _site/chat.html
+          cp web/zhi-community.html _site/community.html
           test -s _site/index.html
           test -s _site/zhi-health-advisor-client.js
           test -s _site/token-admin.html
           test -s _site/chat.html
-          ! grep -Eiq '(service_role|SUPABASE_SERVICE_ROLE_KEY|AGNES_API_KEY|sk-[A-Za-z0-9]{20,})' _site/index.html _site/token-admin.html _site/zhi-health-advisor-client.js _site/chat.html
+          test -s _site/community.html
+          ! grep -Eiq '(service_role|SUPABASE_SERVICE_ROLE_KEY|AGNES_API_KEY|sk-[A-Za-z0-9]{20,})' _site/index.html _site/token-admin.html _site/zhi-health-advisor-client.js _site/chat.html _site/community.html
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
