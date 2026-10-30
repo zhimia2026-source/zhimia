@@ -231,3 +231,19 @@ MOU 是工程功能闭环，不是意识或主观体验的证明。
 **尚未实现：** 持久化的修订提案表与 API、所有者审批/拒绝 API、认知版本快照与回滚 API、真实 Supabase 双账号 HTTP E2E、前端聊天接入。现有 cognitive_cycle_helpers.ts 与 cognitive_version_helpers.ts 仍是纯函数参考逻辑，不能视为这些流程已持久化或已上线。
 
 **安全边界：** 反馈只是新的观察记录，不会自动改变智能体人格、长期记忆策略、提示词、权限或模型。任何后续认知修订必须保留证据链、由所有者明确批准、产生新版本并支持审计/回滚；场景共享消息仍不得自动进入私有认知记录。
+
+
+## 14. 持久化认知修订提案（2026-10-30）
+
+本阶段把“候选认知变化”从纯函数计算推进到独立的私有持久化对象，但尚未执行认知状态变更。
+
+- 新增 `zhi_cognition_revision_proposals`：保存基础记录 ID、基础版本、目标对象、候选状态、创建时间与审核状态。
+- 新增 `zhi_cognition_revision_proposal_feedback`：将提案与反馈证据逐条关联；复合外键要求提案、反馈记录属于同一个 owner 与 agent。
+- 新增服务端 RPC `zhi_create_cognition_revision_proposal`：在单个事务内校验基础记录为带预测的 hypothesis、校验 1–20 条反馈记录均属于相同 owner/agent 且明确引用该假设，再写入提案及证据关联。
+- 新增 API：`GET /v1/agents/{agent_id}/cognition/proposals` 与 `POST /v1/agents/{agent_id}/cognition/{record_id}/proposals`。提案固定为 `shadow_proposed` 且 `requires_human_review=true`。
+- cognition records 增加 `change_kind`、`previous_record_id`、`source_proposal_id` 元数据，为后续追加式修订/回滚建立引用约束；当前 API 尚未写入这些修订版本字段。
+- 新增 `revision_proposal_routes_test.ts`，覆盖提案持久化路径、跨账号隐藏和无效 ID 拒绝。该 API 测试使用 mock DB；数据库 RPC 和约束在一次性 PostgreSQL CI 中验证。
+
+GitHub Actions run `41016332139`（commit `a50ec1292595c597ba5038032f16f0a6a91b8ffe`）中，Edge Function 类型检查与全部测试通过；社区、私有认知、修订提案三项迁移均在 disposable PostgreSQL 成功应用，SQL 冒烟测试通过。
+
+**尚未实现：** 提案批准/拒绝 API、原子生成不可变认知版本、回滚 API、真实 Supabase 双账号端到端验收。提案持久化不等于提案已获批准，也不等于智能人认知已改变。
