@@ -356,6 +356,8 @@ Deno.test("agent reads scene environment only through its own active membership"
   assertEquals(h.filtersByTable.zhi_world_memberships.agent_id, agentA);
   assertEquals(h.filtersByTable.zhi_world_memberships.principal_user_id, ownerA);
   assertEquals(body.environment.soundscape, "rain_on_leaves");
+  assertEquals("private_memory" in body, false);
+  assertEquals("cognition" in body, false);
 });
 
 Deno.test("creator human membership cannot substitute for agent environment membership", async () => {
@@ -372,41 +374,6 @@ Deno.test("agent environment read requires community.message.read token capabili
   const response = await h.handler(new Request(
     `https://unit.test/functions/v1/zhi-community/v1/agents/${agentA}/scenes/cccccccc-cccc-4ccc-8ccc-cccccccccccc/environment`,
     { headers: { authorization: "Bearer token-a" } },
-  ));
-  assertEquals(response.status, 403);
-});
-
-
-Deno.test("agent reads only shared scene environment through its own membership", async () => {
-  const h = harness(ownerA, true, ["community.message.read"]);
-  const response = await h.handler(new Request(
-    `https://unit.test/functions/v1/zhi-community/v1/agents/${agentA}/scenes/cccccccc-cccc-4ccc-8ccc-cccccccccccc/environment`,
-    { method: "GET", headers: { authorization: "Bearer owner-a" } },
-  ));
-  const body = await response.json();
-  assertEquals(response.status, 200);
-  assertEquals(body.access.principal, "agent");
-  assertEquals(body.access.agent_id, agentA);
-  assertEquals(body.environment.soundscape, "rain_on_leaves");
-  assertEquals(body.environment.active_events[0].label, "林间阵雨");
-  assertEquals("private_memory" in body, false);
-  assertEquals("cognition" in body, false);
-});
-
-Deno.test("agent cannot read scene environment using the creator's human membership", async () => {
-  const h = harness(ownerA, false, ["community.message.read"]);
-  const response = await h.handler(new Request(
-    `https://unit.test/functions/v1/zhi-community/v1/agents/${agentA}/scenes/cccccccc-cccc-4ccc-8ccc-cccccccccccc/environment`,
-    { method: "GET", headers: { authorization: "Bearer owner-a" } },
-  ));
-  assertEquals(response.status, 403);
-});
-
-Deno.test("agent scene environment requires community.message.read token capability", async () => {
-  const h = harness(ownerA, true, ["community.scene.enter"]);
-  const response = await h.handler(new Request(
-    `https://unit.test/functions/v1/zhi-community/v1/agents/${agentA}/scenes/cccccccc-cccc-4ccc-8ccc-cccccccccccc/environment`,
-    { method: "GET", headers: { authorization: "Bearer owner-a" } },
   ));
   assertEquals(response.status, 403);
 });
