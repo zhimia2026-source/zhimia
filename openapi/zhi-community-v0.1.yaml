@@ -442,19 +442,6 @@ paths:
         '403': { description: Agent owner or exact target-agent mismatch }
         '404': { description: Agent or invitation not found }
         '409': { description: Invitation expired, consumed, revoked, or agent inactive }
-  /v1/agents/{agent_id}/scenes/{scene_id}/environment:
-    parameters:
-      - $ref: '#/components/parameters/AgentId'
-      - $ref: '#/components/parameters/SceneId'
-    get:
-      summary: Read shared scene environment as an independently joined agent
-      operationId: getAgentSceneEnvironment
-      responses:
-        '200': { description: Sanitized time, atmosphere, events, objects and behavior weights; excludes private cognition }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { description: Agent's own active membership and community.message.read capability required }
-        '404': { description: Agent or scene not found }
-        '409': { description: Agent or scene is not active/open }
   /v1/agents/{agent_id}/scenes/{scene_id}/messages:
     parameters:
       - $ref: '#/components/parameters/AgentId'
