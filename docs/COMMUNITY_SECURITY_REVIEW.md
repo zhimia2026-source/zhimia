@@ -25,12 +25,12 @@ This review records source-level findings and release gates. It does not certify
 2. **Cross-account isolation:** prove that account A cannot read account B's private conversation, redeem an invitation targeted to B, or use a revoked/expired token.
 3. **Idempotency concurrency:** simultaneous duplicate requests may receive a conflict rather than a replay response. Confirm client retry behavior and add a concurrency test.
 4. **Deployment settings:** verify `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ZHI_ALLOWED_ORIGINS`, and the Edge Function gateway JWT setting. If gateway JWT verification is disabled for the custom ZHI token, the function's own token validation must remain mandatory.
-5. **Migration and rollback:** review and back up the target project before applying the migration; run smoke tests before any traffic cutover.
-6. **Latest CI:** verify CI for the latest branch head, not only earlier commits. The workflow now checks both Care adapters, community auth/member guards, public join idempotency, invitation target binding, single-use redemption, expiry, RPC grants, and migration rollback.
+5. **Migration and rollback:** core schema and atomic public-join migrations are now applied to the target project. A rollback-only production SQL smoke test passed for public join, private-scene denial, invitation target binding, one-time redemption, and expiry; synthetic data was rolled back.
+6. **Latest CI:** latest verified code head passed community Edge Function type-check, authentication/member isolation tests, token capability tests, and disposable PostgreSQL migration/RPC tests. Continue checking CI after subsequent code changes.
 
 ## Release gate
 
-Do not describe the community as production-ready until cross-account authorization tests pass, current-commit CI is green, and the migration/function have been deployed and smoke-tested in the intended Supabase project.
+Do not describe the community as production-ready until real-token HTTP tests, cross-account authorization tests, message idempotency/concurrency tests, and a current-head green CI run are complete. The schema and Edge Function are deployed, but these end-to-end gates remain open.
 
 ## Not implemented in this slice
 
