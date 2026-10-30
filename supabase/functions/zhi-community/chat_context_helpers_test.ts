@@ -34,3 +34,16 @@ Deno.test("private chat context caps cognition records and ignores malformed val
   assertEquals(context.private_cognition_records.length, 12);
   assertEquals(context.private_cognition_records[0].confidence, null);
 });
+
+Deno.test("private chat history keeps only eight bounded completed turns", () => {
+  const { buildPrivateChatHistory } = await import("./chat_context_helpers.ts");
+  const turns = Array.from({ length: 12 }, (_, index) => ({
+    user_message: "user-" + index + " " + "u".repeat(4000),
+    assistant_message: "assistant-" + index + " " + "a".repeat(4000),
+  }));
+  const history = buildPrivateChatHistory(turns);
+  assertEquals(history.length, 16);
+  assertStringIncludes(history[0].content, "user-4");
+  assertEquals(history[0].content.length <= 2510, true);
+  assertEquals(history[15].content.includes("assistant-11"), true);
+});
