@@ -682,6 +682,7 @@ export function createCommunityHandler(
 
     if (req.method === "GET" && parts.length === 4 && parts[0] === "v1" && parts[1] === "scenes" && parts[3] === "environment") {
       const sceneId = parts[2];
+      if (!isUuid(sceneId)) return reply({ error: "invalid_argument" }, 400);
       const { data: world, error: worldError } = await db.from("zhi_worlds")
         .select("id,status,environment_state").eq("id", sceneId).maybeSingle();
       if (worldError) throw new Error("database_error");
@@ -700,6 +701,7 @@ export function createCommunityHandler(
 
     if (req.method === "POST" && parts.length === 4 && parts[0] === "v1" && parts[1] === "scenes" && parts[3] === "environment") {
       const sceneId = parts[2];
+      if (!isUuid(sceneId)) return reply({ error: "invalid_argument" }, 400);
       const body = await readBody(req);
       let environmentState: Record<string, unknown>;
       try {
