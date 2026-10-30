@@ -620,6 +620,9 @@ export function createCommunityHandler(
     }
 
     if (req.method === "GET" && path === "/v1/scenes") {
+      if (!hasCapability(actor, "community.scene.discover")) {
+        return reply({ error: "forbidden", detail: "capability_required" }, 403);
+      }
       const { data, error } = await db.from("zhi_worlds")
         .select("id,name,description,visibility,entry_policy,status,rules_version,created_at")
         .eq("visibility", "public").eq("entry_policy", "open").eq("status", "open").order("created_at", { ascending: false }).limit(100);
