@@ -6,7 +6,32 @@ VALUES
   ('22222222-2222-4222-8222-222222222222'),
   ('33333333-3333-4333-8333-333333333333');
 
-DO $$
+DO $community_capability_test$
+BEGIN
+  INSERT INTO public.zhi_personal_access_tokens (capabilities)
+  VALUES (array['community.message.read','community.message.send','community.scene.create']::text[]);
+  INSERT INTO public.zhi_refresh_credentials (capabilities)
+  VALUES (array['community.scene.enter','community.scene.invite']::text[]);
+
+  BEGIN
+    INSERT INTO public.zhi_personal_access_tokens (capabilities)
+    VALUES (array['community.scene.delete']::text[]);
+    RAISE EXCEPTION 'unknown community capability was accepted';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO public.zhi_refresh_credentials (capabilities)
+    VALUES (array['community.message.read','unknown.scope']::text[]);
+    RAISE EXCEPTION 'unknown refresh capability was accepted';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+END;
+$community_capability_test$;
+
+DO $
 DECLARE
   v_result jsonb;
   v_scene_id uuid;
