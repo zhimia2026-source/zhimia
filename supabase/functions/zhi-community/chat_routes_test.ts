@@ -7,8 +7,9 @@ const ownerB = "22222222-2222-4222-8222-222222222222";
 const agentA = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const agentB = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
-function harness(actorId: string, sceneAllowed = false) {
+function harness(actorId: string, sceneAllowed = false, capabilities = ["community.scene.enter", "community.scene.discover"]) {
   const queriedTables: string[] = [];
+  const rpcCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
   const filtersByTable: Record<string, Record<string, unknown>> = {};
   let capturedModelMessages: unknown[] = [];
   const db = {
@@ -85,10 +86,14 @@ function harness(actorId: string, sceneAllowed = false) {
       };
       return builder;
     },
+    rpc(name: string, args: Record<string, unknown>) {
+      rpcCalls.push({ name, args });
+      return Promise.resolve({ data: { scene_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", agent_id: actorId === ownerA ? agentA : agentB, membership: name.includes("revoke") ? "revoked" : "active" }, error: null });
+    },
   } as unknown as SupabaseClient;
   const handler = createCommunityHandler({
     dbClient: () => db,
-    authenticate: async () => ({ userId: actorId }),
+    authenticate: async () => ({ userId: actorId, capabilities }),
     chatConfig: { apiUrl: "https://model.test/v1/chat/completions", apiKey: "test-only", model: "test-model" },
     fetchModel: async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? "{}"));
@@ -98,7 +103,7 @@ function harness(actorId: string, sceneAllowed = false) {
       });
     },
   });
-  return { handler, queriedTables, filtersByTable, getModelMessages: () => capturedModelMessages };
+  return { handler, queriedTables, filtersByTable, rpcCalls, getModelMessages: () => capturedModelMessages };
 }
 
 Deno.test("private agent chat loads only the authenticated owner-agent cognition and chat history", async () => {
@@ -177,4 +182,48 @@ Deno.test("private chat rejects a scene when the owner has no active message-rea
   ));
   assertEquals(response.status, 403);
   assertEquals(JSON.stringify(h.getModelMessages()), "[]");
+});
+
+
+Deno.test("creator explicitly joins their own agent to a public scene", async () => {
+  const h = harness(ownerA);
+  const response = await h.handler(new Request(
+    `https://unit.test/functions/v1/zhi-community/v1/agents/${agentA}/scenes/cccccccc-cccc-4ccc-8ccc-cccccccccccc/join`,
+    { method: "POST", headers: { authorization: "Bearer token-a" } },
+  ));
+  assertEquals(response.status, 200);
+  assertEquals(h.rpcCalls.length, 1);
+  assertEquals(h.rpcCalls[0].name, "zhi_join_public_world_agent");
+  assertEquals(h.rpcCalls[0].args.p_owner_user_id, ownerA);
+  assertEquals(h.rpcCalls[0].args.p_agent_id, agentA);
+});
+
+Deno.test("another owner cannot join an agent they do not own", async () => {
+  const h = harness(ownerB);
+  const response = await h.handler(new Request(
+    `https://unit.test/functions/v1/zhi-community/v1/agents/${agentA}/scenes/cccccccc-cccc-4ccc-8ccc-cccccccccccc/join`,
+    { method: "POST", headers: { authorization: "Bearer token-b" } },
+  ));
+  assertEquals(response.status, 404);
+  assertEquals(h.rpcCalls.length, 0);
+});
+
+Deno.test("agent scene join requires explicit community.scene.enter capability", async () => {
+  const h = harness(ownerA, false, ["community.scene.discover"]);
+  const response = await h.handler(new Request(
+    `https://unit.test/functions/v1/zhi-community/v1/agents/${agentA}/scenes/cccccccc-cccc-4ccc-8ccc-cccccccccccc/join`,
+    { method: "POST", headers: { authorization: "Bearer token-a" } },
+  ));
+  assertEquals(response.status, 403);
+  assertEquals(h.rpcCalls.length, 0);
+});
+
+Deno.test("creator can revoke their own agent scene membership", async () => {
+  const h = harness(ownerA);
+  const response = await h.handler(new Request(
+    `https://unit.test/functions/v1/zhi-community/v1/agents/${agentA}/scenes/cccccccc-cccc-4ccc-8ccc-cccccccccccc/leave`,
+    { method: "POST", headers: { authorization: "Bearer token-a" } },
+  ));
+  assertEquals(response.status, 200);
+  assertEquals(h.rpcCalls[0].name, "zhi_revoke_agent_world_membership");
 });
