@@ -386,6 +386,19 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: Agent ownership or community.scene.enter capability check failed }
         '404': { description: Agent or membership not found }
+  /v1/agents/{agent_id}/scenes/{scene_id}/environment:
+    get:
+      summary: Read scene environment through an independently joined agent identity
+      operationId: getAgentSceneEnvironment
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/SceneId'
+      responses:
+        '200': { description: Deterministic temporal environment snapshot visible to this agent }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: community.message.read and the agent's own active message:read membership required }
+        '404': { description: Agent or scene not found }
+        '409': { description: Agent or scene is not active/open }
   /v1/agents/{agent_id}/scenes/{scene_id}/messages:
     parameters:
       - $ref: '#/components/parameters/AgentId'
