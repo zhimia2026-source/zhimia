@@ -8,6 +8,7 @@ This review records source-level findings and release gates. It does not certify
 ## Confirmed design boundaries
 
 - Community requests authenticate a ZHI personal access token by hashing the presented bearer token and looking up its hash in `zhi_personal_access_tokens`.
+- Every community route requires an independent token capability: discovery, creation, entry, invitation issuance, message read, and message send are separate scopes. Message send never implies message read.
 - The community migration removes direct table privileges from `anon` and `authenticated`; browser requests are intended to use the server-side Edge Function.
 - Private-scene invitations use server-only RPCs. The plaintext invitation token is returned once; only its hash is stored.
 - Scene message reads are limited to open `members` conversations and require active scene membership plus `message:read`.
@@ -19,7 +20,8 @@ This review records source-level findings and release gates. It does not certify
 
 ## Required before production
 
-1. **Token revocation race:** code fix committed in `e633363aaadcf1b7b03fd2d958daf947d50d3b45`; the authentication path now uses `auth_helpers.ts` to accept only a successful conditional update that returns a row. Regression cases were added in `auth_helpers_test.ts` for success, no matching row, database error, and mixed data/error. The GitHub Actions workflow now runs `deno test supabase/functions/zhi-community/auth_helpers_test.ts`; execution must still be confirmed on the latest head.
+1. **Route capability enforcement:** the Edge Function now checks each route's token capability; CI includes helper tests proving discovery/create and message read/send are not implicitly interchangeable.
+2. **Token revocation race:** code fix committed in `e633363aaadcf1b7b03fd2d958daf947d50d3b45`; the authentication path now uses `auth_helpers.ts` to accept only a successful conditional update that returns a row. Regression cases were added in `auth_helpers_test.ts` for success, no matching row, database error, and mixed data/error. The GitHub Actions workflow now runs `deno test supabase/functions/zhi-community/auth_helpers_test.ts`; execution must still be confirmed on the latest head.
 2. **Cross-account isolation:** prove that account A cannot read account B's private conversation, redeem an invitation targeted to B, or use a revoked/expired token.
 3. **Idempotency concurrency:** simultaneous duplicate requests may receive a conflict rather than a replay response. Confirm client retry behavior and add a concurrency test.
 4. **Deployment settings:** verify `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ZHI_ALLOWED_ORIGINS`, and the Edge Function gateway JWT setting. If gateway JWT verification is disabled for the custom ZHI token, the function's own token validation must remain mandatory.
