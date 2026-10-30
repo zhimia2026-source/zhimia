@@ -14,9 +14,13 @@ for (const required of [
   "https://lvxmygrgqtmzqgailmyl.supabase.co/functions/v1/zhi-community",
   "sessionStorage.setItem(TOKEN_KEY,token)",
   "/v1/scenes",
+  "/v1/scenes/"+encodeURIComponent(selected.id)+"/environment",
   "/v1/scenes/mine",
   "/v1/invitations/redeem",
   "/messages",
+  "async function loadEnvironment",
+  "async function saveEnvironment",
+  "environmentPanel",
   "idempotency-key",
   "visibility",
 ]) {
