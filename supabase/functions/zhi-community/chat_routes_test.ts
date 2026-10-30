@@ -72,6 +72,7 @@ function harness(actorId: string) {
   const handler = createCommunityHandler({
     dbClient: () => db,
     authenticate: async () => ({ userId: actorId }),
+    chatConfig: { apiUrl: "https://model.test/v1/chat/completions", apiKey: "test-only", model: "test-model" },
     fetchModel: async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? "{}"));
       capturedModelMessages = body.messages;
