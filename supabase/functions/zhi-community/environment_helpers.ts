@@ -120,8 +120,6 @@ export function computeSceneEnvironment(raw: unknown, now = new Date()) {
     })),
     behavior_weights: behaviorWeights,
   };
-  if (new TextEncoder().encode(JSON.stringify(normalized)).length > 32768) throw new Error("environment_config_too_large");
-  return normalized;
 }
 
 
