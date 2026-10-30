@@ -16,8 +16,8 @@
 | health.history.read | 读取本人聊天历史 | 网关已执行 |
 | health.history.delete | 删除本人聊天历史 | 网关已执行 |
 | health.consent.manage | 读取/修改本人聊天保存同意 | 网关已执行 |
-| care.read / care.write | 访问本人 CareState | 已登记；个人令牌适配器未开放 |
-| care.approve | 审批本人 Care 动作票据 | 已登记；个人令牌适配器未开放 |
+| care.read / care.write | 访问本人 CareState | 适配器源码已入库；尚未部署，需通过安全测试 |
+| care.approve | 审批本人 Care 动作票据 | 适配器源码已接入独立能力门；尚未部署，需通过审批测试 |
 | agent.feed.read | 读取授权智能人的主动消息 | 已登记；接口未开放 |
 | broadcast.send | 发起广播 | 已登记；接口未开放 |
 | tool.execute | 调用外部工具 | 已登记；监督审批和执行网关未接通 |
@@ -30,7 +30,7 @@
 新签发令牌默认只获得 `health.chat`、`health.history.read`、`health.consent.manage`。历史删除、Care、工具、广播、场景和主动消息权限均不默认授予。
 
 ## Care 身份边界
-当前 `zhi-care` 仍要求 Supabase Auth JWT（`verify_jwt=true`），并自行验证用户身份。个人 opaque token 即使被授予 `care.read` 或 `care.write`，也不能直接传给 `zhi-care`。必须先实现服务端适配器：验证个人令牌、校验能力、推导 `user_id`，再调用 Care 核心逻辑；不能关闭 JWT 验证，也不能让客户端传 `user_id` 冒充身份。
+当前 `zhi-care` 仍要求 Supabase Auth JWT（`verify_jwt=true`），并自行验证用户身份。个人 opaque token 即使被授予 `care.read` 或 `care.write`，也不能直接传给 `zhi-care`。已新增独立源码 `supabase/functions/zhi-care-personal/index.ts`（未部署）：它通过 SHA-256 哈希查验个人令牌、从数据库推导 `user_id`，并按操作分别检查 `care.read`、`care.write`、`care.approve`。正式启用前必须完成静态检查、真实令牌 HTTP 测试、双账号隔离和审批票据测试。原 `zhi-care` 仍保持 `verify_jwt=true`，不能为了个人令牌而关闭其 JWT 验证，也不能让客户端传 `user_id` 冒充身份。
 
 ## 验收
 - [x] 数据库添加访问令牌与续签凭证能力字段。
@@ -40,5 +40,7 @@
 - [x] 管理员签发接口校验能力名称、数量与重复项。
 - [x] 管理员令牌列表返回能力元数据，不返回原始令牌。
 - [ ] 真实令牌允许/拒绝路径的端到端 HTTP 测试。
-- [ ] Care 个人令牌适配器与双账号隔离测试。
+- [x] Care 个人令牌适配器独立源码草案（未部署）。
+- [ ] Care 适配器真实令牌 HTTP 测试与双账号隔离测试。
+- [ ] 审批票据过期、重复审批、跨账号审批拒绝测试。
 - [ ] 聊天前端能力展示/授权交互。
