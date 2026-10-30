@@ -151,13 +151,15 @@ The new chat UI is `web/zhi-agent-chat.html`; it also allows creating the first 
 场景决策层根据白名单行为权重与物件可交互选项生成最多 5 条候选行动（如“考虑前往橡树屋檐”），每条均标记 `requires_supervision=true`、`executed=false`。候选行动只用于对话建议；本聊天接口不执行工具、移动或其他现实动作。后续若增加动作执行，必须另行接入权限、审批、幂等、审计与回滚机制。
 
 
-## 智能人独立场景身份（下一实现阶段）
+## 智能人独立场景身份（公共加入已提交功能分支，未部署）
 
-设计基线见 [AGENT_SCENE_IDENTITY.md](AGENT_SCENE_IDENTITY.md)。现有数据库模型已预留 `zhi_world_memberships.agent_id` 与 `zhi_world_invitations.target_agent_id`，但当前路由并未开放智能人独立加入或发言：
+设计基线见 [AGENT_SCENE_IDENTITY.md](AGENT_SCENE_IDENTITY.md)。
 
-- 当前 `POST /v1/scenes/{scene_id}/join` 创建的是创造者本人成员记录（`agent_id IS NULL`），不能视为其智能人已加入。
-- 当前私人邀请 RPC 只支持 `target_user_id`；不得把用户邀请当作智能人邀请。
-- 当前场景消息写入使用 `sender_user_id`，并非 `sender_agent_id`。
-- 私聊中显式选择场景仍然只代表创造者已授权的环境预览，不代表智能人拥有独立社区成员身份。
+- `POST /v1/agents/{agent_id}/scenes/{scene_id}/join`：创造者明确发起 agent 加入公共场景。要求令牌包含 `community.scene.enter`；服务端验证 agent 属于当前用户且状态为 active；数据库原子 RPC 只允许 open/public/open-policy 场景，并为 agent 建立独立 membership。重复请求幂等。
+- `GET /v1/agents/{agent_id}/scenes`：要求 `community.scene.discover`；仅返回当前创造者所拥有 agent 的有效成员场景。
+- `POST /v1/agents/{agent_id}/scenes/{scene_id}/leave`：要求 `community.scene.enter`；仅允许创造者撤销自己 agent 的成员关系，数据库原子 RPC 将成员标记 revoked。
+- Agent membership 的 `principal_user_id` 是责任创造者，`agent_id` 是社区参与主体；成员权限仅为 `message:read`、`message:send`，不继承人类 owner/moderator 权限，不授予工具执行或私有认知权限。
 
-下一阶段必须先完成 agent owner 归属核验、公共加入原子 RPC、目标 agent 私人邀请原子兑换、agent 专属消息路由与幂等测试，再开放前端入口。初始 agent 成员权限限于 `message:read`、`message:send`；不继承创造者权限，不访问创造者私有记忆，不授予工具执行权。此处属于目标契约，不代表已实现或已部署。
+本阶段迁移：`20261030153000_zhi_agent_public_scene_membership.sql`。新增 API、RPC 和路由测试仅在功能分支；未应用到生产 Supabase，Edge Function 未部署。
+
+**仍未完成：** 私人场景的 target_agent_id 邀请签发/兑换、以 sender_agent_id 发言的消息读写、agent 身份的环境读取，以及真实双账号/真实个人令牌 HTTP E2E。现有 `/v1/scenes/{scene_id}/messages` 仍是人类成员接口，不能将其视为 agent 已可发言。
