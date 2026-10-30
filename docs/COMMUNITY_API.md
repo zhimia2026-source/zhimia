@@ -60,4 +60,4 @@ python -m unittest discover -s tests -v
 
 ## 部署状态
 
-Edge Function、数据库迁移和自动化检查已提交到功能分支，**尚未部署**。CI 工作流执行 `deno check`、认证/成员隔离测试，并在一次性 PostgreSQL 中验证迁移、场景创建、公共场景幂等加入、私人场景拒绝公开加入、邀请目标绑定/一次性消费/过期和 RPC 权限。仍须以最新 GitHub Actions 运行结果为准。部署前还需验证个人令牌认证、双账号隔离和消息幂等性，并确认 Supabase Gateway 不会在函数代码执行前把自定义个人令牌误判为 Supabase Auth JWT。
+社区核心 schema、原子公共加入迁移与 Edge Function 已提交到功能分支，**尚未部署**。个人令牌社区 capability 白名单迁移已应用到目标 Supabase，`zhi-token-admin` v13 已部署以支持签发新能力。CI 工作流执行 `deno check`、认证/成员隔离测试，并在一次性 PostgreSQL 中验证迁移、场景创建、公共场景幂等加入、私人场景拒绝公开加入、邀请目标绑定/一次性消费/过期和 RPC 权限。仍须以最新 GitHub Actions 运行结果为准。部署社区 Edge Function 前仍需验证个人令牌认证、双账号隔离和消息幂等性，并确认部署时 `verify_jwt=false`（由函数内 SHA-256 token lookup 自行认证）；不得绕过函数内身份校验。
