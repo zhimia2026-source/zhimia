@@ -7,13 +7,15 @@ export type PrivateAgentProfile = {
 function boundedText(value: unknown, max: number): string {
   if (typeof value !== "string") return "";
   const normalized = value.trim();
-  return normalized.length > max ? normalized.slice(0, max) + "…[truncated]" : normalized;
+  const marker = "…[truncated]";
+  return normalized.length > max ? normalized.slice(0, Math.max(0, max - marker.length)) + marker : normalized;
 }
 
 function boundedJson(value: unknown, max: number): string {
   try {
     const serialized = JSON.stringify(value ?? null);
-    return serialized.length > max ? serialized.slice(0, max) + "…[truncated]" : serialized;
+    const marker = "…[truncated]";
+    return serialized.length > max ? serialized.slice(0, Math.max(0, max - marker.length)) + marker : serialized;
   } catch {
     return "[unserializable]";
   }
