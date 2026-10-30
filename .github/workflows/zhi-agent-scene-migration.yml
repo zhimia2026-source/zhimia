@@ -7,6 +7,7 @@ on:
       - "supabase/migrations/20261030153000_zhi_agent_public_scene_membership.sql"
       - "supabase/migrations/20261030160000_zhi_agent_private_scene_invitations.sql"
       - "supabase/tests/zhi_agent_public_scene_membership_smoke.sql"
+      - "scripts/smoke_test_agent_community_e2e.mjs"
       - ".github/workflows/zhi-agent-scene-migration.yml"
   push:
     branches:
@@ -37,6 +38,8 @@ jobs:
           --health-retries 20
     steps:
       - uses: actions/checkout@v4
+      - name: Check local two-account HTTP smoke script syntax
+        run: node --check scripts/smoke_test_agent_community_e2e.mjs
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - name: Prepare minimal Supabase-compatible auth schema and roles
