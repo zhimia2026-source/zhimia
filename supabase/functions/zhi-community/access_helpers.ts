@@ -49,3 +49,22 @@ export function privilegesForPublicRejoin(
     capabilities: ["message:send", "message:read"],
   };
 }
+
+
+/** Agent membership is bound to both its responsible owner and exact agent actor. */
+export function isAgentMembershipAuthorized(
+  membership: MembershipAuthorizationRecord | null | undefined,
+  ownerUserId: string,
+  agentId: string,
+  capability: string,
+  now = Date.now(),
+): boolean {
+  if (!membership || !ownerUserId || !agentId) return false;
+  if (membership.principal_user_id !== ownerUserId || membership.agent_id !== agentId) return false;
+  if (membership.status !== "active" || membership.revoked_at !== null) return false;
+  if (membership.expires_at) {
+    const expiry = Date.parse(membership.expires_at);
+    if (!Number.isFinite(expiry) || expiry <= now) return false;
+  }
+  return Array.isArray(membership.capabilities) && membership.capabilities.includes(capability);
+}
