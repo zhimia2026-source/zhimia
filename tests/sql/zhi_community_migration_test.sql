@@ -1,0 +1,326 @@
+\set ON_ERROR_STOP on
+
+INSERT INTO auth.users (id)
+VALUES
+  ('11111111-1111-4111-8111-111111111111'),
+  ('22222222-2222-4222-8222-222222222222'),
+  ('33333333-3333-4333-8333-333333333333');
+
+DO $community_capability_test$
+BEGIN
+  INSERT INTO public.zhi_personal_access_tokens (capabilities)
+  VALUES (array['community.message.read','community.message.send','community.scene.create']::text[]);
+  INSERT INTO public.zhi_refresh_credentials (capabilities)
+  VALUES (array['community.scene.enter','community.scene.invite']::text[]);
+
+  BEGIN
+    INSERT INTO public.zhi_personal_access_tokens (capabilities)
+    VALUES (array['community.scene.delete']::text[]);
+    RAISE EXCEPTION 'unknown community capability was accepted';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO public.zhi_refresh_credentials (capabilities)
+    VALUES (array['community.message.read','unknown.scope']::text[]);
+    RAISE EXCEPTION 'unknown refresh capability was accepted';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+END;
+$community_capability_test$;
+
+DO $community_repaired_1$
+DECLARE
+  v_result jsonb;
+  v_scene_id uuid;
+  v_owner_count integer;
+BEGIN
+  v_result := public.zhi_create_world_with_owner(
+    '11111111-1111-4111-8111-111111111111',
+    'CI Atomic Scene',
+    'Disposable migration smoke test',
+    'public',
+    'open'
+  );
+
+  v_scene_id := (v_result #>> '{scene,id}')::uuid;
+
+  IF v_result #>> '{membership}' <> 'owner' THEN
+    RAISE EXCEPTION 'RPC did not return owner membership';
+  END IF;
+
+  SELECT count(*) INTO v_owner_count
+  FROM public.zhi_world_memberships
+  WHERE world_id = v_scene_id
+    AND principal_user_id = '11111111-1111-4111-8111-111111111111'
+    AND membership_role = 'owner'
+    AND status = 'active';
+
+  IF v_owner_count <> 1 THEN
+    RAISE EXCEPTION 'Expected exactly one active owner membership, got %', v_owner_count;
+  END IF;
+
+  IF has_function_privilege('anon', 'public.zhi_create_world_with_owner(uuid,text,text,text,text)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'anon must not execute scene creation RPC';
+  END IF;
+
+  IF has_function_privilege('authenticated', 'public.zhi_create_world_with_owner(uuid,text,text,text,text)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'authenticated must not execute scene creation RPC';
+  END IF;
+
+  IF NOT has_function_privilege('service_role', 'public.zhi_create_world_with_owner(uuid,text,text,text,text)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'service_role must execute scene creation RPC';
+  END IF;
+END;
+$community_repaired_1$;
+
+-- Database-level scene policy must match the only enabled API flows.
+DO $$
+BEGIN
+  BEGIN
+    INSERT INTO public.zhi_worlds (creator_user_id, name, visibility, entry_policy)
+    VALUES ('11111111-1111-4111-8111-111111111111', 'CI Invalid Public Approval', 'public', 'approval');
+    RAISE EXCEPTION 'public approval scene policy was accepted';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO public.zhi_worlds (creator_user_id, name, visibility, entry_policy)
+    VALUES ('11111111-1111-4111-8111-111111111111', 'CI Invalid Private Open', 'private', 'open');
+    RAISE EXCEPTION 'private open scene policy was accepted';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+END;
+$$;
+
+-- Force the second insert to fail and prove the first insert rolls back too.
+CREATE FUNCTION public.zhi_test_reject_membership_insert()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RAISE EXCEPTION 'injected_membership_failure';
+END;
+$$;
+
+CREATE TRIGGER zhi_test_reject_membership_insert
+BEFORE INSERT ON public.zhi_world_memberships
+FOR EACH ROW EXECUTE FUNCTION public.zhi_test_reject_membership_insert();
+
+DO $$
+DECLARE
+  v_before integer;
+  v_after integer;
+BEGIN
+  SELECT count(*) INTO v_before
+  FROM public.zhi_worlds
+  WHERE name = 'CI Rollback Probe';
+
+  BEGIN
+    PERFORM public.zhi_create_world_with_owner(
+      '11111111-1111-4111-8111-111111111111',
+      'CI Rollback Probe',
+      'This scene must not survive a failed owner insert',
+      'public',
+      'open'
+    );
+    RAISE EXCEPTION 'Expected injected membership failure was not raised';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM = 'Expected injected membership failure was not raised' THEN
+      RAISE;
+    END IF;
+    IF SQLERRM <> 'injected_membership_failure' THEN
+      RAISE;
+    END IF;
+  END;
+
+  SELECT count(*) INTO v_after
+  FROM public.zhi_worlds
+  WHERE name = 'CI Rollback Probe';
+
+  IF v_after <> v_before THEN
+    RAISE EXCEPTION 'Atomic rollback failed: scene row was left behind';
+  END IF;
+END;
+$$;
+
+DROP TRIGGER zhi_test_reject_membership_insert ON public.zhi_world_memberships;
+DROP FUNCTION public.zhi_test_reject_membership_insert();
+
+-- Validate key schema invariants without depending on application credentials.
+DO $$
+BEGIN
+  IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid = 'public.zhi_worlds'::regclass) THEN
+    RAISE EXCEPTION 'RLS must be enabled on zhi_worlds';
+  END IF;
+
+  IF has_table_privilege('anon', 'public.zhi_world_messages', 'SELECT') THEN
+    RAISE EXCEPTION 'anon must not directly read community messages';
+  END IF;
+END;
+$$;
+
+-- Public scene join is open to any authenticated principal and idempotent under concurrency.
+DO $public_join_test$
+DECLARE
+  v_scene_id uuid;
+  v_result jsonb;
+  v_count integer;
+BEGIN
+  v_result := public.zhi_create_world_with_owner(
+    '11111111-1111-4111-8111-111111111111',
+    'CI Public Join Scene',
+    'Atomic public join test',
+    'public',
+    'open'
+  );
+  v_scene_id := (v_result #>> '{scene,id}')::uuid;
+
+  v_result := public.zhi_join_public_world(
+    v_scene_id, '22222222-2222-4222-8222-222222222222'
+  );
+  IF v_result ->> 'membership' <> 'active' THEN
+    RAISE EXCEPTION 'public join did not create active membership';
+  END IF;
+
+  -- A repeated join restores/returns the same membership instead of duplicating it.
+  v_result := public.zhi_join_public_world(
+    v_scene_id, '22222222-2222-4222-8222-222222222222'
+  );
+  SELECT count(*) INTO v_count
+  FROM public.zhi_world_memberships
+  WHERE world_id = v_scene_id
+    AND principal_user_id = '22222222-2222-4222-8222-222222222222'
+    AND agent_id IS NULL
+    AND status = 'active';
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'public join is not idempotent; active membership count=%', v_count;
+  END IF;
+
+  IF has_function_privilege('anon', 'public.zhi_join_public_world(uuid,uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'anon must not execute public join RPC';
+  END IF;
+  IF has_function_privilege('authenticated', 'public.zhi_join_public_world(uuid,uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'authenticated must not execute public join RPC';
+  END IF;
+  IF NOT has_function_privilege('service_role', 'public.zhi_join_public_world(uuid,uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'service_role must execute public join RPC';
+  END IF;
+
+  v_result := public.zhi_create_world_with_owner(
+    '11111111-1111-4111-8111-111111111111',
+    'CI Private Join Denial',
+    'Private scenes must not allow public join',
+    'private',
+    'invite_only'
+  );
+  v_scene_id := (v_result #>> '{scene,id}')::uuid;
+  BEGIN
+    PERFORM public.zhi_join_public_world(
+      v_scene_id, '22222222-2222-4222-8222-222222222222'
+    );
+    RAISE EXCEPTION 'private scene accepted public join';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM = 'private scene accepted public join' THEN RAISE; END IF;
+    IF SQLERRM <> 'scene_not_public_open' THEN RAISE; END IF;
+  END;
+END;
+$public_join_test$;
+
+-- Invitation target binding, one-time consumption, and private-scene checks.
+DO $$
+DECLARE
+  v_scene_id uuid;
+  v_result jsonb;
+  v_token_hash text := repeat('a', 64);
+  v_invitation_id uuid;
+BEGIN
+  v_result := public.zhi_create_world_with_owner(
+    '11111111-1111-4111-8111-111111111111',
+    'CI Private Scene',
+    'Private invitation test',
+    'private',
+    'invite_only'
+  );
+  v_scene_id := (v_result #>> '{scene,id}')::uuid;
+
+  v_result := public.zhi_issue_world_invitation(
+    v_scene_id,
+    '11111111-1111-4111-8111-111111111111',
+    '22222222-2222-4222-8222-222222222222',
+    v_token_hash,
+    now() + interval '1 hour'
+  );
+  v_invitation_id := (v_result ->> 'invitation_id')::uuid;
+
+  IF has_function_privilege('anon', 'public.zhi_issue_world_invitation(uuid,uuid,uuid,text,timestamptz)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'anon must not execute invitation issue RPC';
+  END IF;
+  IF has_function_privilege('authenticated', 'public.zhi_redeem_world_invitation(text,uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'authenticated must not execute invitation redeem RPC';
+  END IF;
+  IF NOT has_function_privilege('service_role', 'public.zhi_redeem_world_invitation(text,uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'service_role must execute invitation redeem RPC';
+  END IF;
+
+  BEGIN
+    PERFORM public.zhi_redeem_world_invitation(v_token_hash, '33333333-3333-4333-8333-333333333333');
+    RAISE EXCEPTION 'wrong invitation target was accepted';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM = 'wrong invitation target was accepted' THEN RAISE; END IF;
+    IF SQLERRM <> 'invitation_target_mismatch' THEN RAISE; END IF;
+  END;
+
+  v_result := public.zhi_redeem_world_invitation(v_token_hash, '22222222-2222-4222-8222-222222222222');
+  IF v_result ->> 'membership' <> 'active' THEN
+    RAISE EXCEPTION 'invitation redemption did not create active membership';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.zhi_world_memberships
+    WHERE world_id = v_scene_id
+      AND principal_user_id = '22222222-2222-4222-8222-222222222222'
+      AND agent_id IS NULL AND status = 'active'
+  ) THEN
+    RAISE EXCEPTION 'redeemed invitation did not create membership';
+  END IF;
+
+  BEGIN
+    PERFORM public.zhi_redeem_world_invitation(v_token_hash, '22222222-2222-4222-8222-222222222222');
+    RAISE EXCEPTION 'invitation was redeemed twice';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM = 'invitation was redeemed twice' THEN RAISE; END IF;
+    IF SQLERRM <> 'invitation_unavailable' THEN RAISE; END IF;
+  END;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.zhi_world_invitations
+    WHERE id = v_invitation_id AND used_at IS NOT NULL
+  ) THEN
+    RAISE EXCEPTION 'invitation was not marked consumed';
+  END IF;
+
+  -- An expired invitation must never create or restore membership.
+  INSERT INTO public.zhi_world_invitations (
+    world_id, created_by_user_id, target_user_id, token_hash, expires_at
+  ) VALUES (
+    v_scene_id,
+    '11111111-1111-4111-8111-111111111111',
+    '22222222-2222-4222-8222-222222222222',
+    repeat('b', 64),
+    now() - interval '1 minute'
+  );
+
+  BEGIN
+    PERFORM public.zhi_redeem_world_invitation(repeat('b', 64), '22222222-2222-4222-8222-222222222222');
+    RAISE EXCEPTION 'expired invitation was accepted';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM = 'expired invitation was accepted' THEN RAISE; END IF;
+    IF SQLERRM <> 'invitation_unavailable' THEN RAISE; END IF;
+  END;
+END;
+$$;
+

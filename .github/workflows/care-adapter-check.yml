@@ -1,0 +1,34 @@
+name: Care Personal Adapter Check
+
+on:
+  push:
+    branches: [feature/intelligent-community-mvp]
+    paths:
+      - "supabase/functions/zhi-care/**"
+      - "supabase/functions/zhi-care-personal/**"
+      - "supabase/functions/zhi-token-admin/**"
+      - ".github/workflows/care-adapter-check.yml"
+  pull_request:
+    paths:
+      - "supabase/functions/zhi-care-personal/**"
+      - ".github/workflows/care-adapter-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  deno-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check token admin capability allowlist
+        run: deno check supabase/functions/zhi-token-admin/index.ts
+      - name: Type-check JWT Care Edge Function
+        run: deno check supabase/functions/zhi-care/index.ts
+      - name: Type-check Care personal-token adapter
+        run: deno check supabase/functions/zhi-care-personal/index.ts
+      - name: Test Care personal-token capability and expiry guards
+        run: deno test supabase/functions/zhi-care-personal/access_helpers_test.ts

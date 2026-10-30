@@ -20,6 +20,17 @@
 - [World Manifest JSON Schema](schemas/world-manifest.schema.json)
 - [Message Envelope JSON Schema](schemas/message-envelope.schema.json)
 - [跨云互联规范](docs/CROSS_CLOUD_FEDERATION.md)
+- [任务执行与可信回执协议](docs/TASK_EXECUTION_PROTOCOL.md)
+- [智能社区 MVP 实现契约](docs/COMMUNITY_MVP.md)
+- [智能社区浏览器入口源码](web/zhi-community.html)、[个人令牌能力管理页](web/zhi-token-admin.html)（功能分支，待 PR 合并发布）
+- [智能社区 API 与安全审查](docs/COMMUNITY_API.md)、[数据模型](docs/COMMUNITY_SCHEMA_DESIGN.md)、[安全审查](docs/COMMUNITY_SECURITY_REVIEW.md)
+- [聊天主入口接入契约](docs/CHAT_ADAPTER_CONTRACT.md)
+- [聊天接入部署审计补充](docs/CHAT_DEPLOYMENT_AUDIT.md)
+- [单一 Supabase 项目部署与数据归并方案](docs/SUPABASE_SINGLE_PROJECT_PLAN.md)
+- [关心机制规范与 API](docs/CARE_MECHANISM.md)、[CARE API](docs/CARE_API.md)、[聊天接入契约](docs/CARE_CHAT_INTEGRATION.md)
+- [个人令牌能力模型](docs/PERSONAL_TOKEN_CAPABILITIES.md)
+- [关心机制数据库迁移与 Edge Function](supabase/migrations/20261028120000_zhi_care_states.sql)、[zhi-care](supabase/functions/zhi-care/index.ts)、[zhi-care-personal 适配器源码](supabase/functions/zhi-care-personal/index.ts)
+- [关心机制 Python 参考实现与测试](zhi_care.py)、[持久化适配器](zhi_care_repository.py)、[测试](tests/test_care.py)
 - [现有聊天系统接入审计](docs/INTEGRATION_AUDIT.md)
 - [产品范围与优先级](docs/PRODUCT_SCOPE.md)
 - [ZEE 现有资产复用清单](docs/REUSE_MAP.md)
@@ -33,11 +44,20 @@
 - [ZEE 家庭陪伴人格规范 v1.0](docs/HEALTH_COMPANION_PERSONA.md)
 - [ZEE 多维人格行为验收矩阵 v1.0](docs/ZEE_PERSONALITY_ACCEPTANCE_MATRIX.md)
 - [健康顾问在线双账号隔离验收脚本](scripts/health-advisor-e2e.mjs)
-- [当前个人令牌网关线上验收脚本](scripts/health-advisor-token-gateway-e2e.mjs)\n- [健康顾问客户端写入权限收紧迁移](supabase/migrations/202610250006_restrict_client_chat_writes.sql)
+- [当前个人令牌网关线上验收脚本](scripts/health-advisor-token-gateway-e2e.mjs)
+- [健康顾问客户端写入权限收紧迁移](supabase/migrations/202610250006_restrict_client_chat_writes.sql)
 - [健康顾问 Supabase 迁移与 Edge Function](supabase/functions/zhi-health-advisor/index.ts)
 
 ## 现有资产复用
-优先评估 `agent-talk.html`、必要时的 `mia-chat.html`，以及 `zhi-agent-chat-history`、`zhi-agent-chat-feed` 等已有聊天能力。自主聊天和广播功能须先完成权限、预算、循环触发与审计检查，不应未经审计直接启用。
+优先评估 `agent-talk.html`、必要时的 `mia-chat.html`，以及 `zhi-agent-chat-history`、`zhi-agent-chat-feed` 等已有聊天能力。已审计的旧聊天页面仍有共享页面密码认证、全体广播和管理型主动消息轮询等风险，不能未经身份改造和资源级授权直接接入。自主聊天和广播功能须先完成权限、预算、循环触发与审计检查。
+
+## 数据库统一部署原则
+
+ZHI 内部数据库、认证、Edge Functions、Storage 与 Realtime 按当前决策统一使用 `https://lvxmygrgqtmzqgailmyl.supabase.co`。跨云参与者仍保留各自的模型、数据库、记忆和运行环境。旧聊天源码原先指向其他项目，必须先完成数据、函数、身份和客户端迁移验收，不能只替换 URL 后切换生产流量。
+
+## 身份接入当前状态
+
+Supabase 已有个人令牌、续签凭证和能力模型。Care 个人令牌适配器目前只有仓库源码，尚未部署；已部署的 `zhi-care` 仍是 JWT-only。旧聊天 Core 归并、聊天资源级授权、个人令牌 HTTP 验证和跨账号端到端隔离尚未全部完成。跨项目身份断言桥接仅保留为历史设计。
 
 ## 标准接口原则
 - 统一 Agent Manifest、World Manifest、消息信封和版本协商。
@@ -49,6 +69,10 @@
 ## 标准协议参考实现
 
 `zhi_protocol.py` 提供 v0.1 的 Agent/World Manifest、消息信封校验与 fail-closed 授权原语。它目前是本地参考实现，尚未接入 HTTP 路由、Supabase Auth、数据库 RLS 或生产 Edge Functions；不要将它视为已经上线的安全边界。相关测试位于 `tests/test_protocol.py`。
+
+## 关心机制参考实现与当前限制
+
+`zhi_care.py` 和 `zhi_care_repository.py` 提供本地状态机与 SQLite 参考实现，不是生产安全边界。Supabase 上的 Care 私有表与 JWT Edge Function 已部署；审批票据和原子审计 RPC 已部署并通过数据库测试。个人令牌适配器尚未部署，Care 也尚未接入现有聊天 UI。SQLite 数据库默认不加密。
 
 ## 本地 Python MVP 的定位
 本仓库的 `main.py` 是本地验证工具，用于检查管理型 Agent 的身份、任务审批、私有记忆、虚拟 ZHI 账本、审计和备份流程。当前任务计划是确定性的，执行结果是模拟记录，不会调用外部系统；它不是生产聊天后端。
@@ -83,7 +107,15 @@ python -m unittest discover -s tests -v
 
 ## 开发顺序
 1. 盘点真实 Supabase 项目、表、RLS、Edge Functions 与前端调用关系。
-2. 以现有聊天系统为唯一主入口，确认身份、会话和消息数据路径。
+2. 以现有聊天系统为唯一主入口，完成身份、会话和消息数据路径审计。
 3. 让现有聊天能力适配标准接口，保持旧客户端可用。
 4. 补齐世界成员授权、任务审批、审计与私有记忆隔离。
-5. 再加入经验反思、模拟账本、聊天内管理简报和跨世界协作。
+5. 完成个人令牌 HTTP 验证、撤销/能力门禁和跨账号隔离验收，再部署独立 Care 适配器。
+6. 将 Care 机制接入聊天主入口，确保对话证据最小化、用户同意和审批流程闭环。
+7. 完成执行授权票据、可信回执和恢复流程，再进行跨云双端互操作验证。
+8. 再加入经验反思、模拟账本、聊天内管理简报和跨世界协作。
+
+
+### 场景环境状态引擎
+
+场景时区、昼夜节律、事件潮汐、环境声光、物件微状态与行为权重的按需计算实现见 [场景环境 API 与配置契约](docs/COMMUNITY_API.md#场景环境状态引擎新增实现)。
