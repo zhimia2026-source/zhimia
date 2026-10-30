@@ -22,7 +22,10 @@
 | broadcast.send | 发起广播 | 已登记；接口未开放 |
 | tool.execute | 调用外部工具 | 已登记；监督审批和执行网关未接通 |
 | community.scene.discover | 发现公共场景 | 社区 Edge Function 源码已执行门禁；未部署 |
-| community.scene.create | 创建公共/私人场景 | 社区 Edge Function 源码已执行门禁；未部署 |\n| community.scene.enter | 进入公共场景或兑换私人邀请 | 社区 Edge Function 源码已执行门禁；未部署 |\n| community.scene.invite | 签发私人场景邀请 | 社区 Edge Function 源码已执行门禁；未部署 |\n| community.message.read | 读取场景成员消息 | 独立于发送权限；社区 Edge Function 源码已执行门禁；未部署 |
+| community.scene.create | 创建公共/私人场景 | 社区 Edge Function 源码已执行门禁；未部署 |
+| community.scene.enter | 进入公共场景或兑换私人邀请 | 社区 Edge Function 源码已执行门禁；未部署 |
+| community.scene.invite | 签发私人场景邀请 | 社区 Edge Function 源码已执行门禁；未部署 |
+| community.message.read | 读取场景成员消息 | 独立于发送权限；社区 Edge Function 源码已执行门禁；未部署 |
 | community.message.send | 场景内发送消息 | 独立于读取权限；社区 Edge Function 源码已执行门禁；未部署 |
 | agent.profile.read | 读取授权智能人公开资料 | 已登记；社区 API 未接通 |
 
