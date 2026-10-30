@@ -212,6 +212,204 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Conflict' }
+  /v1/agents:
+    get:
+      summary: List agents owned by the authenticated user
+      operationId: listOwnedAgents
+      responses:
+        '200': { description: Owned agents }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      summary: Create a private manager agent by default
+      operationId: createAgent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [display_name]
+              properties:
+                display_name: { type: string, minLength: 1, maxLength: 120 }
+                role: { type: string, default: manager, maxLength: 80 }
+                visibility: { type: string, enum: [private, public], default: private }
+                public_manifest: { type: object }
+      responses:
+        '201': { description: Agent created; owner is derived from authentication }
+        '400': { description: Invalid agent profile }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/agents/{agent_id}/cognition:
+    parameters:
+      - $ref: '#/components/parameters/AgentId'
+    get:
+      summary: Read private cognition records for an owned agent
+      operationId: listPrivateCognition
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200': { description: Private cognition records }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { description: Agent not found in caller ownership scope }
+    post:
+      summary: Append a private MOU cognition record
+      operationId: appendPrivateCognition
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CognitionRecordInput' }
+      responses:
+        '201': { description: Cognition record appended }
+        '400': { description: MOU validation failed }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { description: Agent not found in caller ownership scope }
+  /v1/agents/{agent_id}/cognition/{record_id}/feedback:
+    post:
+      summary: Append an observed outcome against an owned hypothesis
+      operationId: appendCognitionFeedback
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/RecordId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source_id, event_time, observed_outcome, confidence]
+              properties:
+                source_id: { type: string, maxLength: 240 }
+                event_time: { type: string, format: date-time }
+                observed_outcome: { type: string, maxLength: 4000 }
+                confidence: { type: number, minimum: 0, maximum: 1 }
+      responses:
+        '201': { description: Feedback observation appended; original hypothesis unchanged }
+        '400': { description: Invalid feedback evidence }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { description: Hypothesis not found in caller ownership scope }
+  /v1/agents/{agent_id}/cognition/proposals:
+    get:
+      summary: List private cognition revision proposals
+      operationId: listCognitionRevisionProposals
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+      responses:
+        '200': { description: Revision proposals, including review status }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { description: Agent not found in caller ownership scope }
+  /v1/agents/{agent_id}/cognition/{record_id}/proposals:
+    post:
+      summary: Create a shadow-only revision proposal from owned feedback
+      operationId: createCognitionRevisionProposal
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/RecordId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [feedback_record_ids, proposed_state]
+              properties:
+                feedback_record_ids:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  uniqueItems: true
+                  items: { type: string, format: uuid }
+                proposed_state: { type: object }
+      responses:
+        '201': { description: Proposal persisted as shadow_proposed; no cognition mutation }
+        '400': { description: Feedback or proposal validation failed }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { description: Base record not found in caller ownership scope }
+  /v1/agents/{agent_id}/cognition/proposals/{proposal_id}/decision:
+    post:
+      summary: Approve or reject a cognition revision proposal
+      operationId: decideCognitionRevisionProposal
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ProposalId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [approved]
+              properties:
+                approved: { type: boolean }
+                decision_note: { type: string, maxLength: 2000, nullable: true }
+      responses:
+        '200': { description: Rejected, approved with appended version, or marked stale }
+        '400': { description: Invalid decision }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { description: Agent or proposal not found in caller ownership scope }
+        '409': { description: Agent inactive or proposal already decided }
+  /v1/agents/{agent_id}/cognition/rollback:
+    post:
+      summary: Append a new cognition version from an older snapshot
+      operationId: rollbackCognitionVersion
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_record_id]
+              properties:
+                target_record_id: { type: string, format: uuid }
+                decision_note: { type: string, maxLength: 2000, nullable: true }
+      responses:
+        '200': { description: Rollback appended as a new version; previous versions retained }
+        '400': { description: Target is not older or request is invalid }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { description: Target not found in caller ownership scope }
+  /v1/scenes/{scene_id}/invitations:
+    post:
+      summary: Issue a single-use invitation bound to a target user
+      operationId: issueSceneInvitation
+      parameters:
+        - $ref: '#/components/parameters/SceneId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_user_id]
+              properties:
+                target_user_id: { type: string, format: uuid }
+                expires_in_hours: { type: integer, minimum: 1, maximum: 168, default: 72 }
+      responses:
+        '201': { description: Invitation issued; plaintext token returned once }
+        '400': { description: Invalid invitation request }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/invitations/redeem:
+    post:
+      summary: Redeem a target-bound private scene invitation
+      operationId: redeemSceneInvitation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string, minLength: 64, maxLength: 64 }
+      responses:
+        '200': { description: Membership established atomically }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Invalid invitation }
+        '409': { $ref: '#/components/responses/Conflict' }
 components:
   securitySchemes:
     bearerAuth:
@@ -219,12 +417,43 @@ components:
       scheme: bearer
       bearerFormat: Provider-issued token
   parameters:
+    AgentId:
+      name: agent_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    RecordId:
+      name: record_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ProposalId:
+      name: proposal_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     SceneId:
       name: scene_id
       in: path
       required: true
       schema: { type: string, minLength: 1 }
   schemas:
+    CognitionRecordInput:
+      type: object
+      required: [object_type, object_id, state, evidence_kind]
+      properties:
+        object_type: { type: string, enum: [self, other, world, relation, change, feedback] }
+        object_id: { type: string, minLength: 1, maxLength: 200 }
+        state: { type: object }
+        relation_ids: { type: array, items: { type: string } }
+        evidence_kind: { type: string, enum: [observation, fact, inference, hypothesis, unknown] }
+        source_ids: { type: array, items: { type: string } }
+        confidence: { type: number, minimum: 0, maximum: 1, nullable: true }
+        event_time: { type: string, format: date-time, nullable: true }
+        inferred_at: { type: string, format: date-time, nullable: true }
+        hypothesis: { type: string, nullable: true }
+        prediction: { type: string, nullable: true }
+      description: Server generates owner_user_id, agent_id, record id, recorded_at, and version. MOU evidence constraints are validated by the API and database.
     SceneSummary:
       type: object
       required: [scene_id, name, visibility, state, owner_agent_id, version]
