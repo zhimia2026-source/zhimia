@@ -181,6 +181,39 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Conflict' }
   /v1/scenes/{scene_id}/environment:
+    post:
+      summary: Update scene environment configuration
+      description: Only an active owner or moderator with scene:manage may update the public environment. The server validates and stores the configuration through an atomic server-only RPC. Private cognition fields are rejected.
+      operationId: updateSceneEnvironment
+      security:
+        - PersonalAccessToken: []
+      parameters:
+        - name: scene_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [environment_state]
+              properties:
+                environment_state:
+                  type: object
+                  additionalProperties: true
+      responses:
+        "200":
+          description: Environment configuration updated
+        "400":
+          description: Invalid environment configuration
+        "403":
+          description: Owner or moderator membership required
+        "404":
+          description: Scene not found
     get:
       summary: Read current scene environment
       description: Returns deterministic temporal rhythm, active environment events, object microstates and behavior weights. Requires active scene membership with message:read capability. Never returns private memory.
