@@ -25,6 +25,7 @@
 - [关心机制参考实现](../zhi_care.py) 与 [单元测试](../tests/test_care.py)。
 - [关心机制 SQLite 持久化适配器](../zhi_care_repository.py) 与 [持久化/隔离测试](../tests/test_care_repository.py)。
 - [关心机制 Supabase API](CARE_API.md)、[数据库迁移](../supabase/migrations/20261028120000_zhi_care_states.sql)、[Edge Function](../supabase/functions/zhi-care/index.ts) 与 [真实 API 冒烟测试脚本](../scripts/smoke_test_zhi_care.py)。Supabase 端已部署参考 API，但尚未通过端到端验收。
+- [关心机制 × 聊天主入口接入契约](CARE_CHAT_INTEGRATION.md) — 记录 JWT 与个人令牌身份不匹配、聊天消息证据最小化写入规则及端到端验收门槛；当前为接入前置契约，尚未完成 UI 集成。
 
 ## 不可变设计原则
 
