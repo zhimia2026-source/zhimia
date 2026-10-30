@@ -150,6 +150,67 @@ export function createCommunityHandler(
       return reply({ agent }, 201);
     }
 
+    // Owner-only proposal decision; the database serializes version changes and appends a new record.
+    if (parts.length === 7 && parts[0] === "v1" && parts[1] === "agents" &&
+        parts[3] === "cognition" && parts[4] === "proposals" && parts[6] === "decision" &&
+        req.method === "POST") {
+      const agentId = parts[2];
+      const proposalId = parts[5];
+      if (!isUuid(agentId) || !isUuid(proposalId)) {
+        return reply({ error: "invalid_argument", detail: "agent_and_proposal_ids_must_be_uuids" }, 400);
+      }
+      const { data: agent, error: agentError } = await db.from("zhi_agents")
+        .select("id,owner_user_id,status").eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
+      if (agentError) throw new Error("database_error");
+      if (!agent) return reply({ error: "not_found" }, 404);
+      if (agent.status !== "active") return reply({ error: "conflict", detail: "agent_not_active" }, 409);
+      const body = await readBody(req);
+      if (typeof body.approved !== "boolean") {
+        return reply({ error: "invalid_argument", detail: "approved_boolean_required" }, 400);
+      }
+      const decisionNote = body.decision_note;
+      if (decisionNote !== undefined && decisionNote !== null && !isText(decisionNote, 2000)) {
+        return reply({ error: "invalid_argument", detail: "invalid_decision_note" }, 400);
+      }
+      const { data: result, error } = await db.rpc("zhi_decide_cognition_revision_proposal", {
+        p_owner_user_id: actor.userId,
+        p_agent_id: agentId,
+        p_proposal_id: proposalId,
+        p_approved: body.approved,
+        p_decision_note: decisionNote ?? null,
+      });
+      if (error || !result) throw new Error("database_error");
+      return reply({ result });
+    }
+
+    // Rollback never deletes history: the database appends a new snapshot based on an older record.
+    if (parts.length === 5 && parts[0] === "v1" && parts[1] === "agents" &&
+        parts[3] === "cognition" && parts[4] === "rollback" && req.method === "POST") {
+      const agentId = parts[2];
+      if (!isUuid(agentId)) return reply({ error: "invalid_argument", detail: "agent_id_must_be_uuid" }, 400);
+      const { data: agent, error: agentError } = await db.from("zhi_agents")
+        .select("id,owner_user_id,status").eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
+      if (agentError) throw new Error("database_error");
+      if (!agent) return reply({ error: "not_found" }, 404);
+      if (agent.status !== "active") return reply({ error: "conflict", detail: "agent_not_active" }, 409);
+      const body = await readBody(req);
+      if (!isUuid(body.target_record_id)) {
+        return reply({ error: "invalid_argument", detail: "target_record_id_must_be_uuid" }, 400);
+      }
+      const decisionNote = body.decision_note;
+      if (decisionNote !== undefined && decisionNote !== null && !isText(decisionNote, 2000)) {
+        return reply({ error: "invalid_argument", detail: "invalid_decision_note" }, 400);
+      }
+      const { data: result, error } = await db.rpc("zhi_rollback_cognition_version", {
+        p_owner_user_id: actor.userId,
+        p_agent_id: agentId,
+        p_target_record_id: body.target_record_id,
+        p_decision_note: decisionNote ?? null,
+      });
+      if (error || !result) throw new Error("database_error");
+      return reply({ result });
+    }
+
     // Persisted revision proposals remain shadow-only until a separate owner decision endpoint.
     if (parts.length === 5 && parts[0] === "v1" && parts[1] === "agents" &&
         parts[3] === "cognition" && parts[4] === "proposals" && req.method === "GET") {
