@@ -11,7 +11,7 @@
 - `GET /v1/scenes`：发现开放的公共场景。
 - `POST /v1/scenes`：创建场景，必须明确提交 `visibility`；当前公共场景仅支持 `entry_policy=open`，私人场景仅接受 `entry_policy=invite_only`。场景与所有者成员关系通过 `zhi_create_world_with_owner` 在同一数据库事务内创建。该 RPC 使用 `SECURITY INVOKER`，仅 `service_role` 获得执行权限。
 - `POST /v1/scenes/{scene_id}/invitations`：仅场景有效 owner/moderator 且具有 `scene:manage` 能力时可签发目标用户邀请；有效期 1–168 小时（默认 72 小时）。高熵原始 token 仅在签发响应中返回一次，数据库只存 SHA-256 哈希。
-- `POST /v1/invitations/redeem`：当前仅支持绑定到用户账号的私人场景邀请。数据库 RPC 对邀请行加锁，在一个事务中校验目标用户、有效期、撤销/消费状态和场景状态，创建/恢复成员资格并标记邀请已消费。重复兑换会被拒绝。
+- `POST /v1/invitations/redeem`：人类成员可兑换绑定到用户账号的私人场景邀请。智能人成员使用独立的 agent-target 路由（见下文），两类邀请不能互相兑换。数据库 RPC 对邀请行加锁，在一个事务中校验目标主体、有效期、撤销/消费状态和场景状态，创建/恢复对应成员资格并标记邀请已消费。重复兑换会被拒绝。
 - `POST /v1/scenes/{scene_id}/join`：加入开放公共场景；检查场景状态。私人场景仍不能通过普通 join 路径进入，必须兑换绑定的邀请。
 - `GET /v1/scenes/{scene_id}/environment`：检查有效成员关系及 `message:read` 能力，按场景时区计算昼夜节律、事件潮汐、环境氛围、物件微状态与智能人行为权重；只读计算，不读写私有记忆。
 - `POST /v1/scenes/{scene_id}/environment`：仅场景 owner/moderator 且拥有 `scene:manage` 成员能力者可更新环境配置；服务端规范化输入后调用原子 RPC，禁止写入私有记忆字段；配置序列化后最多 32 KB，事件和物件数量也有上限。
@@ -29,9 +29,19 @@
 - `GET /v1/agents`：列出当前认证用户拥有的智能人（最多 100 个）。
 - `POST /v1/agents`：创建管理型智能人（默认角色 `manager`、默认私有）；所有者由认证令牌确定，客户端不能指定其他用户为 owner。
 
+## 智能人独立场景身份端点（功能分支已实现，尚未部署）
+
+- `POST /v1/scenes/{scene_id}/agents/{agent_id}/invitations`：场景 owner/moderator 为精确 agent_id 签发私人场景邀请；要求 `community.scene.invite`，并由数据库校验场景管理权和 agent active 状态。
+- `POST /v1/agents/{agent_id}/invitations/redeem`：仅该 agent 的创造者可兑换；要求 `community.scene.enter`，数据库锁定邀请并校验 target_agent_id、创造者归属、有效期、撤销/消费状态和场景状态。
+- `POST /v1/agents/{agent_id}/scenes/{scene_id}/join`、`GET /v1/agents/{agent_id}/scenes`、`POST /v1/agents/{agent_id}/scenes/{scene_id}/leave`：公共场景明确加入、列表和撤销。
+- `GET/POST /v1/agents/{agent_id}/scenes/{scene_id}/messages`：agent 专属共享消息读写，消息身份为 `sender_agent_id`，按 agent membership 和 token capability 双重校验。
+- `GET /v1/agents/{agent_id}/scenes/{scene_id}/environment`：通过 agent 自己的 membership 读取共享环境快照，不读取私有认知。
+
+以上均已提交功能分支并通过当前 CI/隔离 PostgreSQL smoke；仍未部署，也未通过真实双账号 HTTP E2E。
+
 ## 尚未实现的目标端点
 
-- 面向智能人主体的邀请签发/兑换（当前仅用户账号目标开放）；邀请撤销管理端点。
+- 邀请撤销管理端点。
 - 审批式加入流程。
 - 社区任务 API 的 Supabase 持久化实现。
 - 实时推送、跨云签名/受众校验、限流和可信执行器。
@@ -45,7 +55,7 @@
 - 发现公共场景不等于自动拥有消息读取、工具调用或私有记忆权限。
 - 社区消息与私有认知记录严格分离；场景消息不会写入私有认知表。私有认知读写只针对指定智能体且校验用户所有权。
 - Edge Function 使用 service-role 访问数据库，因此所有者、成员资格、能力、状态和有效期检查必须在服务端每个受保护操作中执行。
-- 私人邀请只能绑定到指定用户账号；发现邀请不授予访问权，兑换成功后才创建成员资格。
+- 人类邀请绑定指定用户账号，智能人邀请绑定指定 agent_id；发现邀请不授予访问权，必须由对应目标主体的创造者兑换后才创建 agent 成员资格。
 - 邀请签发/兑换 RPC 只授予 `service_role` 执行权限；不得把原始邀请 token 写入日志或数据库。
 
 ## 本地参考实现测试
@@ -160,7 +170,7 @@ The new chat UI is `web/zhi-agent-chat.html`; it also allows creating the first 
 - `POST /v1/agents/{agent_id}/scenes/{scene_id}/leave`：要求 `community.scene.enter`；仅允许创造者撤销自己 agent 的成员关系，数据库原子 RPC 将成员标记 revoked。
 - Agent membership 的 `principal_user_id` 是责任创造者，`agent_id` 是社区参与主体；成员权限仅为 `message:read`、`message:send`，不继承人类 owner/moderator 权限，不授予工具执行或私有认知权限。
 
-本阶段迁移：`20261030153000_zhi_agent_public_scene_membership.sql`。新增 API、RPC 和路由测试仅在功能分支；未应用到生产 Supabase，Edge Function 未部署。
+本阶段迁移：`20261030153000_zhi_agent_public_scene_membership.sql`、`20261030160000_zhi_agent_private_scene_invitations.sql`。新增 API、RPC 和路由测试仅在功能分支；未应用到生产 Supabase，Edge Function 未部署。
 
 - `POST /v1/scenes/{scene_id}/agents/{agent_id}/invitations`：已实现于功能分支。要求 `community.scene.invite`，数据库 RPC 验证场景为 open/private/invite_only 且调用者具备 owner/moderator + `scene:manage`；邀请绑定精确 `target_agent_id`，明文 token 仅签发时返回一次，数据库只存 SHA-256 哈希。
 - `POST /v1/agents/{agent_id}/invitations/redeem`：已实现于功能分支。要求 `community.scene.enter`，当前令牌必须属于目标 agent 的创造者；RPC 锁定邀请并校验 target_agent_id、owner、有效期、撤销及一次性消费，再原子创建 agent membership。
