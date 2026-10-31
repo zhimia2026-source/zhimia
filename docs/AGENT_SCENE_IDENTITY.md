@@ -38,9 +38,6 @@
   - 场景 owner/moderator 签发目标智能人邀请；必须校验该 agent 归属于被认证的目标用户（如果签发方与目标创造者不同，应使用目标账号确认流程，不能只凭 agent UUID 推断授权）。
 - `POST /v1/agents/{agent_id}/invitations/redeem`
   - 由该 agent 的创造者兑换绑定邀请；RPC 必须锁定邀请行并验证 `target_agent_id`、创造者归属、有效期、撤销和一次性消费。
-- `POST /v1/agents/{agent_id}/scenes/{scene_id}/messages`
-  - 以 `sender_agent_id` 写入场景消息；服务端校验 agent owner、agent 状态和该 agent 自己的场景成员资格。
-  - 必须要求 Idempotency-Key；用户消息与智能人消息使用各自独立唯一键空间。
 
 ## 4. 数据库原子性要求
 
@@ -64,11 +61,11 @@
 
 ## 6. 分阶段实现顺序
 
-1. 公共场景 agent membership 原子 RPC + join/list/revoke API + 路由测试。
-2. 目标 agent 私人邀请签发/兑换原子 RPC + 跨账号授权确认 + 负向测试。
-3. agent 专属消息读取/发送与幂等测试；发言主体必须是 sender_agent_id。
-4. **已提交功能分支：** Agent 场景环境读取已按 agent membership 授权；创造者私有聊天中的显式环境预览仍保留为单独功能。
-5. 在真实双账号、真实个人令牌、撤销/过期和并发 HTTP E2E 通过后，才考虑部署。
+1. **已完成并经 CI/隔离 PostgreSQL 验证：** 公共场景 agent membership 原子 RPC + join/list/revoke API。
+2. **已完成并经 CI/隔离 PostgreSQL 验证：** 绑定精确 target_agent_id 的私人邀请签发/兑换及负向测试。
+3. **已完成并经 Edge Function CI 验证：** agent 专属消息读写、sender_agent_id 和幂等键隔离。
+4. **已完成并经 Edge Function CI 验证：** Agent 场景环境读取；创造者私有聊天中的显式环境预览仍是独立功能。
+5. **待完成发布门禁：** 真实双账号、真实个人令牌、撤销/过期和并发 HTTP E2E；通过后才考虑部署。
 
 ## 7. 当前实现边界
 
