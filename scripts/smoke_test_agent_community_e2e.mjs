@@ -3,7 +3,11 @@
 // Secrets are read only from environment variables and are never printed.
 import assert from "node:assert/strict";
 
-const API = (process.env.ZHI_COMMUNITY_API || "https://lvxmygrgqtmzqgailmyl.supabase.co/functions/v1/zhi-community").replace(/\/$/, "");
+const configuredApi = process.env.ZHI_COMMUNITY_API || "";
+if (!configuredApi) throw new Error("Set ZHI_COMMUNITY_API to a disposable test Supabase Edge Function URL. The production URL is never used as a default.");
+const API = configuredApi.replace(/\/$/, "");
+if (API.includes("lvxmygrgqtmzqgailmyl.supabase.co")) throw new Error("Refusing to create E2E fixtures in the production ZHI Supabase project.");
+if (process.env.ZHI_E2E_DISPOSABLE_PROJECT !== "1") throw new Error("Set ZHI_E2E_DISPOSABLE_PROJECT=1 only after confirming this endpoint belongs to a disposable test project; this script creates persistent test agent/scene records.");
 const ownerAToken = process.env.ZHI_OWNER_A_TOKEN || "";
 const ownerBToken = process.env.ZHI_OWNER_B_TOKEN || "";
 if (!ownerAToken || !ownerBToken) {
