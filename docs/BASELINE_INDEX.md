@@ -22,10 +22,10 @@
 - [智能社区核心数据模型草案](COMMUNITY_SCHEMA_DESIGN.md) — Agent、场景、成员关系、会话、消息与环境事件的最小模型和安全不变量；仅为设计草案，尚未部署。
 - [智能人独立场景身份规范](AGENT_SCENE_IDENTITY.md) — 定义创造者、智能人和场景的身份边界；公共加入、agent 场景列表及创造者撤销接口已提交功能分支，私人邀请和 agent 消息仍待实现，整体尚未部署。\n- [智能人公共场景成员迁移](../supabase/migrations/20261030153000_zhi_agent_public_scene_membership.sql) — 为 agent 公共场景加入/撤销提供原子 RPC，仅授予普通消息权限；未应用生产。
 - [智能人私人场景邀请迁移](../supabase/migrations/20261030160000_zhi_agent_private_scene_invitations.sql) — 将一次性邀请绑定到精确 `target_agent_id`，兑换时验证 agent 创造者、有效期和一次性消费；未应用生产。
-- [智能人场景身份 PostgreSQL 17 验证](../.github/workflows/zhi-agent-scene-migration.yml) 与 [SQL 冒烟测试](../supabase/tests/zhi_agent_public_scene_membership_smoke.sql) — 在隔离数据库中验证公共加入、私人邀请、跨账号拒绝、撤销/重放和服务端 RPC grants。
+- [智能人场景身份 PostgreSQL 17 验证](../.github/workflows/zhi-community-check.yml) 与 [SQL 冒烟测试](../supabase/tests/zhi_agent_public_scene_membership_smoke.sql) — 在隔离数据库中验证公共加入、私人邀请、跨账号拒绝、撤销/重放和服务端 RPC grants。
 - [智能人社区双账号 HTTP E2E 脚本](../scripts/smoke_test_agent_community_e2e.mjs) — 使用本地环境变量中的两位创造者令牌验证私人邀请、agent 身份消息、私有认知隔离、幂等和撤销；脚本不输出令牌，尚需真实账号执行。\n- [智能人场景路由测试](../supabase/functions/zhi-community/agent_scene_routes_test.ts) — 覆盖创造者加入、越权 owner 拒绝、能力不足拒绝和成员撤销。
 - [智能社区数据库迁移草案](../supabase/migrations/20261028140000_zhi_community_core.sql) — 8 张社区核心表、约束、索引、RLS 与服务端专用 grants；已提交功能分支，**未应用到 Supabase**，需先在隔离环境验证并审查 API 授权。
-- [智能社区 Edge Function](../supabase/functions/zhi-community/index.ts) — 使用现有个人访问令牌的 SHA-256 哈希进行服务端认证；当前实现公共场景发现/创建/加入及成员消息读写。私人邀请兑换与审批流程明确拒绝，尚未部署或端到端测试；部署时须确认 Supabase Gateway 不会把自定义个人令牌误当作 Supabase Auth JWT。
+- [智能社区 Edge Function](../supabase/functions/zhi-community/index.ts) — 使用现有个人访问令牌的 SHA-256 哈希进行服务端认证；当前实现公共场景发现/创建/加入、私人邀请、agent 专属消息与环境读取；尚未部署，真实双账号 HTTP E2E 待执行；部署时须确认 Supabase Gateway 不会把自定义个人令牌误当作 Supabase Auth JWT。
 - [旧跨项目身份断言桥接契约](IDENTITY_ASSERTION_BRIDGE.md) — 已被单一 Supabase 项目架构取代，仅保留为历史设计记录，不作为目标实现方案。
 - [关心机制规范 V1.0](CARE_MECHANISM.md) — 跨本体认知—价值—行动机制；当前为实现草案，须经评审和测试后才能纳入稳定基准。
 - [关心机制参考实现](../zhi_care.py) 与 [单元测试](../tests/test_care.py)。
