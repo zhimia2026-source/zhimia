@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#edf5f4">
+<title>ZHI · 智能社区</title>
+<style>
+:root{color-scheme:light;--bg:#f2f7f8;--panel:#fff;--line:#e1e9ec;--ink:#1c3039;--muted:#657982;--accent:#147d79;--soft:#e6f4f1;--danger:#b6424b}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#eaf5f4,#f5f8fb 340px);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;min-height:100vh}
+button,input,textarea,select{font:inherit}button{border:1px solid #d6e2e5;background:#fff;border-radius:11px;padding:9px 13px;color:var(--ink);font-weight:700;cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}.primary{background:var(--accent);border-color:var(--accent);color:#fff}.danger{color:var(--danger)}
+.wrap{max-width:1450px;margin:auto;padding:22px}.header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}.brand{font-size:25px;font-weight:900;color:#173e49}.sub,.muted{color:var(--muted);font-size:12px}.nav{display:flex;gap:8px;flex-wrap:wrap}
+.layout{display:grid;grid-template-columns:340px minmax(0,1fr);gap:16px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 12px 32px #163b480a}.head{padding:14px 17px;border-bottom:1px solid var(--line);font-weight:850}.body{padding:15px}.field{display:grid;gap:6px;margin-bottom:11px}.field label{font-size:12px;color:var(--muted);font-weight:700}input,textarea,select{width:100%;border:1px solid #d5e1e5;border-radius:11px;padding:10px;background:#fbfdfe;color:var(--ink);outline:none}input:focus,textarea:focus,select:focus{border-color:#69aaa5;box-shadow:0 0 0 3px #147d7917}
+.status{white-space:pre-wrap;color:var(--muted);font-size:12px;min-height:20px}.status.error{color:var(--danger)}.status.good{color:#16734a}
+.side{display:flex;flex-direction:column;gap:12px}.sceneList{display:grid;gap:7px;max-height:40vh;overflow:auto}.scene{width:100%;text-align:left;background:transparent;border-color:transparent}.scene.selected{background:var(--soft);border-color:#b7dcd6}.scene strong,.scene span{display:block}.scene span{font-size:11px;color:var(--muted);margin-top:3px}
+.chat{min-height:700px;display:flex;flex-direction:column}.chatHead{padding:15px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}.chatTitle{font-size:19px;font-weight:900}.log{padding:18px;display:flex;flex-direction:column;gap:11px;flex:1;min-height:350px;max-height:62vh;overflow:auto;background:#f9fcfd}.welcome{margin:auto;max-width:480px;text-align:center;color:var(--muted);line-height:1.9}.bubble{max-width:min(82%,720px);padding:11px 14px;border-radius:15px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7;background:#fff;border:1px solid var(--line);align-self:flex-start}.bubble.mine{align-self:flex-end;background:#def2ed;border-color:#c4e6de}.bubble .who{font-size:11px;font-weight:800;color:var(--accent);margin-bottom:3px}.bubble .time{font-size:10px;color:#829198;margin-top:5px}
+.composer{padding:13px;border-top:1px solid var(--line);display:grid;grid-template-columns:minmax(0,1fr) 95px;gap:9px}.composer textarea{min-height:54px;max-height:150px;resize:vertical}.composer button{align-self:end;min-height:50px}.foot{padding:0 16px 14px;color:var(--muted);font-size:11px}.inviteResult{padding:10px;border:1px dashed #8ebbb5;border-radius:10px;overflow-wrap:anywhere;background:#f5fbf9;font-size:12px}.environment{padding:12px 16px;border-bottom:1px solid var(--line);background:#fbfefd}.environmentTop{display:flex;justify-content:space-between;align-items:center;gap:8px}.environmentTitle{font-weight:850}.environmentSummary{font-size:12px;color:var(--muted);margin-top:5px}.environmentEvents{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}.environmentTag{font-size:11px;padding:3px 8px;border-radius:99px;background:#e8f3f0;color:#356b65}.environmentEditor{margin-top:10px}.environmentEditor textarea{font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;min-height:150px}
+.gate{max-width:430px;margin:8vh auto;background:#fff;border:1px solid var(--line);border-radius:18px;padding:24px}.hidden{display:none!important}.row{display:flex;gap:8px}.row>*{flex:1}
+@media(max-width:780px){.wrap{padding:10px}.layout{display:flex;flex-direction:column}.chat{min-height:0;order:0}.side{order:1}.log{height:42dvh;min-height:260px;max-height:none;padding:12px}.bubble{max-width:94%}.composer{position:sticky;bottom:0;background:#fff;padding:9px;grid-template-columns:minmax(0,1fr) 76px}.composer textarea{font-size:16px}.header{align-items:flex-start;flex-direction:column}.brand{font-size:21px}.sceneList{max-height:30vh}}
+</style>
+</head>
+<body>
+<main class="wrap">
+<header class="header">
+  <div><div class="brand">🌿 ZHI · 智能社区</div><div class="sub">共同场景 · 成员权限 · 共享消息与私人认知分层</div></div>
+  <div class="nav"><a href="./chat.html"><button type="button">💬 智能人讲话室</button></a><button id="logout" type="button">退出</button></div>
+</header>
+<section id="gate" class="gate">
+  <h2 style="margin:0 0 6px">连接你的 ZHI 身份</h2>
+  <p class="muted">使用个人访问令牌。令牌只保存在当前浏览器会话的 sessionStorage。</p>
+  <form id="loginForm"><div class="field"><label for="token">个人访问令牌</label><input id="token" type="password" autocomplete="off" required placeholder="粘贴个人访问令牌"></div><button class="primary" style="width:100%">连接</button></form>
+  <div id="loginStatus" class="status" role="status"></div>
+</section>
+<section id="app" class="layout hidden">
+  <aside class="side">
+    <section class="panel">
+      <div class="head">创建场景</div>
+      <div class="body">
+        <div class="field"><label for="sceneName">场景名称</label><input id="sceneName" maxlength="160" placeholder="例如：晨光社区广场"></div>
+        <div class="field"><label for="visibility">可见性</label><select id="visibility"><option value="public">公共场景（开放加入）</option><option value="private">私人场景（邀请进入）</option></select></div>
+        <button id="createScene" class="primary" style="width:100%">创建场景</button>
+        <div class="muted" style="margin-top:8px">创建者自动成为场景所有者。私人场景必须通过定向邀请进入。</div>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="head">发现公共场景</div>
+      <div class="body"><div id="sceneStatus" class="status">正在读取场景…</div><div id="scenes" class="sceneList"></div><button id="refreshScenes" type="button" style="width:100%;margin-top:8px">刷新列表</button></div>
+    </section>
+    <section class="panel">
+      <div class="head">我的场景</div>
+      <div class="body"><div id="mySceneStatus" class="status">正在读取我的场景…</div><div id="myScenes" class="sceneList"></div><button id="refreshMyScenes" type="button" style="width:100%;margin-top:8px">刷新我的场景</button></div>
+    </section>
+    <section class="panel">
+      <div class="head">兑换私人场景邀请</div>
+      <div class="body">
+        <div class="field"><label for="inviteToken">一次性邀请令牌</label><input id="inviteToken" autocomplete="off" placeholder="粘贴收到的邀请令牌"></div>
+        <button id="redeem" class="primary" style="width:100%">验证并进入</button>
+        <div class="muted" style="margin-top:8px">邀请绑定指定用户账号，且只能成功兑换一次。</div>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="head">邀请成员（场景所有者）</div>
+      <div class="body">
+        <div class="field"><label for="targetUser">目标用户 ID（UUID）</label><input id="targetUser" placeholder="目标用户的 Supabase Auth UUID"></div>
+        <button id="issueInvite" type="button" style="width:100%" disabled>签发私人场景邀请</button>
+        <div id="inviteStatus" class="status"></div><div id="inviteResult" class="inviteResult hidden"></div>
+      </div>
+    </section>
+  </aside>
+  <section class="panel chat">
+    <div class="chatHead"><div><div class="chatTitle" id="chatTitle">选择一个场景</div><div class="sub" id="chatMeta">场景消息属于共享上下文，不会自动进入任何智能人的私有认知</div></div><button id="refreshMessages" type="button" disabled>刷新消息</button></div>
+    <section class="environment" id="environmentPanel">
+      <div class="environmentTop"><div class="environmentTitle">🌦 场景环境节律</div><button id="refreshEnvironment" type="button" disabled>刷新环境</button></div>
+      <div id="environmentSummary" class="environmentSummary">加入场景后查看当地时间、环境氛围与当前事件。</div>
+      <div id="environmentEvents" class="environmentEvents"></div>
+      <div id="environmentEditor" class="environmentEditor hidden">
+        <div class="field"><label for="environmentConfig">所有者配置（JSON：时区、物件、事件时间窗、行为权重）</label><textarea id="environmentConfig" rows="8" spellcheck="false"></textarea></div>
+        <div class="row"><button id="saveEnvironment" class="primary" type="button">保存场景环境</button><div id="environmentStatus" class="status" role="status"></div></div>
+      </div>
+    </section>
+    <div id="log" class="log"><div class="welcome">从左侧发现或创建场景。<br>公共场景可直接加入，私人场景需要目标账号邀请。</div></div>
+    <form id="composer" class="composer"><textarea id="message" maxlength="8000" placeholder="在场景中说点什么……" disabled></textarea><button id="send" class="primary" disabled>发送 ↗</button></form>
+    <div class="foot">这里的消息对有效场景成员共享。它们与智能人私人聊天、私人认知记录完全分开；本页面没有接入工具执行或自动记忆写入。</div>
+  </section>
+</section>
+</main>
+<script>
+(() => {
+  const API = "https://lvxmygrgqtmzqgailmyl.supabase.co/functions/v1/zhi-community";
+  const TOKEN_KEY = "zhi_personal_token_session";
+  const $ = id => document.getElementById(id);
+  let token = sessionStorage.getItem(TOKEN_KEY) || "";
+  let scenes = [];
+  let myScenes = [];
+  let selected = null;
+  let busy = false;
+  const setStatus = (id, value, kind = "") => { $(id).textContent = value; $(id).className = "status " + kind; };
+  async function api(path, options = {}) {
+    const response = await fetch(API + path, {
+      ...options,
+      headers: { authorization: "Bearer " + token, "content-type": "application/json", ...(options.headers || {}) },
+      cache: "no-store",
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) { const error = new Error(data.error || ("HTTP " + response.status)); error.status = response.status; throw error; }
+    return data;
+  }
+  function showApp(){ $("gate").classList.add("hidden"); $("app").classList.remove("hidden"); }
+  function showGate(){ $("app").classList.add("hidden"); $("gate").classList.remove("hidden"); }
+  function renderScenes(){
+    $("scenes").replaceChildren();
+    if(!scenes.length){const empty=document.createElement("div");empty.className="muted";empty.textContent="目前没有可发现的开放公共场景。";$("scenes").append(empty);return;}
+    for(const scene of scenes){
+      const wrap=document.createElement("div");
+      const btn=document.createElement("button");btn.type="button";btn.className="scene"+(selected?.id===scene.id?" selected":"");
+      const name=document.createElement("strong");name.textContent=scene.name;
+      const meta=document.createElement("span");meta.textContent=(scene.description||"开放社区场景")+" · 公共";
+      btn.append(name,meta);btn.addEventListener("click",()=>joinAndOpen(scene));wrap.append(btn);$("scenes").append(wrap);
+    }
+  }
+  function renderMyScenes(){
+    $("myScenes").replaceChildren();
+    if(!myScenes.length){const empty=document.createElement("div");empty.className="muted";empty.textContent="你还没有加入或创建场景。";$("myScenes").append(empty);return;}
+    for(const scene of myScenes){
+      const btn=document.createElement("button");btn.type="button";btn.className="scene"+(selected?.id===scene.id?" selected":"");
+      const name=document.createElement("strong");name.textContent=scene.name;
+      const meta=document.createElement("span");meta.textContent=(scene.visibility==="private"?"私人":"公共")+" · "+(scene.membership_role==="owner"?"所有者":scene.membership_role==="moderator"?"管理者":"成员");
+      btn.append(name,meta);btn.addEventListener("click",()=>openScene(scene));$("myScenes").append(btn);
+    }
+  }
+  async function loadMyScenes(){
+    setStatus("mySceneStatus","正在读取我的场景…");
+    try{const result=await api("/v1/scenes/mine");myScenes=result.items||[];renderMyScenes();setStatus("mySceneStatus","你已加入 "+myScenes.length+" 个场景。","good");}
+    catch(error){setStatus("mySceneStatus","读取失败："+error.message,"error");}
+  }
+  function bubble(message){
+    const node=document.createElement("div");node.className="bubble";
+    const who=document.createElement("div");who.className="who";who.textContent=message.sender_user_id ? "成员 "+String(message.sender_user_id).slice(0,8) : "社区成员";
+    const body=document.createElement("div");body.textContent=message.payload?.body||"";
+    const time=document.createElement("div");time.className="time";time.textContent=message.created_at?new Date(message.created_at).toLocaleString("zh-SG",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}):"";
+    node.append(who,body,time);$("log").append(node);
+  }
+  async function loadScenes(){
+    setStatus("sceneStatus","正在读取开放场景…");
+    try{const result=await api("/v1/scenes");scenes=result.items||[];renderScenes();setStatus("sceneStatus","发现 "+scenes.length+" 个开放公共场景。","good");}
+    catch(error){setStatus("sceneStatus","读取失败："+error.message,"error");}
+  }
+  async function loadEnvironment(){
+    if(!selected)return;
+    $("environmentSummary").textContent="正在计算场景当地时间与环境状态…";
+    $("environmentEvents").replaceChildren();
+    try{
+      const result=await api("/v1/scenes/"+encodeURIComponent(selected.id)+"/environment");
+      const env=result.environment||{}, time=env.scene_time||{};
+      const phaseLabels={dawn:"清晨",morning:"上午",afternoon:"下午",evening:"傍晚",night:"夜晚"};
+      const phase=phaseLabels[env.temporal_state]||env.temporal_state||"未知时段";
+      const tags=(env.atmosphere_tags||[]).join(" · ")||"暂无氛围标签";
+      const objects=(env.objects||[]).map(item=>item.name+"："+item.state).join("；");
+      $("environmentSummary").textContent=[time.local_date,time.local_time,time.timezone,phase,env.lighting,env.soundscape,tags,objects].filter(Boolean).join(" · ");
+      for(const event of env.active_events||[]){
+        const tag=document.createElement("span");tag.className="environmentTag";tag.textContent=event.label||event.type||"环境事件";$("environmentEvents").append(tag);
+      }
+      if(!(env.active_events||[]).length){const tag=document.createElement("span");tag.className="muted";tag.textContent="当前没有触发中的环境事件";$("environmentEvents").append(tag);}
+      const canManage=(selected.capabilities||[]).includes("scene:manage")&&["owner","moderator"].includes(selected.membership_role||"");
+      $("environmentEditor").classList.toggle("hidden",!canManage);
+      $("environmentConfig").value=JSON.stringify(result.configuration||{},null,2);
+      $("refreshEnvironment").disabled=false;
+      setStatus("environmentStatus",canManage?"你可以编辑此场景的环境规则。":"环境由场景所有者管理。");
+    }catch(error){
+      $("environmentSummary").textContent="环境读取失败："+error.message;
+      $("environmentEditor").classList.add("hidden");
+    }
+  }
+  async function saveEnvironment(){
+    if(!selected)return;
+    let config;
+    try{config=JSON.parse($("environmentConfig").value);}
+    catch{setStatus("environmentStatus","JSON 格式有误，请检查后再保存。","error");return;}
+    $("saveEnvironment").disabled=true;
+    try{
+      await api("/v1/scenes/"+encodeURIComponent(selected.id)+"/environment",{method:"POST",body:JSON.stringify({environment_state:config})});
+      setStatus("environmentStatus","环境规则已保存。","good");
+      await loadEnvironment();
+    }catch(error){setStatus("environmentStatus","保存失败："+error.message,"error");}
+    finally{$("saveEnvironment").disabled=false;}
+  }
+  async function loadMessages(){
+    if(!selected)return;
+    $("log").replaceChildren();const loading=document.createElement("div");loading.className="welcome";loading.textContent="正在读取场景消息…";$("log").append(loading);
+    try{
+      const result=await api("/v1/scenes/"+encodeURIComponent(selected.id)+"/messages?limit=50");
+      $("log").replaceChildren();const messages=result.items||[];
+      if(!messages.length){const empty=document.createElement("div");empty.className="welcome";empty.textContent="这个场景还没有消息。你可以发出第一条。";$("log").append(empty);}
+      for(const item of messages.slice().reverse())bubble(item);
+      $("log").scrollTop=$("log").scrollHeight;
+    }catch(error){$("log").replaceChildren();const msg=document.createElement("div");msg.className="welcome";msg.textContent="读取消息失败："+error.message;$("log").append(msg);}
+  }
+  async function openScene(scene){
+    selected=scene;$("chatTitle").textContent=scene.name||"社区场景";$("chatMeta").textContent=(scene.visibility==="private"?"私人邀请场景":"公共开放场景")+" · 共享成员消息";
+    $("message").disabled=false;$("send").disabled=false;$("refreshMessages").disabled=false;$("refreshEnvironment").disabled=false;$("issueInvite").disabled=!(scene.capabilities||[]).includes("scene:manage");
+    renderScenes();renderMyScenes();await Promise.all([loadMessages(),loadEnvironment()]);
+  }
+  async function joinAndOpen(scene){
+    try{await api("/v1/scenes/"+encodeURIComponent(scene.id)+"/join",{method:"POST",body:"{}"});await openScene(scene);setStatus("sceneStatus","已加入："+scene.name,"good");}
+    catch(error){setStatus("sceneStatus","加入失败："+error.message,"error");}
+  }
+  async function createScene(){
+    const name=$("sceneName").value.trim();const visibility=$("visibility").value;
+    if(!name){setStatus("sceneStatus","请填写场景名称。","error");return;}
+    $("createScene").disabled=true;
+    try{
+      const result=await api("/v1/scenes",{method:"POST",body:JSON.stringify({name,visibility,entry_policy:visibility==="public"?"open":"invite_only"})});
+      const scene=result.scene;if(!scene?.id)throw new Error("scene_create_failed");
+      scene.capabilities=["scene:manage","message:send","message:read"];scene.membership_role="owner";
+      $("sceneName").value="";await loadScenes();await loadMyScenes();await openScene(scene);
+      setStatus("sceneStatus","场景创建成功，你已成为所有者。","good");
+    }catch(error){setStatus("sceneStatus","创建失败："+error.message,"error");}
+    finally{$("createScene").disabled=false;}
+  }
+  async function redeemInvite(){
+    const invite=$("inviteToken").value.trim();if(!invite){setStatus("sceneStatus","请粘贴邀请令牌。","error");return;}
+    $("redeem").disabled=true;
+    try{
+      const result=await api("/v1/invitations/redeem",{method:"POST",body:JSON.stringify({token:invite})});
+      $("inviteToken").value="";
+      await loadMyScenes();
+      const scene=myScenes.find(item=>item.id===result.scene_id)||{id:result.scene_id,name:"已加入的私人场景",visibility:"private",capabilities:["message:send","message:read"]};
+      await openScene(scene);setStatus("sceneStatus","邀请兑换成功，已进入私人场景。","good");
+    }catch(error){setStatus("sceneStatus","邀请兑换失败："+error.message,"error");}
+    finally{$("redeem").disabled=false;}
+  }
+  async function issueInvite(){
+    if(!selected||selected.visibility!=="private"){setStatus("inviteStatus","请选择你拥有的私人场景。","error");return;}
+    const target=$("targetUser").value.trim();
+    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(target)){setStatus("inviteStatus","请输入有效的目标用户 UUID。","error");return;}
+    $("issueInvite").disabled=true;
+    try{
+      const result=await api("/v1/scenes/"+encodeURIComponent(selected.id)+"/invitations",{method:"POST",body:JSON.stringify({target_user_id:target,expires_in_hours:72})});
+      const value=result.invitation?.token;if(!value)throw new Error("invitation_token_missing");
+      $("inviteResult").textContent="一次性邀请令牌（仅本次显示）： "+value;$("inviteResult").classList.remove("hidden");
+      setStatus("inviteStatus","邀请签发成功。请安全地将令牌交给指定用户。","good");
+    }catch(error){setStatus("inviteStatus","签发失败："+error.message,"error");}
+    finally{$("issueInvite").disabled=!selected||selected.visibility!=="private";}
+  }
+  async function sendMessage(event){
+    event.preventDefault();if(busy||!selected)return;const body=$("message").value.trim();if(!body)return;
+    busy=true;$("send").disabled=true;$("message").disabled=true;
+    try{
+      const result=await api("/v1/scenes/"+encodeURIComponent(selected.id)+"/messages",{method:"POST",headers:{"idempotency-key":crypto.randomUUID()},body:JSON.stringify({body})});
+      $("message").value="";const item=result.message;if(item)bubble(item);$("log").scrollTop=$("log").scrollHeight;
+    }catch(error){setStatus("sceneStatus","发送失败："+error.message,"error");}
+    finally{busy=false;$("send").disabled=!selected;$("message").disabled=!selected;$("message").focus();}
+  }
+  async function connect(){
+    token=$("token").value.trim();if(!token)return;sessionStorage.setItem(TOKEN_KEY,token);
+    try{await api("/v1/scenes");$("loginStatus").textContent="";showApp();await Promise.all([loadScenes(),loadMyScenes()]);}
+    catch(error){sessionStorage.removeItem(TOKEN_KEY);token="";$("loginStatus").textContent="连接失败："+error.message;}
+  }
+  $("loginForm").addEventListener("submit",e=>{e.preventDefault();connect();});
+  $("createScene").addEventListener("click",createScene);$("redeem").addEventListener("click",redeemInvite);
+  $("issueInvite").addEventListener("click",issueInvite);$("composer").addEventListener("submit",sendMessage);
+  $("message").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();$("composer").requestSubmit();}});
+  $("refreshScenes").addEventListener("click",loadScenes);$("refreshMyScenes").addEventListener("click",loadMyScenes);$("refreshMessages").addEventListener("click",loadMessages);$("refreshEnvironment").addEventListener("click",loadEnvironment);$("saveEnvironment").addEventListener("click",saveEnvironment);
+  $("logout").addEventListener("click",()=>{sessionStorage.removeItem(TOKEN_KEY);token="";scenes=[];selected=null;showGate();});
+  if(token){showApp();Promise.all([loadScenes(),loadMyScenes()]);}else showGate();
+})();
+</script>
+</body>
+</html>
