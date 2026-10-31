@@ -26,6 +26,8 @@ on:
       - ".github/workflows/zhi-community-check.yml"
       - "openapi/**"
       - "docs/**"
+      - "scripts/smoke_test_agent_community_e2e.mjs"
+      - "supabase/tests/zhi_agent_public_scene_membership_smoke.sql"
 
 permissions:
   contents: read
