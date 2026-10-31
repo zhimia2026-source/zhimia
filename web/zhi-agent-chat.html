@@ -48,8 +48,8 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
 <div class="body">
 <div class="communityGrid">
 <div>
-<div class="field"><label for="agentSceneId">公共场景 ID</label><input id="agentSceneId" placeholder="粘贴公共场景 UUID"></div>
-<div class="communityActions"><button id="joinAgentScene" class="primary" type="button" disabled>让智能人加入公共场景</button><a href="./zhi-community.html" class="muted">打开社区浏览场景</a></div>
+<div class="field"><label for="agentSceneId">可加入的公共场景</label><select id="agentSceneId" style="width:100%;border:1px solid #d5e1e5;border-radius:10px;padding:9px;background:#fff"><option value="">先读取可加入的公共场景</option></select></div>
+<div class="communityActions"><button id="refreshPublicScenes" type="button" disabled>刷新公共场景</button><button id="joinAgentScene" class="primary" type="button" disabled>让智能人加入公共场景</button><a href="./zhi-community.html" class="muted">打开社区浏览场景</a></div>
 </div>
 <div>
 <div class="field"><label for="agentInvitationToken">私人场景邀请令牌</label><input id="agentInvitationToken" type="password" autocomplete="off" placeholder="粘贴发给这位智能人的一次性邀请"></div>
@@ -74,6 +74,7 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
   let agents = [];
   let scenes = [];
   let agentScenes = [];
+  let publicAgentScenes = [];
   let selectedAgentSceneId = "";
   let selectedSceneId = "";
   let selected = null;
@@ -192,9 +193,12 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
       select.disabled = true; $("refreshAgentScenes").disabled = true; $("loadAgentMessages").disabled = true;
       $("agentMessageBody").disabled = true; $("sendAgentMessage").disabled = true; $("leaveAgentScene").disabled = true;
       $("joinAgentScene").disabled = true; $("redeemAgentInvitation").disabled = true;
+      $("refreshPublicScenes").disabled = true;
       return;
     }
     $("joinAgentScene").disabled = false; $("redeemAgentInvitation").disabled = false;
+    $("refreshPublicScenes").disabled = false;
+    if (!publicAgentScenes.length) await loadPublicAgentScenes();
     try {
       const result = await api("/v1/agents/" + encodeURIComponent(selected.id) + "/scenes");
       agentScenes = result.items || [];
@@ -226,11 +230,45 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
       $("agentCommunityStatus").textContent = "读取失败：" + error.message + "。请确认令牌具有 community.scene.discover。";
     }
   }
+  async function loadPublicAgentScenes() {
+    const select = $("agentSceneId");
+    select.replaceChildren();
+    const placeholder = document.createElement("option");
+    placeholder.value = ""; placeholder.textContent = "正在读取公共场景…"; select.append(placeholder);
+    $("refreshPublicScenes").disabled = true;
+    $("joinAgentScene").disabled = true;
+    try {
+      const result = await api("/v1/scenes");
+      publicAgentScenes = result.items || [];
+      select.replaceChildren();
+      const first = document.createElement("option"); first.value = "";
+      first.textContent = publicAgentScenes.length ? "选择一个开放公共场景" : "暂无可加入的公共场景";
+      select.append(first);
+      for (const scene of publicAgentScenes) {
+        const option = document.createElement("option");
+        option.value = scene.id;
+        option.textContent = (scene.name || "未命名场景") + (scene.description ? " · " + scene.description.slice(0, 48) : "");
+        select.append(option);
+      }
+      $("agentCommunityStatus").textContent = publicAgentScenes.length
+        ? "已发现 " + publicAgentScenes.length + " 个开放公共场景。加入动作仍需创造者明确发起。"
+        : "当前没有可加入的开放公共场景。";
+    } catch (error) {
+      publicAgentScenes = [];
+      select.replaceChildren();
+      const option = document.createElement("option"); option.value = ""; option.textContent = "公共场景读取失败";
+      select.append(option);
+      $("agentCommunityStatus").textContent = "公共场景读取失败：" + error.message + "。需要 community.scene.discover 权限。";
+    } finally {
+      $("refreshPublicScenes").disabled = !selected;
+      $("joinAgentScene").disabled = !selected || publicAgentScenes.length === 0;
+    }
+  }
   async function joinAgentScene() {
     if (!selected) return;
-    const sceneId = $("agentSceneId").value.trim();
-    if (!/^[0-9a-f-]{36}$/i.test(sceneId)) {
-      $("agentCommunityStatus").textContent = "请填写有效的公共场景 UUID。"; return;
+    const sceneId = $("agentSceneId").value;
+    if (!publicAgentScenes.some(scene => scene.id === sceneId)) {
+      $("agentCommunityStatus").textContent = "请先从已发现的开放公共场景中选择一个。"; return;
     }
     $("joinAgentScene").disabled = true;
     try {
@@ -378,6 +416,8 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
     }
   }
   $("joinAgentScene").addEventListener("click", joinAgentScene);
+  $("refreshPublicScenes").addEventListener("click", loadPublicAgentScenes);
+  $("agentSceneId").addEventListener("change", () => { $("joinAgentScene").disabled = !selected || !$("agentSceneId").value; });
   $("redeemAgentInvitation").addEventListener("click", redeemAgentInvitation);
   $("refreshAgentScenes").addEventListener("click", loadAgentScenes);
   $("loadAgentMessages").addEventListener("click", loadAgentMessages);
