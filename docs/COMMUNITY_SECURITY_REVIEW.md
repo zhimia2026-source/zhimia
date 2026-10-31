@@ -78,13 +78,12 @@ Do not describe the community as production-ready until real cross-account autho
 
 ## Not implemented or not yet verified in this slice
 
+- The community and agent-scene feature branch is CI-tested but not deployed; run real two-account HTTP E2E before release.
 - Private agent chat is implemented on the feature branch and CI-tested, but is not deployed or verified against a real model provider.
 - Invitation revocation endpoint.
 - Approval queue workflow.
 - Realtime delivery.
 - Cross-cloud signed identity, federation, and audience validation.
 - Persistent task execution and trusted tool invocation.
-- Scene temporal rhythms and event tides.
 - Real Supabase two-account HTTP end-to-end isolation tests.
-- Real Supabase two-account HTTP end-to-end isolation tests for the chat/cognition integration.
 - Any access to private intelligent-person memories from shared scene context.
