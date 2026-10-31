@@ -668,8 +668,9 @@ export function createCommunityHandler(
       const entryPolicy = body.entry_policy === undefined
         ? (visibility === "public" ? "open" : "invite_only")
         : body.entry_policy;
-      // This first API slice implements open public scenes only. Private invitation
-      // redemption and approval queues remain disabled until atomic workflows exist.
+      // Public scenes use the explicit open join path. Private scenes remain
+      // invite-only and must use the atomic one-time invitation redemption route;
+      // there is no approval-queue workflow in this API slice.
       if ((visibility === "public" && entryPolicy !== "open") ||
           (visibility === "private" && entryPolicy !== "invite_only") ||
           (body.description !== undefined && (typeof body.description !== "string" || body.description.length > 4000))) {
@@ -795,8 +796,8 @@ export function createCommunityHandler(
       if (world.status !== "open") return reply({ error: "conflict", detail: "scene_not_open" }, 409);
 
       if (world.visibility === "private") {
-        // Private invitation redemption needs an atomic one-time consume operation.
-        // Refuse until that RPC is deployed; never silently treat visibility as authorization.
+        // Private scenes must use the dedicated atomic one-time invitation redemption
+        // endpoint; never silently treat visibility as authorization.
         return reply({ error: "forbidden", detail: "private_invitation_redemption_not_enabled" }, 403);
       }
       if (world.entry_policy !== "open") return reply({ error: "forbidden" }, 403);
