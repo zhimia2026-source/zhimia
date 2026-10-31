@@ -13,10 +13,8 @@ on:
       - "web/zhi-agent-chat.html"
       - "scripts/check-zhi-community-page.mjs"
       - "scripts/check-zhi-agent-chat-page.mjs"
-      - "web/zhi-community.html"
-      - "web/zhi-agent-chat.html"
-      - "scripts/check-zhi-community-page.mjs"
-      - "scripts/check-zhi-agent-chat-page.mjs"
+      - "scripts/smoke_test_agent_community_e2e.mjs"
+      - "supabase/tests/zhi_agent_public_scene_membership_smoke.sql"
   push:
     branches:
       - "feature/intelligent-community-mvp"
@@ -43,6 +41,8 @@ jobs:
         run: node scripts/check-zhi-agent-chat-page.mjs
       - name: Validate community scene page and embedded JavaScript
         run: node scripts/check-zhi-community-page.mjs
+      - name: Check two-account HTTP E2E harness syntax
+        run: node --check scripts/smoke_test_agent_community_e2e.mjs
 
   edge-function-typecheck:
     runs-on: ubuntu-latest
@@ -122,6 +122,12 @@ jobs:
           SQL
       - name: Apply community migration to disposable PostgreSQL
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261028140000_zhi_community_core.sql
+      - name: Apply agent public-scene membership migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030153000_zhi_agent_public_scene_membership.sql
+      - name: Apply target-agent private invitation migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030160000_zhi_agent_private_scene_invitations.sql
+      - name: Smoke-test agent ownership, invitation binding, idempotency, revoke, and grants
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/zhi_agent_public_scene_membership_smoke.sql
       - name: Apply scene environment configuration migration
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030210000_zhi_scene_environment_config.sql
       - name: Apply private cognition migration to disposable PostgreSQL
