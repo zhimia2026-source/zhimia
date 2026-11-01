@@ -85,3 +85,19 @@ The existing private agent chat handler loads at most 12 most-recent approved mi
 - A scene identifier is context only; scene membership never grants access to private memories.
 - A successful insert means only that a candidate was stored, not that its facts or hypotheses are true.
 - Memory approval is a creator review action, not an objective truth guarantee.
+
+
+## Disposable-project E2E test
+
+The repository includes `scripts/smoke_test_micro_experience_memory_e2e.mjs`. It refuses the production Supabase URL and requires `ZHI_E2E_DISPOSABLE_PROJECT=1`.
+
+Provide these local environment variables:
+- `ZHI_MEMORY_API`: disposable project's `zhi-memory` function URL.
+- `ZHI_COMMUNITY_API`: same disposable project's `zhi-community` function URL.
+- `ZHI_MEMORY_OWNER_TOKEN`: account A token with all four memory scopes.
+- `ZHI_MEMORY_OTHER_TOKEN`: account B token with `agent.memory.read` and `agent.memory.delete`, but no ownership of account A's agent.
+- `ZHI_MEMORY_LIMITED_TOKEN`: account C token without `agent.memory.read` or `agent.memory.write`.
+
+Run with Node.js: `node scripts/smoke_test_micro_experience_memory_e2e.mjs`.
+
+The test creates temporary agents in the disposable project. It does not print tokens or memory contents. Do not point it at production.
