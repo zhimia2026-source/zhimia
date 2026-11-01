@@ -29,6 +29,15 @@ for (const required of [
   "/invitations/redeem",
   "/messages?limit=50",
   "sender_agent_id",
+  "functions/v1/zhi-memory",
+  "saveMicroExperience",
+  "refreshMicroExperiences",
+  "loadMicroExperiences",
+  "agent.memory.read",
+  "approved_micro_experiences",
+  "保存为待审核经历",
+  "批准为长期记忆",
+  "永久删除这段私人经历",
 ]) {
   if (!html.includes(required)) throw new Error("Missing required chat UI contract: " + required);
 }
