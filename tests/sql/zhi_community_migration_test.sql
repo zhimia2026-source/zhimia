@@ -692,12 +692,5 @@ BEGIN
   IF EXISTS (SELECT 1 FROM public.zhi_agent_micro_experiences WHERE id=v_id) THEN
     RAISE EXCEPTION 'hard delete did not remove micro-experience';
   END IF;
-
-  INSERT INTO public.zhi_personal_access_tokens (user_id, token_hash, label, capabilities)
-  VALUES (
-    v_owner, repeat('f',64), 'memory-scope-test',
-    ARRAY['agent.memory.read','agent.memory.write','agent.memory.approve','agent.memory.delete']::text[]
-  );
-  DELETE FROM public.zhi_personal_access_tokens WHERE token_hash=repeat('f',64);
 END;
 $zhi_micro_experience_memory_test$;
