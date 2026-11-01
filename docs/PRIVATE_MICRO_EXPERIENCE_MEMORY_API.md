@@ -86,6 +86,7 @@ When a private chat request is made with a PAT that includes `agent.memory.write
 - The extractor input is a bounded JSON evidence payload and is explicitly treated as untrusted data.
 - The extractor cannot approve memories, call tools, or modify the system prompt.
 - The server validates the response shape and limits before inserting it as `memory_status=candidate` with `source_kind=agent_reflection`.
+- Oversized claims, malformed arrays, invalid importance values, and empty proposals are rejected rather than silently promoted or rewritten.
 - The source reference points to the private chat turn; it is not injected into the model's future memory context.
 - No scene membership is inferred from a chat's optional scene selection; generated memories remain private with `world_id=null`.
 - Extraction and insert failures are best-effort and do not undo a completed chat turn.
