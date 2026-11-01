@@ -5,6 +5,7 @@ import { validateMouRecord } from "./ontology_helpers.ts";
 import { buildFeedbackRecord, buildRevisionProposal } from "./cognitive_cycle_helpers.ts";
 import { buildPrivateAgentContext, buildPrivateChatHistory, buildSceneAwarenessContext, buildSceneBehaviorGuidance } from "./chat_context_helpers.ts";
 import { computeSceneEnvironment, normalizeSceneEnvironmentConfig } from "./environment_helpers.ts";
+import { buildReflectionExtractionMessages, parseReflectionCandidate } from "./reflection_helpers.ts";
 
 const MAX_BODY_BYTES = 64_000;
 
@@ -559,6 +560,51 @@ export function createCommunityHandler(
         .select("id,owner_user_id,agent_id,user_message,assistant_message,status,provider_model,created_at,completed_at")
         .maybeSingle();
       if (completeError || !completed) throw new Error("database_error");
+
+      // Supervised reflection: only tokens with memory.write may propose a candidate.
+      // The extractor sees this completed turn only; it cannot approve long-term memory.
+      if (hasCapability(actor, "agent.memory.write")) {
+        try {
+          const reflectionMessages = buildReflectionExtractionMessages(body.message.trim(), modelReply);
+          const reflectionResponse = await callModel(providerUrl, {
+            method: "POST",
+            headers: { authorization: `Bearer ${providerKey}`, "content-type": "application/json" },
+            body: JSON.stringify({
+              model: providerModel,
+              messages: reflectionMessages,
+              temperature: 0.1,
+              max_tokens: 500,
+              stream: false,
+            }),
+            signal: AbortSignal.timeout(15_000),
+          });
+          if (reflectionResponse.ok) {
+            const reflectionResult = await reflectionResponse.json().catch(() => ({}));
+            const candidate = parseReflectionCandidate(reflectionResult?.choices?.[0]?.message?.content);
+            if (candidate) {
+              const { error: candidateError } = await db.from("zhi_agent_micro_experiences").insert({
+                owner_user_id: actor.userId,
+                agent_id: agentId,
+                world_id: null,
+                experience_type: candidate.experience_type,
+                source_kind: "agent_reflection",
+                source_ref: pendingTurn.id,
+                observed_facts: candidate.observed_facts,
+                hypotheses: candidate.hypotheses,
+                unknowns: candidate.unknowns,
+                reflection: candidate.reflection,
+                importance: candidate.importance,
+                memory_status: "candidate",
+                occurred_at: completedAt,
+              });
+              if (candidateError) console.error("supervised_reflection_candidate_insert_failed");
+            }
+          }
+        } catch {
+          // Optional reflection must never fail or undo the chat turn.
+          console.warn("supervised_reflection_extraction_skipped");
+        }
+      }
       return reply({ turn: completed, idempotent_replay: false }, 201);
     }
 
