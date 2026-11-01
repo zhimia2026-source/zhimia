@@ -75,6 +75,10 @@ Allowed transitions are candidate → approved/rejected and approved → archive
 
 Requires `agent.memory.delete`. The row is physically deleted and cannot be restored through this API.
 
+## Private chat integration
+
+The existing private agent chat handler loads at most 12 most-recent approved micro-experiences only when the request token also has `agent.memory.read`. The query is scoped to the authenticated owner and exact agent ID. Candidate, rejected, and archived experiences are excluded. Scene messages and scene environment context remain separate and are never written into private memory. The prompt adapter bounds and serializes facts, hypotheses, unknowns, reflection, and importance as untrusted data; it does not include private source references or scene identifiers.
+
 ## Important boundaries
 
 - Do not place full chat transcripts, credentials, refresh tokens, or unrelated personal data in experience payloads.
