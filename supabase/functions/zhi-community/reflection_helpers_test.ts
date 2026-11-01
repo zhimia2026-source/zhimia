@@ -34,6 +34,16 @@ Deno.test("reflection parser rejects no-op, malformed, oversized and invalid can
     observed_facts: [{ claim: "A fact" }], hypotheses: [],
     unknowns: [], reflection: "", importance: 6,
   })), null);
+  assertEquals(parseReflectionCandidate(JSON.stringify({
+    should_remember: true, experience_type: "observation",
+    observed_facts: [{ claim: "A fact" }], hypotheses: [],
+    unknowns: ["u".repeat(201)], reflection: "", importance: 2,
+  })), null);
+  assertEquals(parseReflectionCandidate(JSON.stringify({
+    should_remember: true, experience_type: "observation",
+    observed_facts: [{ claim: "A fact" }], hypotheses: [{ claim: "A hypothesis", basis: "b".repeat(321) }],
+    unknowns: [], reflection: "", importance: 2,
+  })), null);
 });
 
 Deno.test("reflection extractor bounds evidence and marks it untrusted", () => {
