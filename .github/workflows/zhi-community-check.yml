@@ -1,0 +1,148 @@
+name: ZHI Community MVP Checks
+
+on:
+  pull_request:
+    paths:
+      - "supabase/functions/zhi-community/**"
+      - "supabase/migrations/**"
+      - "tests/sql/**"
+      - ".github/workflows/zhi-community-check.yml"
+      - "openapi/**"
+      - "docs/**"
+      - "web/zhi-community.html"
+      - "web/zhi-agent-chat.html"
+      - "scripts/check-zhi-community-page.mjs"
+      - "scripts/check-zhi-agent-chat-page.mjs"
+      - "scripts/smoke_test_agent_community_e2e.mjs"
+      - "supabase/tests/zhi_agent_public_scene_membership_smoke.sql"
+  push:
+    branches:
+      - "feature/intelligent-community-mvp"
+      - "feature/intelligent-community-mvp-clean"
+    paths:
+      - "supabase/functions/zhi-community/**"
+      - "supabase/migrations/**"
+      - "tests/sql/**"
+      - ".github/workflows/zhi-community-check.yml"
+      - "openapi/**"
+      - "docs/**"
+      - "scripts/smoke_test_agent_community_e2e.mjs"
+      - "supabase/tests/zhi_agent_public_scene_membership_smoke.sql"
+
+permissions:
+  contents: read
+
+jobs:
+  contract-and-doc-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse OpenAPI and workflow YAML documents
+        run: ruby -e 'require "yaml"; ARGV.each { |path| YAML.parse_file(path); puts "YAML syntax OK " + path }' openapi/zhi-community-v0.1.yaml .github/workflows/zhi-community-check.yml .github/workflows/health-advisor-pages.yml
+      - name: Validate private chat page and embedded JavaScript
+        run: node scripts/check-zhi-agent-chat-page.mjs
+      - name: Validate community scene page and embedded JavaScript
+        run: node scripts/check-zhi-community-page.mjs
+      - name: Check two-account HTTP E2E harness syntax
+        run: node --check scripts/smoke_test_agent_community_e2e.mjs
+
+  edge-function-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check community Edge Function
+        run: deno check supabase/functions/zhi-community/index.ts
+      - name: Test token authentication guard
+        run: deno test supabase/functions/zhi-community/auth_helpers_test.ts
+      - name: Test HTTP principal binding and request authorization
+        run: deno test --allow-env=ZHI_ALLOWED_ORIGINS supabase/functions/zhi-community/http_handler_test.ts
+      - name: Test intelligent agent ownership routes
+        run: deno test --allow-env=ZHI_ALLOWED_ORIGINS supabase/functions/zhi-community/agent_routes_test.ts
+      - name: Test two-owner private cognition read isolation
+        run: deno test --allow-env=ZHI_ALLOWED_ORIGINS supabase/functions/zhi-community/cognition_routes_test.ts
+      - name: Test scene membership isolation guard
+        run: deno test supabase/functions/zhi-community/access_helpers_test.ts
+      - name: Test scene temporal rhythm and event tides
+        run: deno test supabase/functions/zhi-community/environment_helpers_test.ts
+      - name: Test authenticated scene membership listing
+        run: deno test --allow-env=ZHI_ALLOWED_ORIGINS supabase/functions/zhi-community/scene_routes_test.ts
+      - name: Test offline ontology MOU validation
+        run: deno test supabase/functions/zhi-community/ontology_helpers_test.ts
+      - name: Test append-only cognitive feedback cycle
+        run: deno test supabase/functions/zhi-community/cognitive_cycle_helpers_test.ts
+      - name: Test private cognition feedback API isolation
+        run: deno test --allow-env=ZHI_ALLOWED_ORIGINS supabase/functions/zhi-community/feedback_routes_test.ts
+      - name: Test private cognition revision proposal routes
+        run: deno test --allow-env=ZHI_ALLOWED_ORIGINS supabase/functions/zhi-community/revision_proposal_routes_test.ts
+      - name: Test owner-only cognition revision decisions and rollback routes
+        run: deno test --allow-env=ZHI_ALLOWED_ORIGINS supabase/functions/zhi-community/revision_decision_routes_test.ts
+      - name: Test private agent chat context isolation
+        run: deno test --allow-env=ZHI_ALLOWED_ORIGINS supabase/functions/zhi-community/chat_routes_test.ts
+      - name: Test bounded private chat context and history
+        run: deno test supabase/functions/zhi-community/chat_context_helpers_test.ts
+      - name: Test approved cognitive revisions and rollback
+        run: deno test supabase/functions/zhi-community/cognitive_version_helpers_test.ts
+
+  migration-smoke-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: zhi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d zhi_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: zhi_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+      - name: Prepare minimal Supabase-compatible auth schema
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE anon NOLOGIN;
+          CREATE ROLE authenticated NOLOGIN;
+          CREATE ROLE service_role NOLOGIN BYPASSRLS;
+          CREATE SCHEMA auth;
+          CREATE TABLE auth.users (id uuid PRIMARY KEY);
+          GRANT USAGE ON SCHEMA auth TO service_role;
+          GRANT SELECT ON auth.users TO service_role;
+          SQL
+      - name: Apply community migration to disposable PostgreSQL
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261028140000_zhi_community_core.sql
+      - name: Apply agent public-scene membership migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030153000_zhi_agent_public_scene_membership.sql
+      - name: Apply target-agent private invitation migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030160000_zhi_agent_private_scene_invitations.sql
+      - name: Smoke-test agent ownership, invitation binding, idempotency, revoke, and grants
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/zhi_agent_public_scene_membership_smoke.sql
+      - name: Apply scene environment configuration migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030210000_zhi_scene_environment_config.sql
+      - name: Apply private cognition migration to disposable PostgreSQL
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030120000_zhi_private_cognition_records.sql
+      - name: Apply cognition revision proposals migration to disposable PostgreSQL
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030150000_zhi_cognition_revision_proposals.sql
+      - name: Apply cognition revision decisions migration to disposable PostgreSQL
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030170000_zhi_cognition_revision_decisions.sql
+      - name: Apply cognition change-note audit migration to disposable PostgreSQL
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030190000_zhi_cognition_change_note_audit.sql
+      - name: Apply private agent chat migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030200000_zhi_private_agent_chat.sql
+      - name: Smoke-test atomic scene creation RPC and access grants
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/zhi_community_migration_test.sql

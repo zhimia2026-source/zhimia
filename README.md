@@ -33,11 +33,28 @@
 - [ZEE 家庭陪伴人格规范 v1.0](docs/HEALTH_COMPANION_PERSONA.md)
 - [ZEE 多维人格行为验收矩阵 v1.0](docs/ZEE_PERSONALITY_ACCEPTANCE_MATRIX.md)
 - [健康顾问在线双账号隔离验收脚本](scripts/health-advisor-e2e.mjs)
-- [当前个人令牌网关线上验收脚本](scripts/health-advisor-token-gateway-e2e.mjs)\n- [健康顾问客户端写入权限收紧迁移](supabase/migrations/202610250006_restrict_client_chat_writes.sql)
+- [当前个人令牌网关线上验收脚本](scripts/health-advisor-token-gateway-e2e.mjs)
+- [任务执行与可信回执协议](docs/TASK_EXECUTION_PROTOCOL.md)
+- [智能社区 MVP 实现契约](docs/COMMUNITY_MVP.md)
+- [聊天主入口接入契约](docs/CHAT_ADAPTER_CONTRACT.md)
+- [聊天接入部署审计补充](docs/CHAT_DEPLOYMENT_AUDIT.md)
+- [单一 Supabase 项目部署与数据归并方案](docs/SUPABASE_SINGLE_PROJECT_PLAN.md)
+- [关心机制规范 V1.0（实现草案）](docs/CARE_MECHANISM.md)
+- [关心机制 Supabase API](docs/CARE_API.md)
+- [智能社区 API 规范](docs/COMMUNITY_API.md)
+- [智能社区安全审查](docs/COMMUNITY_SECURITY_REVIEW.md)
+- [智能社区数据库迁移草案](supabase/migrations/20261028140000_zhi_community_core.sql)
+- [智能社区 Edge Function](supabase/functions/zhi-community/index.ts)\n- [健康顾问客户端写入权限收紧迁移](supabase/migrations/202610250006_restrict_client_chat_writes.sql)
 - [健康顾问 Supabase 迁移与 Edge Function](supabase/functions/zhi-health-advisor/index.ts)
 
 ## 现有资产复用
 优先评估 `agent-talk.html`、必要时的 `mia-chat.html`，以及 `zhi-agent-chat-history`、`zhi-agent-chat-feed` 等已有聊天能力。自主聊天和广播功能须先完成权限、预算、循环触发与审计检查，不应未经审计直接启用。
+
+## 数据库统一部署原则
+ZHI 内部数据库、认证与 Edge Functions 的目标统一项目为 `https://lvxmygrgqtmzqgailmyl.supabase.co`。旧聊天源码仍需按归并方案迁移和验收；在完成回滚验证前不切换生产流量。
+
+## 智能社区当前状态
+社区 API、迁移和访问控制当前属于功能分支实现；已通过隔离 PostgreSQL 迁移冒烟测试与 Deno 类型/单元测试，但尚未应用到生产数据库、部署社区函数或完成真实账号端到端隔离验收。
 
 ## 标准接口原则
 - 统一 Agent Manifest、World Manifest、消息信封和版本协商。
@@ -87,3 +104,8 @@ python -m unittest discover -s tests -v
 3. 让现有聊天能力适配标准接口，保持旧客户端可用。
 4. 补齐世界成员授权、任务审批、审计与私有记忆隔离。
 5. 再加入经验反思、模拟账本、聊天内管理简报和跨世界协作。
+
+
+### 场景环境状态引擎
+
+场景环境按需确定性计算昼夜节律、事件潮汐、物件微状态与行为权重；owner/moderator 可通过受保护 API 配置，社区页面可查看和编辑。智能人讲话室可显式选择已加入的场景作为共享环境上下文；该上下文与私人认知隔离，不触发自主移动或工具执行。实现与权限边界见 [社区 API 文档](docs/COMMUNITY_API.md#场景环境状态引擎增量实现)。
