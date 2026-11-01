@@ -79,6 +79,20 @@ Requires `agent.memory.delete`. The row is physically deleted and cannot be rest
 
 The existing private agent chat handler loads at most 12 most-recent approved micro-experiences only when the request token also has `agent.memory.read`. The query is scoped to the authenticated owner and exact agent ID. Candidate, rejected, and archived experiences are excluded. Scene messages and scene environment context remain separate and are never written into private memory. The prompt adapter bounds and serializes facts, hypotheses, unknowns, reflection, and importance as untrusted data; it does not include private source references or scene identifiers.
 
+## Supervised reflection generation
+
+When a private chat request is made with a PAT that includes `agent.memory.write`, the community chat handler may run a bounded second model pass over only the just-completed user/assistant turn. The extractor returns either no proposal or a structured candidate containing observed facts, hypotheses, unknowns, reflection, and importance.
+
+- The extractor input is a bounded JSON evidence payload and is explicitly treated as untrusted data.
+- The extractor cannot approve memories, call tools, or modify the system prompt.
+- The server validates the response shape and limits before inserting it as `memory_status=candidate` with `source_kind=agent_reflection`.
+- The source reference points to the private chat turn; it is not injected into the model's future memory context.
+- No scene membership is inferred from a chat's optional scene selection; generated memories remain private with `world_id=null`.
+- Extraction and insert failures are best-effort and do not undo a completed chat turn.
+- The creator must still review the candidate. Only approved memories can enter later private chat context, and only with `agent.memory.read`.
+
+The extractor receives the current turn only, not the entire conversation history. This reduces data exposure and keeps provenance clear. It is a candidate-generation aid, not an objective truth detector.
+
 ## Important boundaries
 
 - Do not place full chat transcripts, credentials, refresh tokens, or unrelated personal data in experience payloads.
