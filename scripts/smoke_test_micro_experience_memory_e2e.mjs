@@ -99,6 +99,12 @@ try {
     },
   });
   expect(noWrite, 403, "missing memory.write scope");
+  const noApprove = await request(memoryApi, limitedToken, "/v1/micro-experiences/" + experienceId + "/review", {
+    method: "POST", body: { status: "approved" },
+  });
+  expect(noApprove, 403, "missing memory.approve scope");
+  const noDelete = await request(memoryApi, limitedToken, "/v1/micro-experiences?id=" + experienceId, { method: "DELETE" });
+  expect(noDelete, 403, "missing memory.delete scope");
 
   const approved = await request(memoryApi, ownerToken, "/v1/micro-experiences/" + experienceId + "/review", {
     method: "POST", body: { status: "approved" },
