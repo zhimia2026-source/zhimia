@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "supabase/functions/zhi-community/**"
+      - "supabase/functions/zhi-memory/**"
+      - "supabase/functions/zhi-token-admin/**"
       - "supabase/migrations/**"
       - "tests/sql/**"
       - ".github/workflows/zhi-community-check.yml"
@@ -14,6 +16,8 @@ on:
       - "scripts/check-zhi-community-page.mjs"
       - "scripts/check-zhi-agent-chat-page.mjs"
       - "scripts/smoke_test_agent_community_e2e.mjs"
+      - "scripts/smoke_test_micro_experience_memory_e2e.mjs"
+      - "web/zhi-token-admin.html"
       - "supabase/tests/zhi_agent_public_scene_membership_smoke.sql"
   push:
     branches:
@@ -45,6 +49,8 @@ jobs:
         run: node scripts/check-zhi-community-page.mjs
       - name: Check two-account HTTP E2E harness syntax
         run: node --check scripts/smoke_test_agent_community_e2e.mjs
+      - name: Check private memory HTTP E2E harness syntax
+        run: node --check scripts/smoke_test_micro_experience_memory_e2e.mjs
 
   edge-function-typecheck:
     runs-on: ubuntu-latest
@@ -55,6 +61,10 @@ jobs:
           deno-version: v2.x
       - name: Type-check community Edge Function
         run: deno check supabase/functions/zhi-community/index.ts
+      - name: Type-check private memory Edge Function
+        run: deno check supabase/functions/zhi-memory/index.ts
+      - name: Type-check token administration Edge Function
+        run: deno check supabase/functions/zhi-token-admin/index.ts
       - name: Test token authentication guard
         run: deno test supabase/functions/zhi-community/auth_helpers_test.ts
       - name: Test HTTP principal binding and request authorization
@@ -121,6 +131,8 @@ jobs:
           CREATE ROLE service_role NOLOGIN BYPASSRLS;
           CREATE SCHEMA auth;
           CREATE TABLE auth.users (id uuid PRIMARY KEY);
+          CREATE TABLE public.zhi_personal_access_tokens (capabilities text[] NOT NULL DEFAULT '{}');
+          CREATE TABLE public.zhi_refresh_credentials (capabilities text[] NOT NULL DEFAULT '{}');
           GRANT USAGE ON SCHEMA auth TO service_role;
           GRANT SELECT ON auth.users TO service_role;
           SQL
@@ -144,5 +156,9 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030190000_zhi_cognition_change_note_audit.sql
       - name: Apply private agent chat migration
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261030200000_zhi_private_agent_chat.sql
+      - name: Apply private micro-experience memory migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261101090000_zhi_agent_micro_experiences.sql
+      - name: Apply private memory capability migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261101093000_zhi_agent_memory_capabilities.sql
       - name: Smoke-test atomic scene creation RPC and access grants
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/zhi_community_migration_test.sql
