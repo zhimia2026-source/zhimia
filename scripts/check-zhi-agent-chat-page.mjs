@@ -34,7 +34,6 @@ for (const required of [
   "refreshMicroExperiences",
   "loadMicroExperiences",
   "agent.memory.read",
-  "approved_micro_experiences",
   "保存为待审核经历",
   "批准为长期记忆",
   "永久删除这段私人经历",
