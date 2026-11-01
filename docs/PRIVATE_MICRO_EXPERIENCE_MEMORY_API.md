@@ -1,0 +1,83 @@
+# ZHI Private Micro-Experience Memory API v1
+
+This module stores private, owner-scoped experiences for one ZHI agent. It is intentionally separate from scene messages and public agent manifests.
+
+## Security model
+
+- Authenticate every request with a ZHI personal access token (PAT) in `Authorization: Bearer <token>`.
+- The function hashes the presented token with SHA-256 and looks up only the hash in `zhi_personal_access_tokens`.
+- Revoked and expired tokens are rejected; successful authentication conditionally updates `last_used_at`.
+- Every route checks an explicit capability and verifies that the requested agent belongs to the authenticated owner.
+- The memory table has RLS enabled and grants no table privileges to `anon` or `authenticated`; only server-side `service_role` can access it.
+- Scene-linked memory creation additionally requires an active membership for the same owner and agent.
+- Candidate memories are never automatically approved.
+- Hard deletion removes the row; no tombstone or content-bearing audit copy is retained.
+
+## Token capabilities
+
+- `agent.memory.read`
+- `agent.memory.write`
+- `agent.memory.approve`
+- `agent.memory.delete`
+
+The token-admin allowlist and database constraints include these scopes. A token must be issued with the required scopes; existing tokens are not silently expanded. The existing maximum of 12 capabilities per token remains.
+
+## Routes
+
+Base URL: `https://lvxmygrgqtmzqgailmyl.supabase.co/functions/v1/zhi-memory`
+
+### List experiences
+
+`GET /v1/agents/{agent_id}/micro-experiences?status=approved&limit=50`
+
+Requires `agent.memory.read`. Status may be `candidate`, `approved`, `rejected`, `archived`, or `all`. If omitted, only approved records are returned.
+
+### Create a candidate
+
+`POST /v1/agents/{agent_id}/micro-experiences`
+
+Requires `agent.memory.write`.
+
+```json
+{
+  "experience_type": "observation",
+  "source_kind": "direct_observation",
+  "world_id": null,
+  "observed_facts": [{"claim": "Window light moved across the reading desk."}],
+  "hypotheses": [{"claim": "The sun angle may have changed.", "basis": "A prior observation"}],
+  "unknowns": ["Whether airflow changed the dust movement"],
+  "reflection": "I will observe again before treating the explanation as fact.",
+  "importance": 2
+}
+```
+
+Supported experience types: `observation`, `touch`, `interaction`, `rest`, `environment_change`, `reflection`.
+
+Supported source kinds: `direct_observation`, `scene_event`, `agent_reflection`, `creator_input`.
+
+Each fact and hypothesis must be an object with a non-empty `claim`. The API caps each list at 50 items, unknowns at 30 items, and reflection at 4,000 characters. The server always creates the record as `candidate`; clients cannot set the approval state.
+
+When `world_id` is supplied, the authenticated owner must have an active membership for that exact agent in that scene.
+
+### Review
+
+`POST /v1/micro-experiences/{experience_id}/review`
+
+Requires `agent.memory.approve`.
+
+Body: `{"status":"approved"}`, `{"status":"rejected"}`, or `{"status":"archived"}`.
+
+Allowed transitions are candidate → approved/rejected and approved → archived. Updates use compare-and-set semantics to prevent concurrent review races.
+
+### Hard delete
+
+`DELETE /v1/micro-experiences?id={experience_id}`
+
+Requires `agent.memory.delete`. The row is physically deleted and cannot be restored through this API.
+
+## Important boundaries
+
+- Do not place full chat transcripts, credentials, refresh tokens, or unrelated personal data in experience payloads.
+- A scene identifier is context only; scene membership never grants access to private memories.
+- A successful insert means only that a candidate was stored, not that its facts or hypotheses are true.
+- Memory approval is a creator review action, not an objective truth guarantee.
