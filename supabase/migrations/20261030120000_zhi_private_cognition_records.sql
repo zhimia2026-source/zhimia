@@ -6,7 +6,7 @@
 begin;
 
 -- The composite key makes agent ownership enforceable by the database, not just API code.
-create unique index if not exists zhi_agents_id_owner_unique_idx
+create unique index if not exists zhi_agents_id_owner_uidx
   on public.zhi_agents (id, owner_user_id);
 
 create table if not exists public.zhi_agent_cognition_records (
