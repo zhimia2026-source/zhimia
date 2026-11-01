@@ -38,6 +38,7 @@ function boundedJson(value: unknown, max: number): string {
 export function buildPrivateAgentContext(
   agent: PrivateAgentProfile,
   cognition: Array<Record<string, unknown>>,
+  approvedMicroExperiences: Array<Record<string, unknown>> = [],
 ): string {
   const profile = {
     display_name: boundedText(agent.display_name, 120),
@@ -61,7 +62,27 @@ export function buildPrivateAgentContext(
     prediction: boundedText(record.prediction, 500),
     version: Number.isInteger(record.version) ? record.version : null,
   }));
-  return JSON.stringify({ profile, private_cognition_records: records });
+  const microExperiences = approvedMicroExperiences.slice(0, 12).map((experience) => {
+    const claims = (value: unknown) => Array.isArray(value)
+      ? value.slice(0, 8).map((item) => boundedText(record(item).claim, 500)).filter(Boolean)
+      : [];
+    return {
+      experience_type: boundedText(experience.experience_type, 40),
+      occurred_at: boundedText(experience.occurred_at, 80),
+      observed_facts: claims(experience.observed_facts),
+      hypotheses: claims(experience.hypotheses),
+      unknowns: boundedList(experience.unknowns, 8).map((item) => boundedText(item, 200)),
+      reflection: boundedText(experience.reflection, 600),
+      importance: Number.isInteger(experience.importance)
+        ? Math.max(1, Math.min(5, experience.importance as number))
+        : 1,
+    };
+  });
+  return JSON.stringify({
+    profile,
+    private_cognition_records: records,
+    approved_micro_experiences: microExperiences,
+  });
 }
 
 /** Keep prompt history bounded to control cost and prevent oversized context replay. */
