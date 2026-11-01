@@ -628,3 +628,69 @@ BEGIN
   END;
 END;
 $zhi_environment_size_limit_test$;
+
+
+-- Private micro-experience memories are owner/agent scoped and approval-gated.
+DO $zhi_micro_experience_memory_test$
+DECLARE
+  v_owner uuid := '11111111-1111-4111-8111-111111111111';
+  v_other uuid := '22222222-2222-4222-8222-222222222222';
+  v_agent uuid := 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  v_id uuid;
+BEGIN
+  IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid='public.zhi_agent_micro_experiences'::regclass) THEN
+    RAISE EXCEPTION 'RLS must be enabled on private micro-experiences';
+  END IF;
+  IF has_table_privilege('anon','public.zhi_agent_micro_experiences','SELECT')
+     OR has_table_privilege('authenticated','public.zhi_agent_micro_experiences','SELECT') THEN
+    RAISE EXCEPTION 'browser roles must not directly read private micro-experiences';
+  END IF;
+  IF NOT has_table_privilege('service_role','public.zhi_agent_micro_experiences','SELECT')
+     OR NOT has_table_privilege('service_role','public.zhi_agent_micro_experiences','INSERT')
+     OR NOT has_table_privilege('service_role','public.zhi_agent_micro_experiences','DELETE') THEN
+    RAISE EXCEPTION 'service_role must mediate private micro-experience access';
+  END IF;
+
+  INSERT INTO public.zhi_agent_micro_experiences (
+    owner_user_id, agent_id, experience_type, source_kind,
+    observed_facts, hypotheses, unknowns, reflection, importance
+  ) VALUES (
+    v_owner, v_agent, 'observation', 'direct_observation',
+    '[{"claim":"The sunlight moved across the reading desk."}]'::jsonb,
+    '[{"claim":"The sun angle may have changed."}]'::jsonb,
+    ARRAY['The airflow source is not yet known'],
+    'Observe again before accepting the explanation.', 2
+  ) RETURNING id INTO v_id;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.zhi_agent_micro_experiences
+    WHERE id=v_id AND memory_status='candidate'
+      AND reviewed_at IS NULL AND reviewed_by_user_id IS NULL
+  ) THEN RAISE EXCEPTION 'new micro-experience must start as an unreviewed candidate'; END IF;
+
+  BEGIN
+    INSERT INTO public.zhi_agent_micro_experiences (
+      owner_user_id, agent_id, experience_type, source_kind, observed_facts
+    ) VALUES (
+      v_other, v_agent, 'observation', 'direct_observation',
+      '[{"claim":"Cross-owner attempt"}]'::jsonb
+    );
+    RAISE EXCEPTION 'cross-owner micro-experience insert was accepted';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  UPDATE public.zhi_agent_micro_experiences
+  SET memory_status='approved', reviewed_by_user_id=v_owner, reviewed_at=now()
+  WHERE id=v_id AND owner_user_id=v_owner AND agent_id=v_agent;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.zhi_agent_micro_experiences
+    WHERE id=v_id AND memory_status='approved' AND reviewed_at IS NOT NULL
+  ) THEN RAISE EXCEPTION 'approved micro-experience state was not persisted'; END IF;
+
+  DELETE FROM public.zhi_agent_micro_experiences WHERE id=v_id AND owner_user_id=v_owner;
+  IF EXISTS (SELECT 1 FROM public.zhi_agent_micro_experiences WHERE id=v_id) THEN
+    RAISE EXCEPTION 'hard delete did not remove micro-experience';
+  END IF;
+END;
+$zhi_micro_experience_memory_test$;

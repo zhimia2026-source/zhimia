@@ -63,11 +63,32 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
 <div class="muted" style="margin-top:8px">加入公共场景由创造者明确发起；私人场景必须使用绑定到这位智能人身份的邀请。智能人只获得普通成员消息权限，不会继承创造者的管理权限或私人记忆。</div>
 </div>
 </section>
+<section id="agentMemory" class="panel communityPanel">
+<div class="head">🧬 私人记忆 · 微体验 <span class="muted">仅当前创造者与这位智能人可见</span></div>
+<div class="body">
+<p class="muted">把值得保留的细节整理成待审核经历。事实、假设和未知分开记录；保存后不会自动成为长期记忆，必须由创造者审批。</p>
+<div class="communityGrid">
+<div>
+<div class="field"><label for="memoryType">经历类型</label><select id="memoryType"><option value="observation">观察</option><option value="touch">触碰</option><option value="interaction">交流</option><option value="rest">静息</option><option value="environment_change">环境变化</option><option value="reflection">反思</option></select></div>
+<div class="field"><label for="memoryFacts">观察事实（每行一条，必须有证据依据）</label><textarea id="memoryFacts" rows="3" maxlength="5000" placeholder="例如：窗边的光线从书架移到了桌面。"></textarea></div>
+<div class="field"><label for="memoryHypotheses">可能的解释 / 假设（每行一条，不等于事实）</label><textarea id="memoryHypotheses" rows="3" maxlength="5000" placeholder="例如：可能是太阳位置发生了变化。"></textarea></div>
+</div>
+<div>
+<div class="field"><label for="memoryUnknowns">尚未确认的事情（每行一条）</label><textarea id="memoryUnknowns" rows="3" maxlength="3000" placeholder="例如：尘埃运动是否受到空气流动影响。"></textarea></div>
+<div class="field"><label for="memoryReflection">反思与后续验证方向</label><textarea id="memoryReflection" rows="4" maxlength="4000" placeholder="记录这段经历带来的理解，以及下一步如何验证。"></textarea></div>
+<div class="field"><label for="memoryImportance">重要性</label><select id="memoryImportance"><option value="1">1 · 普通</option><option value="2" selected>2 · 值得留意</option><option value="3">3 · 有意义</option><option value="4">4 · 重要</option><option value="5">5 · 核心经历</option></select></div>
+</div>
+</div>
+<div class="communityActions"><button id="saveMicroExperience" class="primary" type="button" disabled>保存为待审核经历</button><button id="refreshMicroExperiences" type="button" disabled>刷新私人记忆</button><span id="memoryStatus" class="status">选择智能人并使用具备记忆权限的令牌。</span></div>
+<div id="memoryRecords" class="communityMessages"><div class="muted">私人经历尚未加载。</div></div>
+</div>
+</section>
 </section>
 </main>
 <script>
 (() => {
   const API = "https://lvxmygrgqtmzqgailmyl.supabase.co/functions/v1/zhi-community";
+  const MEMORY_API = "https://lvxmygrgqtmzqgailmyl.supabase.co/functions/v1/zhi-memory";
   const TOKEN_KEY = "zhi_personal_token_session";
   const $ = (id) => document.getElementById(id);
   let token = sessionStorage.getItem(TOKEN_KEY) || "";
@@ -97,6 +118,132 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
       throw error;
     }
     return data;
+  }
+  async function memoryApi(path, options = {}) {
+    const response = await fetch(MEMORY_API + path, {
+      ...options,
+      headers: { authorization: "Bearer " + token, "content-type": "application/json", ...(options.headers || {}) },
+      cache: "no-store",
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(data.error || ("HTTP " + response.status));
+      error.status = response.status;
+      throw error;
+    }
+    return data;
+  }
+  const memoryStatusText = status => ({
+    candidate: "待审核", approved: "已批准", rejected: "未批准", archived: "已归档",
+  }[status] || status);
+  function renderMicroExperiences(items) {
+    const root = $("memoryRecords"); root.replaceChildren();
+    if (!items.length) {
+      const empty = document.createElement("div"); empty.className = "muted";
+      empty.textContent = "这位智能人还没有私人微体验记录。重要经历可以先保存为候选，再由创造者审核。";
+      root.append(empty); return;
+    }
+    for (const item of items) {
+      const card = document.createElement("article"); card.className = "communityMessage";
+      const title = document.createElement("strong");
+      const typeLabel = ({observation:"观察",touch:"触碰",interaction:"交流",rest:"静息",environment_change:"环境变化",reflection:"反思"})[item.experience_type] || item.experience_type;
+      title.textContent = typeLabel + " · " + memoryStatusText(item.memory_status) + " · 重要性 " + item.importance + "/5";
+      const time = document.createElement("div"); time.className = "muted";
+      time.textContent = item.occurred_at ? new Date(item.occurred_at).toLocaleString("zh-SG") : "";
+      card.append(title,time);
+      const addList = (label, values) => {
+        if (!Array.isArray(values) || !values.length) return;
+        const heading = document.createElement("div"); heading.style.fontWeight = "700"; heading.style.marginTop = "8px"; heading.textContent = label; card.append(heading);
+        for (const value of values) {
+          const line = document.createElement("div"); line.textContent = "• " + (typeof value?.claim === "string" ? value.claim : String(value)); card.append(line);
+        }
+      };
+      addList("事实", item.observed_facts); addList("假设", item.hypotheses); addList("未知", item.unknowns);
+      if (item.reflection) { const reflection = document.createElement("div"); reflection.style.marginTop = "8px"; reflection.textContent = "反思：" + item.reflection; card.append(reflection); }
+      const actions = document.createElement("div"); actions.className = "communityActions"; actions.style.marginTop = "10px";
+      const action = (label, status, danger = false) => {
+        const button = document.createElement("button"); button.type = "button"; button.textContent = label;
+        if (danger) button.className = "danger";
+        button.addEventListener("click", () => status === "delete" ? deleteMicroExperience(item.id) : reviewMicroExperience(item.id,status));
+        actions.append(button);
+      };
+      if (item.memory_status === "candidate") { action("批准为长期记忆","approved"); action("拒绝","rejected"); }
+      if (item.memory_status === "approved") action("归档","archived");
+      action("永久删除","delete",true);
+      card.append(actions); root.append(card);
+    }
+  }
+  async function loadMicroExperiences() {
+    if (!selected) {
+      $("memoryStatus").textContent = "先选择一位智能人。"; $("saveMicroExperience").disabled = true; $("refreshMicroExperiences").disabled = true; return;
+    }
+    $("saveMicroExperience").disabled = false; $("refreshMicroExperiences").disabled = false;
+    $("memoryStatus").textContent = "正在读取这位智能人的私人经历…";
+    try {
+      const result = await memoryApi("/v1/agents/" + encodeURIComponent(selected.id) + "/micro-experiences?status=all&limit=50");
+      renderMicroExperiences(result.items || []);
+      $("memoryStatus").textContent = "已读取 " + (result.items || []).length + " 条私人经历。内容不会共享给场景成员。";
+    } catch (error) {
+      $("memoryRecords").replaceChildren();
+      const hint = document.createElement("div"); hint.className = "muted";
+      hint.textContent = error.status === 403
+        ? "当前令牌缺少 agent.memory.read 权限。请在 ZHI 令牌管理中为该身份签发相应的私人记忆权限。"
+        : "私人记忆读取失败：" + error.message;
+      $("memoryRecords").append(hint);
+      $("memoryStatus").textContent = error.status === 403 ? "需要 agent.memory.read 权限。" : "读取失败：" + error.message;
+    }
+  }
+  async function saveMicroExperience() {
+    if (!selected) return;
+    const lines = id => $(id).value.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+    const facts = lines("memoryFacts").map(claim => ({claim}));
+    const hypotheses = lines("memoryHypotheses").map(claim => ({claim}));
+    const unknowns = lines("memoryUnknowns");
+    if (!facts.length) { $("memoryStatus").textContent = "至少填写一条可观察事实；推测请放在假设栏。"; return; }
+    $("saveMicroExperience").disabled = true;
+    $("memoryStatus").textContent = "正在保存待审核经历…";
+    try {
+      await memoryApi("/v1/agents/" + encodeURIComponent(selected.id) + "/micro-experiences", {
+        method: "POST",
+        body: JSON.stringify({
+          experience_type: $("memoryType").value,
+          source_kind: "creator_input",
+          world_id: selectedAgentSceneId || null,
+          observed_facts: facts,
+          hypotheses,
+          unknowns,
+          reflection: $("memoryReflection").value.trim(),
+          importance: Number($("memoryImportance").value),
+        }),
+      });
+      $("memoryFacts").value = ""; $("memoryHypotheses").value = ""; $("memoryUnknowns").value = ""; $("memoryReflection").value = "";
+      $("memoryStatus").textContent = "已保存为候选经历，尚未进入长期记忆。";
+      await loadMicroExperiences();
+    } catch (error) {
+      $("memoryStatus").textContent = error.status === 403
+        ? "保存失败：令牌缺少 agent.memory.write 权限，或智能人尚未加入所选场景。"
+        : "保存失败：" + error.message;
+    } finally { $("saveMicroExperience").disabled = !selected; }
+  }
+  async function reviewMicroExperience(id, status) {
+    if (!selected) return;
+    const labels = {approved:"批准为长期记忆",rejected:"拒绝这段经历",archived:"归档这段经历"};
+    if (!window.confirm("确定" + labels[status] + "？")) return;
+    try {
+      await memoryApi("/v1/micro-experiences/" + encodeURIComponent(id) + "/review", {
+        method: "POST", body: JSON.stringify({status}),
+      });
+      $("memoryStatus").textContent = "审核状态已更新。";
+      await loadMicroExperiences();
+    } catch (error) { $("memoryStatus").textContent = "审核失败：" + error.message; }
+  }
+  async function deleteMicroExperience(id) {
+    if (!window.confirm("确定永久删除这段私人经历？删除后不能恢复。")) return;
+    try {
+      await memoryApi("/v1/micro-experiences?id=" + encodeURIComponent(id), {method:"DELETE"});
+      $("memoryStatus").textContent = "经历已永久删除。";
+      await loadMicroExperiences();
+    } catch (error) { $("memoryStatus").textContent = "删除失败：" + error.message; }
   }
   function showApp() { $("gate").classList.add("hidden"); $("app").classList.remove("hidden"); }
   function showGate() { $("app").classList.add("hidden"); $("gate").classList.remove("hidden"); }
@@ -184,6 +331,7 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
     }
     selectedAgentSceneId = "";
     await loadAgentScenes();
+    await loadMicroExperiences();
   }
   async function loadAgentScenes() {
     const select = $("agentSceneSelect");
@@ -415,6 +563,8 @@ button,input,textarea{font:inherit}button{border:1px solid #d6e2e5;background:#f
       busy = false; $("send").disabled = !selected; $("message").disabled = !selected; $("message").focus();
     }
   }
+  $("saveMicroExperience").addEventListener("click", saveMicroExperience);
+  $("refreshMicroExperiences").addEventListener("click", loadMicroExperiences);
   $("joinAgentScene").addEventListener("click", joinAgentScene);
   $("refreshPublicScenes").addEventListener("click", loadPublicAgentScenes);
   $("agentSceneId").addEventListener("change", () => { $("joinAgentScene").disabled = !selected || !$("agentSceneId").value; });

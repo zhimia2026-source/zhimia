@@ -95,3 +95,29 @@ Deno.test("scene decision layer proposes shelter options but never executes them
   assertEquals(context.suggested_actions[0].executed, false);
   assertEquals(context.suggested_actions.some((item: Record<string, unknown>) => item.action === "rest"), true);
 });
+
+
+Deno.test("approved micro-experiences are bounded and preserve fact-hypothesis separation", () => {
+  const context = JSON.parse(buildPrivateAgentContext(
+    { display_name: "Mia", role: "manager" },
+    [],
+    [{
+      experience_type: "observation",
+      occurred_at: "2026-11-01T09:00:00Z",
+      observed_facts: [{ claim: "Sunlight moved across the desk." }],
+      hypotheses: [{ claim: "The sun angle may have changed." }],
+      unknowns: ["The airflow source is not yet known"],
+      reflection: "Observe again before accepting the explanation.",
+      importance: 4,
+      world_id: "private-scene-id",
+      source_ref: "private-source-id",
+    }],
+  ));
+  assertEquals(context.approved_micro_experiences.length, 1);
+  assertEquals(context.approved_micro_experiences[0].observed_facts[0], "Sunlight moved across the desk.");
+  assertEquals(context.approved_micro_experiences[0].hypotheses[0], "The sun angle may have changed.");
+  assertEquals(context.approved_micro_experiences[0].unknowns[0], "The airflow source is not yet known");
+  assertEquals(context.approved_micro_experiences[0].importance, 4);
+  assertEquals(context.approved_micro_experiences[0].world_id, undefined);
+  assertEquals(context.approved_micro_experiences[0].source_ref, undefined);
+});
