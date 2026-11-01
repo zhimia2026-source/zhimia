@@ -22,10 +22,10 @@ function claimList(value: unknown, allowBasis: boolean): Array<{ claim: string; 
   const result: Array<{ claim: string; basis?: string }> = [];
   for (const item of value) {
     if (!item || typeof item !== "object" || Array.isArray(item)) return null;
-    const claim = typeof item.claim === "string" ? boundedInput(item.claim, MAX_CLAIM_CHARS) : "";
+    const claim = typeof item.claim === "string" && item.claim.length <= MAX_CLAIM_CHARS ? boundedInput(item.claim, MAX_CLAIM_CHARS) : "";
     if (!claim) return null;
     if (allowBasis && item.basis !== undefined) {
-      if (typeof item.basis !== "string") return null;
+      if (typeof item.basis !== "string" || item.basis.length > MAX_CLAIM_CHARS) return null;
       result.push({ claim, basis: boundedInput(item.basis, MAX_CLAIM_CHARS) });
     } else {
       result.push({ claim });
