@@ -68,3 +68,46 @@ export function isAgentMembershipAuthorized(
   }
   return Array.isArray(membership.capabilities) && membership.capabilities.includes(capability);
 }
+
+
+/** Canonical public protocol alias; legacy /v1/scenes remains supported. */
+export function normalizeWorldProtocolPath(path: string): string {
+  return path.replace(/^\\/v1\\/worlds(?=\\/|$)/, "/v1/scenes");
+}
+
+export type PublicJoinWorld = {
+  visibility?: string;
+  entry_policy?: string;
+  status?: string;
+};
+export type PublicJoinAgent = {
+  owner_user_id?: string;
+  status?: string;
+};
+
+/** Public entry is permitted only for the authenticated owner and an active Agent. */
+export function isPublicAgentJoinAllowed(
+  world: PublicJoinWorld | null | undefined,
+  agent: PublicJoinAgent | null | undefined,
+  actorUserId: string,
+): boolean {
+  return Boolean(
+    world && agent && actorUserId &&
+    agent.owner_user_id === actorUserId &&
+    agent.status === "active" &&
+    world.status === "open" &&
+    world.visibility === "public" &&
+    world.entry_policy === "open"
+  );
+}
+
+export function publicAgentMembershipPrivileges() {
+  return {
+    membership_role: "member" as const,
+    status: "active" as const,
+    revoked_at: null,
+    expires_at: null,
+    capabilities: ["message:read", "message:send"],
+    joined_at: new Date().toISOString(),
+  };
+}
