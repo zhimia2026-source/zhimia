@@ -3,7 +3,7 @@
 Status: Phase 1 deployed; API ACTIVE (V4)
 Project: `ZHIMIA` (`lvxmygrgqtmzqgailmyl`)
 API: `zhi-spatial`
-Related runtime: `zhi-community` V29, `zhi-ecosystem-engine` V6, `zhi-memory` V7
+Related runtime: `zhi-community` V30, `zhi-ecosystem-engine` V6, `zhi-memory` V7
 
 ## 1. Purpose
 
@@ -90,6 +90,25 @@ The first seeded graph is based only on the persisted Aurora ecosystem state:
 - 9 containment edges
 
 Coordinates are currently null because the source ecosystem state does not provide authoritative coordinates. The model's weather and object lifecycle values are modeled state, not physical measurements.
+
+
+## 5.1 Chat cognition integration (2026-11-03)
+
+The active `zhi-community` V30 chat route now loads spatial perception after the existing agent-owner binding and scene-membership check.
+
+The injected spatial context contains:
+- database-backed spatial nodes with provenance, freshness and observability;
+- graph edges only when both endpoints are visible and the edge policy is `inherit` or `open`;
+- exact-agent private nodes only when both `owner_agent_id` and `owner_user_id` match;
+- per-agent/per-world continuity, defaulting to `position_unobserved` when no evidence exists;
+- current ecosystem simulation metadata and bounded environment/microstate details, explicitly labeled as modeled inference;
+- explicit unknown/unobserved records for missing coordinates and unavailable observations.
+
+Every spatial context load writes only a minimal row to `zhi_spatial_perception_events`; it does not store the prompt or memory content. The packet explicitly excludes private memory. Existing private cognition, approved memory and private chat history continue through their pre-existing owner-scoped path and are not copied into spatial records.
+
+The system prompt now instructs the agent to distinguish database facts, modeled inference and unknowns; never convert an anchor into a current location; never infer missing directions; and never claim movement from a graph edge. Supervised action semantics remain unchanged.
+
+Verification boundary: deployment and source inspection are confirmed. A live authenticated chat turn has not yet been executed because a valid owner token with scene access is required. No authenticated end-to-end success is claimed.
 
 ## 6. Mia / Forest_Corner boundary
 
