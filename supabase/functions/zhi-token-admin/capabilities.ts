@@ -11,4 +11,5 @@ export const DEFAULT_PERSONAL_TOKEN_CAPABILITIES = Object.freeze([
   "community.agent.create",
   "community.message.read",
   "community.message.send",
+  "agent.audit.read",
 ] as const);
