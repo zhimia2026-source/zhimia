@@ -143,9 +143,6 @@ export function createCommunityHandler(
         parts[1] === "agents" && parts[3] === "system-logs") {
       const agentId = parts[2];
       if (!isUuid(agentId)) return reply({ error: "invalid_argument", detail: "agent_id_must_be_uuid" }, 400);
-      if (!hasCapability(actor, "agent.audit.read")) {
-        return reply({ error: "forbidden", detail: "capability_required" }, 403);
-      }
       const { data: agent, error: agentError } = await db.from("zhi_agents")
         .select("id,owner_user_id").eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
       if (agentError) throw new Error("database_error");
