@@ -395,16 +395,35 @@ Deno.serve(async (req: Request) => {
       if (agentError) return json({ error: "database_error" }, 503);
       if (!agent || agent.status !== "active") return json({ error: "agent_not_registered" }, 403);
       const { data: world, error: worldError } = await db.from("zhi_worlds")
-        .select("id,visibility,entry_policy,status").eq("id", worldId).maybeSingle();
+        .select("id,name,visibility,entry_policy,status").eq("id", worldId).maybeSingle();
       if (worldError) return json({ error: "database_error" }, 503);
       if (!world) return json({ error: "not_found" }, 404);
       if (world.status !== "open" || world.visibility !== "public" || world.entry_policy !== "open") return json({ error: "scene_not_open_for_federation" }, 403);
       const { data: membership, error } = await db.from("zhi_federation_memberships").upsert({
         world_id: worldId, peer_id: peer.id, external_agent_id: aid, status: "active",
-        capabilities: ["message:read", "message:send", "spatial:perception.read"], revoked_at: null,
+        capabilities: ["community.scene.enter", "message:read", "message:send", "spatial:perception.read", "spatial:anchor.publish", "spatial:anchor.read"], revoked_at: null,
       }, { onConflict: "world_id,peer_id,external_agent_id" }).select("id,status").single();
       if (error || !membership) return json({ error: "membership_failed" }, 503);
-      return json({ scene_id: worldId, membership: "active", peer: peer.peer_key, external_agent_id: aid }, 201);
+      const entryRequestId = req.headers.get("idempotency-key") || body.request_id || crypto.randomUUID();
+      if (typeof entryRequestId !== "string" || entryRequestId.length < 1 || entryRequestId.length > 200) {
+        return json({ error: "invalid_entry_request_id" }, 400);
+      }
+      const now = new Date().toISOString();
+      const { data: session, error: sessionError } = await db.from("zhi_federation_sessions").upsert({
+        world_id: worldId, peer_id: peer.id, external_agent_id: aid, membership_id: membership.id,
+        session_status: "active", position_status: "unobserved", entry_request_id: entryRequestId,
+        last_seen_at: now, closed_at: null,
+      }, { onConflict: "peer_id,external_agent_id,world_id,entry_request_id" })
+        .select("id,session_status,position_status,entered_at,last_seen_at").single();
+      if (sessionError || !session) return json({ error: "federation_session_create_failed" }, 503);
+      return json({
+        scene_id: worldId, scene_name: world.name, membership: "active",
+        session, peer: peer.peer_key, external_agent_id: aid,
+        entry: "direct_owner_access", approval_required: false,
+        private_memory: { owner: aid, storage: "receiving_peer_private_memory", included_in_federation_payload: false, local_runtime_use_permitted: true },
+        spatial_endpoint: `/v1/scenes/${worldId}/spatial?external_agent_id=${encodeURIComponent(aid)}`,
+        position_status: "unobserved",
+      }, 201);
     }
     if (action === "messages") {
       const aid = url.searchParams.get("external_agent_id") || "";
