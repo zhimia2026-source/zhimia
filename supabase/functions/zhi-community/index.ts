@@ -581,6 +581,9 @@ export function createCommunityHandler(
         .eq("world_id", worldId).eq("principal_user_id", actor.userId).eq("agent_id", agentId)
         .eq("status", "active").is("revoked_at", null).maybeSingle();
       if (membershipError) throw new Error("database_error");
+      if (!membership) {
+        return reply({ error: "forbidden", detail: "agent_scene_membership_required" }, 403);
+      }
       if (!isAgentMembershipAuthorized(membership, actor.userId, agentId, "message:read")) {
         return reply({ error: "forbidden", detail: "agent_scene_membership_required" }, 403);
       }
