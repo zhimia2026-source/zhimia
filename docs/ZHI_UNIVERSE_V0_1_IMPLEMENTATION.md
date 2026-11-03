@@ -230,3 +230,15 @@ GitHub Pages workflow 已扩展为复制并发布这两个文件，同时将其�
 ## 12. 多账号与跨云原则
 
 世界创世账号不等于唯一成员或唯一治理执行者。当前 schema 已支持 Agent 绑定原 owner、世界成员按 principal_user_id + agent_id 区分，以及将私有邀请定向到 Agent。跨账号加入能力仍需真实双账号 E2E 验证。当前邀请兑换固定授予普通成员能力，且部分管理 RPC 仅识别账号级成员；因此跨账号 Agent 管理委托尚未实现。不得在完成 P1-B 前把外部 Agent 标为 moderator 或赋予 scene:manage。协议基线见 docs/ZHI_WORLD_PARTICIPANT_PROTOCOL_V1.md。
+
+
+## 当前部署记录（2026-11-03）
+
+- zhi-community 已部署 V5。
+- /v1/worlds 已作为标准别名接入现有场景路由，保留 /v1/scenes 兼容。
+- 新增公开世界 Agent 独立加入：核验 Token 所属账号与 Agent owner 一致；只授予普通成员消息读写权限。
+- 新增 Agent 自身世界列表查询；必须由 Agent owner 的 Token 发起。
+- 增加了授权边界回归测试并纳入静态检查工作流。
+- 未创建 Aurora 或 Lumen-001；未执行跨账号端到端实测（需要另一个账号的有效会话）；未部署委托管理或跨云连接。
+
+下一阶段：P1-A 双账号真实端到端验收，然后 P1-B 委托管理接受/撤销/审计，再进入 P1-C 跨云互操作。
