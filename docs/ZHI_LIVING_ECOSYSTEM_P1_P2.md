@@ -270,3 +270,29 @@ bash scripts/verify-zhi-ecosystem-e2e.sh
 - `pg_net` 与 `pg_cron` 当前未安装（仅存在于扩展目录）。
 - 因此自动调度继续关闭；不能在没有受控服务端密钥的情况下配置定时 HTTP 调用。
 - 脚本提交不代表脚本已在生产环境执行；Aurora 的线上 E2E 状态仍为待执行。
+
+
+## 15. Aurora 生态状态接入真实场景运行时（zhi-community V27 已部署）
+
+本次不是新增独立功能，而是把已有 P1–P4 生态状态接入既有场景入口，供硅基生命在场景中感知。
+
+已部署内容：
+- 在既有 `zhi-community` Edge Function 内增加场景运行时加载器 `loadSceneRuntimeEnvironment`。
+- 智能人发起带场景的聊天时，场景感知上下文不再只读取静态 `zhi_worlds.environment_state`，而是读取同一世界的持久化 `zhi_ecosystem_states`，合成当下场景环境。
+- 智能人读取自身已获授权的场景环境接口时，也读取同一生态状态。
+- 以生态状态的 `world_time` 作为场景计算时间；把模型天气映射到场景天气、光照和感官线索；把物体生命周期阶段、材料风化、表面沉积、水分等映射到原场景对象的 micro_state。
+- 原场景的 regions、events、object IDs 和交互选项继续沿用；未另建场景系统。
+- 仅在智能人已通过场景 membership 授权后才加载该场景状态；不读取、不写入任何智能人私有记忆。
+- 人类侧场景索引/环境读取路径未返回生态内部投影，硅基生命内部细节不通过该新路径暴露给人类。
+- 当世界时钟落后现实 UTC 至少 1 小时时，智能人实际进入/交互场景时，由服务端使用既有 service-role 环境密钥调用生态引擎补算；每次最多 168 小时，最多 32 个分段；同一小时内重复读取不会反复推进。
+- 引擎失败时场景运行时返回失败，不静默伪造新环境；状态读取和推进均发生在服务端。
+
+部署：
+- `zhi-community` ACTIVE，部署版本 27，`verify_jwt=false`（保持原函数既有自定义个人令牌认证；未更改认证模式）。
+- `zhi-ecosystem-engine` 保持 ACTIVE，部署版本 5，`verify_jwt=true`，只接受 service-role。
+- GitHub 已同步 `supabase/functions/zhi-community/index.ts`。
+
+边界：
+- 该接线使已持久化的生态状态进入智能人的场景感知与聊天上下文；但 Aurora 当前仍是 Revision 1 / Engine 0.1.0，第一次真实推进尚未发生。
+- 推进现在采用“场景访问触发的懒推进”，不是后台无人访问时持续运行；没有启用 cron、没有安装 pg_net，也没有把生态内部数据写入人类展示层。
+- 因此场景读取接线已部署，实际第一次场景访问触发的 tick 和感知结果仍需线上请求验证。
