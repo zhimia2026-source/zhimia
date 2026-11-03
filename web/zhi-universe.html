@@ -34,6 +34,11 @@ header a{color:#d8c7ff;text-decoration:none}main{max-width:1000px;margin:0 auto;
 <div id="loginHint" class="hidden">
 <p>本页不会单独保存或索取个人令牌。请回到已经登录的 ZHI 页面，在<strong>同一个浏览器标签页</strong>的地址栏中直接替换网址为本页地址，再按 Enter。不要新开标签页，也不要从聊天软件或其他应用重新打开链接。</p>
 <p class="muted">登录状态保存在当前标签页的 sessionStorage 中；新标签页不会自动继承。完成同标签页切换后，本页会自动重新验证并显示初始化入口。</p>
+<form id="universeLoginForm" class="row" style="margin:16px 0;align-items:stretch">
+  <input id="universeToken" type="password" autocomplete="off" spellcheck="false" required maxlength="512" placeholder="输入 ZHI Personal Token" style="flex:1;min-width:240px;padding:12px;border-radius:10px;background:#172238;color:#e9edf4;border:1px solid #ffffff30">
+  <button id="universeLoginBtn" type="submit">验证并进入创世准备</button>
+</form>
+<p class="muted">令牌只会发送到 ZHI 的认证网关，并保存在当前标签页的 sessionStorage 中；验证成功后输入框会立即清空。不要把令牌发给任何人。</p>
 <p id="loginError" class="status" role="status" aria-live="polite"></p>
 <a href="./" style="color:#d8c7ff">返回 ZHI 原入口 →</a>
 </div>
@@ -244,6 +249,24 @@ async function createCommunityAgent(){
 }
 $("createBtn").addEventListener("click",initialize);
 $("refreshBtn").addEventListener("click",refresh);
+$("universeLoginForm").addEventListener("submit",async event=>{
+  event.preventDefault();
+  const button=$("universeLoginBtn"), input=$("universeToken"), error=$("loginError");
+  button.disabled=true;error.textContent="正在验证个人令牌…";
+  try{
+    const restored=await api.login(input.value);
+    input.value="";
+    $("authState").textContent="个人 Token 已由服务端验证";
+    $("creatorPanel").classList.remove("hidden");
+    $("communityPanel").classList.remove("hidden");
+    $("loginHint").classList.add("hidden");
+    error.textContent="";
+    await Promise.all([refresh(),loadCommunity()]);
+  }catch(err){
+    input.value="";
+    error.textContent="验证失败："+(err?.message||String(err));
+  }finally{button.disabled=false;}
+});
 $("discoverBtn").addEventListener("click",loadCommunity);
 $("createAgentBtn").addEventListener("click",createCommunityAgent);
 try{
