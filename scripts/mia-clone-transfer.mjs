@@ -162,8 +162,8 @@ async function main() {
         if (page.length<pageSize) break;
       }
     }
-    digestRows.sort((a,b)=>a.pk.localeCompare(b.pk));
-    expected[table]={count:tableRows,rowset_sha256:sha256(digestRows.map(x=>JSON.stringify([x.pk,x.hash]))),upper_bound:maxPk===null?null:String(maxPk)};
+    digestRows.sort((a,b)=>a.pk < b.pk ? -1 : a.pk > b.pk ? 1 : 0);
+    expected[table]={count:tableRows,rowset_sha256:sha256(digestRows.map(x=>x.pk+':'+x.hash)),upper_bound:maxPk===null?null:String(maxPk)};
     all+=tableRows;
     console.log(`DONE ${table}: ${tableRows}`);
   }
