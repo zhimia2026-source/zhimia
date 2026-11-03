@@ -83,7 +83,7 @@ Verified on 2026-11-03:
 - Revision 2 and all six causal events are persisted.
 - Scene discovery projection remains `{id,name}`.
 
-The first scheduled Cron execution is expected at the next 15-minute boundary after deployment; the direct authenticated tick already verified the same Edge Function path and scheduler credential.
+The first scheduled Cron execution succeeded at 2026-11-03 09:30:00 UTC. The Cron job run status was `succeeded`, and the persisted world state advanced to revision 3 at `2026-11-03T09:30:00.052Z`. This verifies the recurring scheduler path, not only the manual invocation.
 
 ## 7. Pause and recovery
 
