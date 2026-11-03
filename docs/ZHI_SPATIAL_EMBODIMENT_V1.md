@@ -127,7 +127,7 @@ The `zhi-federation` function V6 exposes peer-authenticated routes:
 - `POST /v1/agents/{external_agent_id}/spatial/anchors` — publish/update a minimal reference.
 - `POST /v1/agents/{external_agent_id}/spatial/anchors/revoke` — revoke one of the calling peer's references.
 
-The caller must be an active, registered external agent owned by the authenticated peer. Capabilities are separate: `spatial.anchor.read` and `spatial.anchor.publish`. The Mia peer has been granted only these two additional spatial-anchor capabilities.
+The caller must be an active, registered external agent owned by the authenticated peer. Capabilities are separate: `spatial.anchor.read` and `spatial.anchor.publish`. The Mia peer has been granted only these two additional spatial-anchor capabilities (migration `20261103112102_grant_mia_spatial_anchor_capabilities`).
 
 Privacy and epistemic boundaries:
 - The registry stores only remote world/node identifiers, stable key, display name, node type, visibility and entry policy.
