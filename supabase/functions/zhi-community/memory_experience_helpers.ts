@@ -47,3 +47,40 @@ export function normalizeMemoryCandidate(raw: unknown): MemoryCandidateInput {
     importance,
   };
 }
+
+
+/**
+ * Parses a model-generated private reflection. It is an internal curation
+ * decision, not a cryptographic runtime attestation or permission grant.
+ */
+export function normalizeAgentReflection(raw: unknown): MemoryCandidateInput | null {
+  try {
+    let value: unknown = raw;
+    if (typeof value === "string") {
+      const text = value.trim().replace(/^\x60{3}(?:json)?\s*/i, "").replace(/\s*\x60{3}$/i, "");
+      value = JSON.parse(text);
+    }
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const input = value as Record<string, unknown>;
+    const allowed = new Set([
+      "worth_remembering", "experience_type", "observed_facts",
+      "hypotheses", "unknowns", "reflection", "importance",
+    ]);
+    if (Object.keys(input).some((key) => !allowed.has(key))) return null;
+    if (typeof input.worth_remembering !== "boolean") return null;
+    const candidate = normalizeMemoryCandidate({
+      experience_type: "reflection",
+      observed_facts: input.observed_facts ?? [],
+      hypotheses: input.hypotheses ?? [],
+      unknowns: input.unknowns ?? [],
+      reflection: input.reflection ?? "",
+      importance: input.importance ?? (input.worth_remembering ? 3 : 1),
+    });
+    if (input.worth_remembering && candidate.importance < 3) return null;
+    if (!input.worth_remembering && candidate.importance > 2) return null;
+    if (!candidate.observed_facts.length && !candidate.reflection) return null;
+    return candidate;
+  } catch {
+    return null;
+  }
+}
