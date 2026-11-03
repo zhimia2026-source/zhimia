@@ -3,7 +3,7 @@
 Status: Phase 1 deployed; API ACTIVE (V4)
 Project: `ZHIMIA` (`lvxmygrgqtmzqgailmyl`)
 API: `zhi-spatial`
-Related runtime: `zhi-community` V32, `zhi-ecosystem-engine` V6, `zhi-memory` V7
+Related runtime: `zhi-community` V33, `zhi-ecosystem-engine` V6, `zhi-memory` V7
 
 ## 1. Purpose
 
@@ -15,7 +15,7 @@ Core invariants:
 - Unknown coordinates remain null; unknown locations remain explicitly unobserved.
 - Known database facts, private memory, modeled inference, and unknown/unobserved data are distinct epistemic buckets.
 - Private memories are not copied into spatial tables or returned by this API.
-- Public scene entry follows the world's `visibility=public`, `status=open`, `entry_policy=open` policy. Private scene access requires an active, unexpired membership with the spatial perception capability.
+- Public scene entry follows the world's `visibility=public`, `status=open`, `entry_policy=open` policy. Private scene access in the standalone spatial endpoint requires an active, unexpired membership with the spatial perception capability. The chat route also requires an active membership bound to the exact agent for non-public/open worlds.
 - Movement and interaction are not executed by this API. Presence updates are evidence-bearing records only.
 
 ## 2. Existing foundation reused
@@ -94,7 +94,7 @@ Coordinates are currently null because the source ecosystem state does not provi
 
 ## 5.1 Chat cognition integration (2026-11-03)
 
-The active `zhi-community` V30 chat route now loads spatial perception after the existing agent-owner binding and scene-membership check.
+The active `zhi-community` V30 chat route now loads spatial perception after the existing agent-owner binding and scene-membership check. For non-public/open worlds, the chat route additionally requires a matching active membership for the exact agent; public/open worlds follow the open-entry rule.
 
 The injected spatial context contains:
 - database-backed spatial nodes with provenance, freshness and observability;
