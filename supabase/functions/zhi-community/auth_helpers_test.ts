@@ -1,4 +1,4 @@
-import { isTokenExpiryValid, tokenTouchSucceeded } from "./auth_helpers.ts";
+import { hasCapability, isTokenExpiryValid, tokenTouchSucceeded } from "./auth_helpers.ts";
 
 Deno.test("missing token expiry is accepted as non-expiring", () => {
   if (!isTokenExpiryValid(null)) throw new Error("null expiry should be valid");
@@ -13,25 +13,23 @@ Deno.test("future token expiry is accepted", () => {
 
 Deno.test("elapsed and malformed token expiries fail closed", () => {
   const now = Date.parse("2026-11-03T00:00:00.000Z");
-  if (isTokenExpiryValid("2026-11-02T00:00:00.000Z", now)) {
-    throw new Error("elapsed expiry must be rejected");
-  }
-  if (isTokenExpiryValid("not-a-date", now)) {
-    throw new Error("malformed expiry must be rejected");
-  }
-  if (isTokenExpiryValid("", now)) {
-    throw new Error("empty expiry must be rejected");
-  }
+  if (isTokenExpiryValid("2026-11-02T00:00:00.000Z", now)) throw new Error("elapsed expiry must be rejected");
+  if (isTokenExpiryValid("not-a-date", now)) throw new Error("malformed expiry must be rejected");
+  if (isTokenExpiryValid("", now)) throw new Error("empty expiry must be rejected");
 });
 
 Deno.test("token touch succeeds only when an active row is returned", () => {
-  if (!tokenTouchSucceeded({ data: { id: "token-id" }, error: null })) {
-    throw new Error("returned active row should pass");
+  if (!tokenTouchSucceeded({ data: { id: "token-id" }, error: null })) throw new Error("active row should pass");
+  if (tokenTouchSucceeded({ data: null, error: null })) throw new Error("missing row must fail closed");
+  if (tokenTouchSucceeded({ data: { id: "token-id" }, error: new Error("db") })) throw new Error("database error must fail closed");
+});
+
+Deno.test("capability checks are exact and fail closed", () => {
+  if (!hasCapability({ capabilities: ["community.scene.create"] }, "community.scene.create")) {
+    throw new Error("granted capability should pass");
   }
-  if (tokenTouchSucceeded({ data: null, error: null })) {
-    throw new Error("missing row must fail closed");
+  if (hasCapability({ capabilities: ["community.scene.create"] }, "community.agent.create")) {
+    throw new Error("different capability must not pass");
   }
-  if (tokenTouchSucceeded({ data: { id: "token-id" }, error: new Error("db") })) {
-    throw new Error("database error must fail closed");
-  }
+  if (hasCapability({}, "community.scene.create")) throw new Error("missing capabilities must fail closed");
 });
