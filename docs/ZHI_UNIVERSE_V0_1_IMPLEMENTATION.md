@@ -170,7 +170,7 @@ Supabase PostgreSQL
 - [x] 入口复用 `zhi_personal_token` / `zhi_refresh_token` 的 sessionStorage 与现有 Token Gateway 续签流程；不显示或记录 Token 明文。
 - [x] 增加从现有“关心”页面进入 ZHI 世界的同标签页链接。
 - [x] 扩展 GitHub Pages workflow，发布入口页面与客户端适配器，并将新文件纳入前端密钥扫描。
-- [ ] GitHub Pages 实际部署与浏览器加载验证（代码已提交，部署结果尚未核实）。
+- [x] GitHub Pages 构建与部署成功（run `41575113311`，commit `e8faf751`）；浏览器端实际加载与 Token 请求仍待真实会话验证。
 - [ ] 展示 Aurora、Lumina City、区域和居民状态。
 - [ ] 点击 Lumen 进入现有智能人聊天系统（需核实现有聊天页的 Agent 深链参数后接入，不重建聊天）。
 - [ ] 环境时间状态可见并可验证。
@@ -208,7 +208,7 @@ Supabase PostgreSQL
 
 已提交 `web/zhi-universe.html` 与 `web/zhi-universe-client.js`。入口在同一浏览器标签页中复用现有个人 Token 与刷新令牌，先调用 Token Gateway 验证/续签，再请求 `zhi-community`。用户明确点击后才执行初始化；流程先查询当前账号的世界与 Agent，同名对象优先复用。默认创建私有 Aurora 与私有 Lumen-001，并通过服务端签发的一次性 Agent 邀请完成入驻。页面不会展示或写日志记录 Token 明文，也不会直接访问数据库。
 
-GitHub Pages workflow 已扩展为复制并发布这两个文件，同时将其纳入前端密钥扫描。仅确认代码与 workflow 已提交；Pages workflow 是否成功运行、页面是否可访问、真实浏览器 Token 请求是否成功，仍待线上验证。当前尚未创建任何 Aurora 或 Lumen-001 实例。
+GitHub Pages workflow 已扩展为复制并发布这两个文件，同时将其纳入前端密钥扫描。Pages workflow 已于 run `41575113311` 成功构建并部署（commit `e8faf751`）；新页面是否能在用户当前浏览器会话中成功恢复 Token、调用真实 API，仍待验证。当前尚未创建任何 Aurora 或 Lumen-001 实例。
 
 ## 11. 状态声明
 
