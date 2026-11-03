@@ -149,6 +149,60 @@ function advanceObjectLifecycles(
   return events;
 }
 
+
+function advanceBiogeochemicalCycle(soil: Record<string, any>, flora: Record<string, any>, p: Record<string, number>) {
+  const days = p.elapsedHours / 24;
+  const litter = Number(soil.organic_litter_index ?? 0.025);
+  const humus = Number(soil.humus_index ?? 0.08);
+  const nutrient = clamp(p.nutrientIndex, 0, 1);
+  const propagules = Number(flora.propagule_bank_index ?? 0.12);
+  const seedlings = Number(flora.seedling_establishment_index ?? 0.04);
+  const decomposer = Number(soil.decomposer_activity_index ?? 0.18);
+  const tempFit = clamp(1 - Math.abs(p.temperature - 20) / 28, 0.12, 1);
+  const wetFit = clamp((p.moisture - 0.12) / 0.55, 0, 1);
+  const activity = clamp(decomposer + (tempFit * wetFit - 0.35) * 0.0008 * days, 0, 1);
+  const plantGain = Math.max(0, (p.moss - p.moss0) * 0.18 + (p.fern - p.fern0) * 0.42 + (p.tree - p.tree0) * 0.65);
+  const litterInput = plantGain * 0.32 + (p.moss0 * 0.000012 + p.fern0 * 0.000009 + p.tree0 * 0.000006) * days;
+  const decomposed = Math.min(litter + litterInput, 0.00022 * activity * wetFit * tempFit * days * (0.4 + litter));
+  const humusFormed = decomposed * 0.34;
+  const nutrientRelease = decomposed * 0.48 + humusFormed * 0.08;
+  const uptake = plantGain * 0.24 + (p.moss + p.fern + p.tree) * 0.000002 * days;
+  const leaching = p.rain * 0.000006 * wetFit;
+  const nextNutrient = clamp(nutrient + nutrientRelease - uptake - leaching, 0.02, 1);
+  const sporeSeedInput = Math.max(0, p.fern - p.fern0) * 0.75 + Math.max(0, p.tree - p.tree0) * 0.55 + p.tree * 0.000018 * days;
+  const germination = (propagules + sporeSeedInput) * 0.00011 * wetFit * tempFit * p.light * days;
+  const nextPropagules = clamp(propagules + sporeSeedInput - propagules * 0.000035 * days - germination, 0, 1);
+  const recruitment = germination * 0.62;
+  const nextSeedlings = clamp(seedlings + recruitment - seedlings * 0.000025 * days, 0, 1);
+  const nextLitter = clamp(litter + litterInput - decomposed, 0, 1);
+  const nextHumus = clamp(humus + humusFormed - humus * 0.000015 * days, 0, 1);
+  soil.organic_litter_index = Number(nextLitter.toFixed(10));
+  soil.humus_index = Number(nextHumus.toFixed(10));
+  soil.decomposer_activity_index = Number(activity.toFixed(8));
+  soil.nutrient_index = Number(nextNutrient.toFixed(10));
+  soil.biogeochemical_model = "zhi_biogeochemical_cycle_v0.1";
+  soil.biogeochemical_parameter_quality = "modeled_assumption";
+  flora.propagule_bank_index = Number(nextPropagules.toFixed(10));
+  flora.seedling_establishment_index = Number(nextSeedlings.toFixed(10));
+  flora.recruitment_model = "functional_group_propagule_bank_v0.1";
+  flora.recruitment_parameter_quality = "modeled_assumption";
+  const stamp = new Date(p.worldTime).toISOString();
+  const events: Record<string, unknown>[] = [];
+  if (decomposed >= 0.0005) events.push({
+    idempotency_key: "decomposition:" + stamp, event_kind: "organic_matter_decomposed",
+    source_kind: "biogeochemical_process", occurred_at: stamp,
+    payload: { decomposed_index: Number(decomposed.toFixed(10)), litter_remaining_index: Number(nextLitter.toFixed(10)), humus_formed_index: Number(humusFormed.toFixed(10)), nutrient_released_index: Number(nutrientRelease.toFixed(10)), simulated: true },
+    causal_chain: ["plant_turnover", "organic_litter", "decomposer_activity", "humus_formation", "nutrient_release"],
+  });
+  if (recruitment >= 0.00005) events.push({
+    idempotency_key: "recruitment:" + stamp, event_kind: "plant_recruitment",
+    source_kind: "life_cycle_process", occurred_at: stamp,
+    payload: { propagule_bank_index: Number(nextPropagules.toFixed(10)), seedling_establishment_index: Number(nextSeedlings.toFixed(10)), recruitment_increment: Number(recruitment.toFixed(10)), functional_group: "seed_and_spore_bearing_plants", simulated: true },
+    causal_chain: ["mature_plant_propagules", "propagule_bank", "moisture_temperature_light", "germination", "seedling_establishment"],
+  });
+  return { events, summary: { litter_input_index: Number(litterInput.toFixed(10)), decomposition_index: Number(decomposed.toFixed(10)), humus_formed_index: Number(humusFormed.toFixed(10)), nutrient_release_index: Number(nutrientRelease.toFixed(10)), plant_uptake_index: Number(uptake.toFixed(10)), nutrient_index_after: Number(nextNutrient.toFixed(10)), propagule_bank_index_after: Number(nextPropagules.toFixed(10)), seedling_establishment_index_after: Number(nextSeedlings.toFixed(10)) } };
+}
+
 function advanceModel(
   worldId: string,
   initial: Record<string, any>,
@@ -171,7 +225,10 @@ function advanceModel(
     fern_growth_index_initial: 0.20,
     tree_growth_index_initial: 0.30,
     rainfall_probability_per_hour: 0.035,
-    units_note: "Growth and nutrient values are normalized model indices, not measured biological quantities.",
+    units_note: "Growth, biomass, nutrient and propagule values are normalized model indices, not measured biological quantities.",
+    biogeochemical_profile: "functional_group_litter_humus_nutrient_cycle_v1",
+    initial_litter_index: 0.025, initial_humus_index: 0.08,
+    initial_propagule_bank_index: 0.12, initial_seedling_establishment_index: 0.04,
   };
 
   let moisture = typeof soil.moisture_fraction === "number"
@@ -186,6 +243,8 @@ function advanceModel(
   let tree = typeof flora.tree_growth_index === "number"
     ? flora.tree_growth_index
     : assumptions.tree_growth_index_initial;
+  const mossBefore = moss, fernBefore = fern, treeBefore = tree;
+  let nutrientIndex = typeof soil.nutrient_index === "number" ? soil.nutrient_index : assumptions.nutrient_index_initial;
 
   let cumulativeRain = Number(hydrology.cumulative_rainfall_mm ?? 0);
   let cumulativeEvaporation = Number(hydrology.cumulative_evaporation_fraction ?? 0);
@@ -196,6 +255,7 @@ function advanceModel(
   let rainHours = 0;
   let temperatureHours = 0;
   let windSpeedHours = 0;
+  let lightHours = 0;
   let lastWeather: Record<string, unknown> = {};
   const events: Record<string, unknown>[] = [];
 
@@ -226,6 +286,7 @@ function advanceModel(
       2.5 * Math.sin(2 * Math.PI * (dayOfYear - 80) / 365.25);
     const windSpeedMps = 0.4 + 5 * windSeed;
     temperatureHours += temperatureC * hours;
+    lightHours += lightIndex * hours;
     windSpeedHours += windSpeedMps * hours;
 
     // Rain -> infiltration -> soil water; sunlight/temperature -> evaporation;
@@ -242,7 +303,8 @@ function advanceModel(
 
     const waterSuitability = clamp(moisture / 0.45, 0, 1);
     const temperatureSuitability = clamp(1 - Math.abs(temperatureC - 19) / 25, 0, 1);
-    const growth = 0.000018 * lightIndex * waterSuitability * temperatureSuitability * hours;
+    const nutrientSuitability = clamp(nutrientIndex / 0.55, 0.25, 1);
+    const growth = 0.000018 * lightIndex * waterSuitability * temperatureSuitability * nutrientSuitability * hours;
     tree = clamp(tree + growth - 0.000002 * hours, 0, 1);
     fern = clamp(fern + growth * 1.3 - 0.0000025 * hours, 0, 1);
     moss = clamp(
@@ -311,10 +373,13 @@ function advanceModel(
   events.push(...lifecycleEvents);
 
   soil.moisture_fraction = Number(moisture.toFixed(8));
-  soil.nutrient_index = typeof soil.nutrient_index === "number"
-    ? soil.nutrient_index
-    : assumptions.nutrient_index_initial;
   soil.initial_condition_quality = soil.initial_condition_quality ?? "modeled_assumption";
+  const biogeochemical = advanceBiogeochemicalCycle(soil, flora, {
+    elapsedHours, moisture, nutrientIndex, moss0: mossBefore, moss, fern0: fernBefore, fern,
+    tree0: treeBefore, tree, temperature: averageTemperature,
+    light: elapsedHours > 0 ? lightHours / elapsedHours : 0, rain: rainTotal, worldTime: toMs,
+  });
+  events.push(...biogeochemical.events);
 
   hydrology.cumulative_rainfall_mm = Number((cumulativeRain + rainTotal).toFixed(5));
   hydrology.cumulative_evaporation_fraction = Number((cumulativeEvaporation + evaporationTotal).toFixed(8));
@@ -337,9 +402,10 @@ function advanceModel(
 
   state.engine = {
     id: "zhi_living_ecosystem",
-    version: "0.2.1",
+    version: "0.3.0",
     model_assumptions: assumptions,
     last_interval_hours: Number(((toMs - fromMs) / 3_600_000).toFixed(6)),
+    last_biogeochemical_summary: biogeochemical.summary,
     last_tick_summary: {
       rainfall_mm: Number(rainTotal.toFixed(5)),
       rain_hours: Number(rainHours.toFixed(4)),
@@ -481,7 +547,7 @@ Deno.serve(async (req: Request) => {
     commit,
     summary: result.summary,
     remaining_seconds: Math.max(0, Math.floor((requestedTarget - toMs) / 1000)),
-    model: "zhi_living_ecosystem/0.2.1",
+    model: "zhi_living_ecosystem/0.3.0",
     weather_source: "world_generated_model",
   });
 });
