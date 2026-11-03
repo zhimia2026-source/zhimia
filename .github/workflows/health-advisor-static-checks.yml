@@ -25,6 +25,8 @@ on:
       - "web/zhi-universe-client.js"
       - "web/zhi-resident.html"
       - "web/zhi-resident.js"
+      - "web/zhi-memory.html"
+      - "web/zhi-memory.js"
       - ".github/workflows/health-advisor-static-checks.yml"
   pull_request:
     paths:
@@ -42,6 +44,12 @@ on:
       - "supabase/functions/zhi-token-gateway/safety_test.ts"
       - "web/zhi-health-advisor.html"
       - "web/zhi-health-advisor-client.js"
+      - "web/zhi-universe.html"
+      - "web/zhi-universe-client.js"
+      - "web/zhi-resident.html"
+      - "web/zhi-resident.js"
+      - "web/zhi-memory.html"
+      - "web/zhi-memory.js"
       - ".github/workflows/health-advisor-static-checks.yml"
 
 permissions:
