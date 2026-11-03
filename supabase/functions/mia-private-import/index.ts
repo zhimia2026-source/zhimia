@@ -53,6 +53,7 @@ async function targetManifest(supabase: ReturnType<typeof createClient>) {
   const tables:Record<string,unknown>={};
   for(const table of [...grouped.keys()].sort()) {
     const g=grouped.get(table)!;
+    g.rows.sort();
     tables[table]={count:g.count,rowset_sha256:await sha256(g.rows),invalid_row_hashes:g.badHashes};
   }
   return {batch_id:BATCH_ID,tables};
