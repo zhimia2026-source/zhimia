@@ -31,9 +31,18 @@ begin
   if not exists(select 1 from pg_trigger where tgname='zhi_biogenesis_reviews_append_only' and not tgisinternal) then
     raise exception 'FAIL: review append-only trigger missing';
   end if;
+  if not exists(select 1 from pg_trigger where tgname='zhi_biogenesis_contribution_validate' and not tgisinternal) then
+    raise exception 'FAIL: contribution provenance trigger missing';
+  end if;
+  if not exists(select 1 from pg_trigger where tgname='zhi_biogenesis_review_validate' and not tgisinternal) then
+    raise exception 'FAIL: independent review trigger missing';
+  end if;
+  if to_regprocedure('public.zhi_jsonb_has_sensitive_key(jsonb)') is null then
+    raise exception 'FAIL: sensitive payload guard function missing';
+  end if;
   if not exists(select 1 from pg_constraint where conname='zhi_biogenesis_direction_actor_check') then
     raise exception 'FAIL: direction/actor constraint missing';
   end if;
 end $body$;
 
-select 'PASS: ZHI_Biogenesis_Engine V0.1 catalog assertions (10)' as result;
+select 'PASS: ZHI_Biogenesis_Engine V0.1 catalog assertions (13)' as result;
