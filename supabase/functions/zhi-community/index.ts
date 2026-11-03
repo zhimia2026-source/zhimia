@@ -915,7 +915,7 @@ export function createCommunityHandler(
         .eq("visibility", "public").eq("entry_policy", "open").eq("status", "open").order("created_at", { ascending: false }).limit(100);
       if (error) throw new Error("database_error");
       return reply({ items: (data ?? []).map((scene: { id: string; name: string }) => ({
-        index: scene.id,
+        id: scene.id,
         name: scene.name,
       })) });
     }
@@ -932,7 +932,7 @@ export function createCommunityHandler(
         .eq("status", "open").maybeSingle();
       if (error) throw new Error("database_error");
       if (!world) return reply({ error: "not_found" }, 404);
-      return reply({ world: { index: world.id, name: world.name } });
+      return reply({ world: { id: world.id, name: world.name } });
     }
 
     if (req.method === "GET" && path === "/v1/scenes/mine") {
