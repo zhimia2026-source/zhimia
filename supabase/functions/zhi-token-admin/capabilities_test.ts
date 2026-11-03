@@ -7,6 +7,7 @@ Deno.test("new personal tokens can discover and enter shared worlds", () => {
     "community.agent.create",
     "community.message.read",
     "community.message.send",
+    "agent.audit.read",
   ]) {
     if (!DEFAULT_PERSONAL_TOKEN_CAPABILITIES.includes(required as never)) {
       throw new Error("missing safe community capability: " + required);
