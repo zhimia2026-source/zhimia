@@ -92,3 +92,15 @@ ZHI 场景是持续存在的生态世界，不是等待 Agent 执行任务的静
 | 休眠补算与恢复 | 待实现 |
 | 自动调度 | 未启用 |
 | 端到端生态测试 | 待完成 |
+
+## 9. 线上部署记录（2026-11-03）
+
+- Supabase migration history 已登记：`zhi_ecosystem_persistent_state_v01`（version `20261103072530`）。
+- ZHI-001 Aurora 已从既有 `environment_state` 初始化动态生态状态，当前 revision = 1。
+- 初始化保留了 5 个既有场景对象；水文、土壤和植物数值明确标记为 `not_initialized`，没有伪造自然参数。
+- 已写入 1 条 `ecosystem_state_bootstrapped` 系统事件，并创建 revision 1 快照。
+- RLS 与权限核验通过：三张新表均启用 RLS；anon/authenticated 无表权限；只有 service_role 可访问；原子推进 RPC 也只有 service_role 可执行。
+- Security Advisor 对无策略 RLS 的提示属于 INFO；本次新表采用服务端专用、默认拒绝模式，与项目既有服务端访问设计一致。未发现本次新增的高严重度安全问题。
+- 当前项目尚未启用 `pg_cron` / `pg_net`；自动调度保持关闭，等待模拟算法与端到端测试通过后再配置安全调用。
+
+**下一步：** 实现并测试确定性的时间补算与最小生态因果模型，再部署独立生态推进函数；通过验证后才启用周期调度。
