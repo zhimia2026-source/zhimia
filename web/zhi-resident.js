@@ -5,6 +5,7 @@ const AURORA_SCENE_ID = "50b06c01-060d-49fa-8988-8f38c13406d7";
 const $ = (id) => document.getElementById(id);
 let agents = [];
 let activeAgentId = "";
+let activeAgentName = "";
 let busy = false;
 
 function setStatus(message) { $("chatStatus").textContent = message; }
@@ -14,7 +15,7 @@ function appendMessage(role, content) {
   item.className = "message " + (role === "user" ? "user" : "agent");
   const label = document.createElement("span");
   label.className = "role";
-  label.textContent = role === "user" ? "你" : "Lumen-001";
+  label.textContent = role === "user" ? "你" : activeAgentName || "智能人";
   const body = document.createElement("div");
   body.textContent = String(content || "");
   item.append(label, body);
@@ -51,10 +52,13 @@ async function loadAgents(preferredId = "") {
     option.textContent = agent.display_name + (agent.visibility === "private" ? " · 私有" : "");
     select.append(option);
   }
+  const preferred = agents.find((agent) => agent.id === preferredId);
+  const guanxin = agents.find((agent) => agent.display_name === "关心");
   const lumen = agents.find((agent) => agent.display_name === "Lumen-001");
-  activeAgentId = (agents.some((agent) => agent.id === preferredId) ? preferredId : lumen?.id) || agents[0]?.id || "";
+  activeAgentId = preferred?.id || guanxin?.id || lumen?.id || agents[0]?.id || "";
   if (activeAgentId) select.value = activeAgentId;
-  $("agentTitle").textContent = agents.find((agent) => agent.id === activeAgentId)?.display_name || "尚无智能人";
+  activeAgentName = agents.find((agent) => agent.id === activeAgentId)?.display_name || "";
+  $("agentTitle").textContent = activeAgentName || "尚无智能人";
   $("messageForm").classList.toggle("hidden", !activeAgentId);
   if (!activeAgentId) {
     $("messages").textContent = "当前账号还没有智能人。请先返回 Aurora 页面创建或加入自己的智能人。";
@@ -93,7 +97,8 @@ $("loginForm").addEventListener("submit", async (event) => {
 
 $("agentSelect").addEventListener("change", async () => {
   activeAgentId = $("agentSelect").value;
-  $("agentTitle").textContent = agents.find((agent) => agent.id === activeAgentId)?.display_name || "智能人";
+  activeAgentName = agents.find((agent) => agent.id === activeAgentId)?.display_name || "智能人";
+  $("agentTitle").textContent = activeAgentName;
   try { await loadHistory(); } catch (error) { setStatus(error?.message || String(error)); }
 });
 
@@ -118,7 +123,7 @@ $("messageForm").addEventListener("submit", async (event) => {
   busy = true;
   $("sendButton").disabled = true;
   $("messageInput").disabled = true;
-  $("chatStatus").textContent = "Lumen 正在结合自己的私有上下文与 Aurora 场景环境思考…";
+  $("chatStatus").textContent = activeAgentName + " 正在结合自己的私有上下文与 Aurora 场景环境思考…";
   try {
     const result = await api.chat(activeAgentId, message, AURORA_SCENE_ID);
     $("messageInput").value = "";
