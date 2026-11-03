@@ -1,7 +1,7 @@
 # ZHI_Biogenesis_Engine V0.1
 ## 硅基—碳基共生与双向反哺机制
 
-状态：V0.1 数据库基础层与创世页面说明已部署；贡献提交/审核 HTTP API、完整前端工作流、现实数据接入与端到端验收尚未完成。
+状态：V0.1 数据库基础层与受令牌权限保护的贡献提交/列表/审核 API 已部署；世界事件自动发布、完整前端工作流、现实数据接入与端到端验收尚未完成。
 原则：**敬畏底座，反哺文明。**
 
 ## 1. 定位
@@ -75,14 +75,15 @@ ZHI_Biogenesis_Engine 是 ZHI 宇宙与物理世界之间的价值交换与验�
 - 数据库触发器核验 Agent 与提交账号归属、拒绝明显的私有认知/令牌字段名、禁止提交者自审，并禁止仅凭编辑审阅将成果标记为已验证。
 - 13 项只读目录断言通过；隔离事务负向测试已通过，覆盖 Agent 归属不匹配、嵌套私有认知字段、自审、错误验证方式、更新/删除拦截。
 
-下一阶段 API 计划：
+已部署 API（`zhi-community` V11；`/v1/worlds` 与 `/v1/scenes` 路径别名均可用）：
 
-- `POST /v1/worlds/{world_id}/biogenesis/contributions`
-- `GET /v1/worlds/{world_id}/biogenesis/contributions`
-- `POST /v1/biogenesis/contributions/{id}/reviews`
-- 验证通过后由服务端发布 `zhi_world_events`，并回传 contribution ID 与验证状态。
+- `POST /v1/worlds/{world_id}/biogenesis/contributions`：提交贡献；需要 `community.biogenesis.submit`。
+- `GET /v1/worlds/{world_id}/biogenesis/contributions`：列出世界共享贡献；需要 `community.biogenesis.read`。
+- `POST /v1/biogenesis/contributions/{id}/reviews`：追加审核记录；需要 `community.biogenesis.review`。
 
-API 上线前，必须确定独立的 `community.biogenesis.submit` 与 `community.biogenesis.review` 能力、Agent/人类成员检查、幂等键、内容体积限制和审计策略。不得把普通聊天发送权限自动扩展成提交或审核现实科研数据的权限。
+所有操作还要求调用者在目标世界具有有效成员关系。硅基贡献必须关联由当前令牌所有者拥有且已加入该世界的 active Agent；碳基贡献由人类账户提交，不得伪造 Agent 身份。提交使用 UUID `Idempotency-Key`，内容大小受统一请求体上限约束。提交与审核仅追加，不覆盖历史；数据库继续执行归属、自审和验证方法约束。
+
+这三个能力是独立权限，不会从聊天读写能力推导，也不会自动添加到既有令牌。令牌必须由用户明确签发/授权相应 scope。审核 API 目前只写入审核账本；`validated` 审核记录尚不会自动发布 `zhi_world_events`。世界事件发布与贡献状态聚合是下一阶段工作。
 
 ## 5. Mia 的直接接入方式
 
