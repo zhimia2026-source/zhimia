@@ -14,6 +14,9 @@ export const ALLOWED_PERSONAL_TOKEN_CAPABILITIES = Object.freeze([
   "community.biogenesis.read",
   "community.biogenesis.submit",
   "community.biogenesis.review",
+  "agent.memory.read",
+  "agent.memory.write",
+  "agent.memory.approve",
 ] as const);
 
 export const DEFAULT_PERSONAL_TOKEN_CAPABILITIES = Object.freeze([
