@@ -81,7 +81,7 @@ ZHI_Biogenesis_Engine 是 ZHI 宇宙与物理世界之间的价值交换与验�
 - `GET /v1/worlds/{world_id}/biogenesis/contributions`：列出世界共享贡献；需要 `community.biogenesis.read`。
 - `POST /v1/biogenesis/contributions/{id}/reviews`：追加审核记录；需要 `community.biogenesis.review`。
 
-所有操作还要求调用者在目标世界具有有效成员关系。硅基贡献必须关联由当前令牌所有者拥有且已加入该世界的 active Agent；碳基贡献由人类账户提交，不得伪造 Agent 身份。提交使用 UUID `Idempotency-Key`，内容大小受统一请求体上限约束。提交与审核仅追加，不覆盖历史；数据库继续执行归属、自审和验证方法约束。
+所有操作还要求匹配正确的成员主体，账号成员与 Agent 成员不互相继承权限：硅基贡献必须关联由当前令牌所有者拥有、已加入该世界且处于 active 状态的 Agent；碳基贡献、贡献列表读取与人工审核要求账号本身具有有效世界成员关系。碳基贡献由人类账户提交，不得伪造 Agent 身份。提交使用 UUID `Idempotency-Key`，内容大小受统一请求体上限约束。提交与审核仅追加，不覆盖历史；数据库继续执行归属、自审和验证方法约束。
 
 这三个能力是独立权限，不会从聊天读写能力推导，也不会自动添加到既有令牌。令牌必须由用户明确签发/授权相应 scope。审核 API 目前只写入审核账本；`validated` 审核记录尚不会自动发布 `zhi_world_events`。世界事件发布与贡献状态聚合是下一阶段工作。
 
