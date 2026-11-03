@@ -1286,6 +1286,200 @@ export function createCommunityHandler(
       return reply({ message, idempotent_replay: false }, 201);
     }
 
+
+    // Biogenesis contribution ledger: explicit token scope + active world membership.
+    // The public /v1/worlds alias is normalized to /v1/scenes above.
+    const contributionKinds = [
+      "research_proposal", "engineering_blueprint", "philosophy", "artwork",
+      "physical_measurement", "experiment_result", "compute_support",
+      "energy_support", "human_feedback", "other",
+    ];
+    const verificationRequirements = ["human_review", "reproducibility_check", "physical_test", "peer_review"];
+    const reviewOutcomes = ["triaged", "request_evidence", "validated", "rejected", "withdrawn"];
+    const verificationMethods = [
+      "editorial_review", "provenance_check", "reproducibility_check",
+      "external_lab", "human_feedback_review",
+    ];
+    const isObject = (value: unknown): value is JsonObject =>
+      Boolean(value) && typeof value === "object" && !Array.isArray(value);
+    const hasActiveWorldMembership = async (worldId: string): Promise<boolean> => {
+      const { data: memberships, error } = await db.from("zhi_world_memberships")
+        .select("id,status,revoked_at,expires_at")
+        .eq("world_id", worldId).eq("principal_user_id", actor.userId)
+        .eq("status", "active").is("revoked_at", null).limit(50);
+      if (error) throw new Error("database_error");
+      const now = Date.now();
+      return (memberships ?? []).some((membership: {
+        expires_at: string | null;
+      }) => !membership.expires_at || Date.parse(membership.expires_at) > now);
+    };
+
+    if ((req.method === "GET" || req.method === "POST") &&
+        parts.length === 5 && parts[0] === "v1" && parts[1] === "scenes" &&
+        parts[3] === "biogenesis" && parts[4] === "contributions") {
+      const worldId = parts[2];
+      if (!isUuid(worldId)) return reply({ error: "invalid_argument", detail: "world_id_must_be_uuid" }, 400);
+      const requiredScope = req.method === "GET"
+        ? "community.biogenesis.read"
+        : "community.biogenesis.submit";
+      if (!hasCapability(actor, requiredScope)) {
+        return reply({ error: "forbidden", detail: "capability_required", required: requiredScope }, 403);
+      }
+      const { data: world, error: worldError } = await db.from("zhi_worlds")
+        .select("id,status").eq("id", worldId).maybeSingle();
+      if (worldError) throw new Error("database_error");
+      if (!world) return reply({ error: "not_found" }, 404);
+      if (world.status !== "open") return reply({ error: "conflict", detail: "world_not_open" }, 409);
+      if (!await hasActiveWorldMembership(worldId)) return reply({ error: "forbidden", detail: "active_world_membership_required" }, 403);
+
+      if (req.method === "GET") {
+        const limit = Number(url.searchParams.get("limit") ?? "50");
+        if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+          return reply({ error: "invalid_argument", detail: "limit_must_be_1_to_100" }, 400);
+        }
+        const { data: items, error } = await db.from("zhi_biogenesis_contributions")
+          .select("id,world_id,direction,contribution_kind,submitted_by_user_id,submitted_by_agent_id,title,abstract,payload,evidence,provenance,data_classification,verification_requirement,created_at")
+          .eq("world_id", worldId).order("created_at", { ascending: false }).limit(limit);
+        if (error) throw new Error("database_error");
+        return reply({ items: items ?? [] });
+      }
+
+      const body = await readBody(req);
+      const direction = body.direction;
+      const kind = body.contribution_kind;
+      if (!["silicon_to_carbon", "carbon_to_silicon"].includes(String(direction)) ||
+          !contributionKinds.includes(String(kind)) ||
+          !isText(body.title, 180) || !isText(body.abstract, 5000)) {
+        return reply({ error: "invalid_argument", detail: "invalid_contribution_fields" }, 400);
+      }
+      const payload = body.payload === undefined ? {} : body.payload;
+      const evidence = body.evidence === undefined ? {} : body.evidence;
+      const provenance = body.provenance === undefined ? {} : body.provenance;
+      if (!isObject(payload) || !isObject(evidence) || !isObject(provenance)) {
+        return reply({ error: "invalid_argument", detail: "payload_evidence_provenance_must_be_objects" }, 400);
+      }
+      if (body.data_classification !== undefined &&
+          !["public", "world_shared"].includes(String(body.data_classification))) {
+        return reply({ error: "invalid_argument", detail: "private_classification_not_supported" }, 400);
+      }
+      const verificationRequirement = body.verification_requirement ?? "human_review";
+      if (!verificationRequirements.includes(String(verificationRequirement))) {
+        return reply({ error: "invalid_argument", detail: "invalid_verification_requirement" }, 400);
+      }
+      const requestKey = req.headers.get("idempotency-key")?.trim();
+      if (!isUuid(requestKey)) {
+        return reply({ error: "invalid_argument", detail: "uuid_idempotency_key_required" }, 400);
+      }
+
+      let submittedByAgentId: string | null = null;
+      if (direction === "silicon_to_carbon") {
+        if (!isUuid(body.submitted_by_agent_id)) {
+          return reply({ error: "invalid_argument", detail: "submitted_by_agent_id_required" }, 400);
+        }
+        submittedByAgentId = body.submitted_by_agent_id;
+        const { data: agent, error: agentError } = await db.from("zhi_agents")
+          .select("id,owner_user_id,status").eq("id", submittedByAgentId)
+          .eq("owner_user_id", actor.userId).maybeSingle();
+        if (agentError) throw new Error("database_error");
+        if (!agent || agent.status !== "active") {
+          return reply({ error: "forbidden", detail: "active_owned_agent_required" }, 403);
+        }
+        const { data: membership, error: membershipError } = await db.from("zhi_world_memberships")
+          .select("id,status,revoked_at,expires_at").eq("world_id", worldId)
+          .eq("principal_user_id", actor.userId).eq("agent_id", submittedByAgentId)
+          .eq("status", "active").is("revoked_at", null).maybeSingle();
+        if (membershipError) throw new Error("database_error");
+        if (!membership || (membership.expires_at && Date.parse(membership.expires_at) <= Date.now())) {
+          return reply({ error: "forbidden", detail: "agent_world_membership_required" }, 403);
+        }
+      } else {
+        if (body.submitted_by_agent_id !== undefined && body.submitted_by_agent_id !== null) {
+          return reply({ error: "invalid_argument", detail: "carbon_contribution_must_not_claim_agent_identity" }, 400);
+        }
+      }
+
+      const { data: existing, error: existingError } = await db.from("zhi_biogenesis_contributions")
+        .select("id,world_id,direction,contribution_kind,title,abstract,created_at")
+        .eq("world_id", worldId).eq("submitted_by_user_id", actor.userId)
+        .eq("idempotency_key", requestKey).maybeSingle();
+      if (existingError) throw new Error("database_error");
+      if (existing) {
+        if (existing.title !== body.title.trim() || existing.abstract !== body.abstract.trim() ||
+            existing.direction !== direction || existing.contribution_kind !== kind) {
+          return reply({ error: "conflict", detail: "idempotency_key_payload_mismatch" }, 409);
+        }
+        return reply({ contribution: existing, idempotent_replay: true }, 200);
+      }
+
+      const { data: contribution, error: insertError } = await db.from("zhi_biogenesis_contributions").insert({
+        world_id: worldId,
+        direction,
+        contribution_kind: kind,
+        submitted_by_user_id: actor.userId,
+        submitted_by_agent_id: submittedByAgentId,
+        title: body.title.trim(),
+        abstract: body.abstract.trim(),
+        payload,
+        evidence,
+        provenance,
+        data_classification: body.data_classification ?? "world_shared",
+        verification_requirement: verificationRequirement,
+        idempotency_key: requestKey,
+      }).select("id,world_id,direction,contribution_kind,submitted_by_user_id,submitted_by_agent_id,title,abstract,data_classification,verification_requirement,created_at").single();
+      if (insertError || !contribution) {
+        if (insertError?.code === "23505") return reply({ error: "conflict", detail: "idempotency_race_retry" }, 409);
+        if (insertError?.code === "42501") return reply({ error: "forbidden", detail: "contribution_policy_rejected" }, 403);
+        throw new Error("database_error");
+      }
+      return reply({ contribution, idempotent_replay: false }, 201);
+    }
+
+    if (req.method === "POST" && parts.length === 5 && parts[0] === "v1" &&
+        parts[1] === "biogenesis" && parts[2] === "contributions" && parts[4] === "reviews") {
+      if (!hasCapability(actor, "community.biogenesis.review")) {
+        return reply({ error: "forbidden", detail: "capability_required", required: "community.biogenesis.review" }, 403);
+      }
+      const contributionId = parts[3];
+      if (!isUuid(contributionId)) return reply({ error: "invalid_argument", detail: "contribution_id_must_be_uuid" }, 400);
+      const body = await readBody(req);
+      if (!reviewOutcomes.includes(String(body.outcome)) ||
+          !verificationMethods.includes(String(body.verification_method)) ||
+          !isText(body.note, 4000)) {
+        return reply({ error: "invalid_argument", detail: "invalid_review_fields" }, 400);
+      }
+      const evidence = body.evidence === undefined ? {} : body.evidence;
+      if (!isObject(evidence)) return reply({ error: "invalid_argument", detail: "review_evidence_must_be_object" }, 400);
+      const { data: contribution, error: contributionError } = await db.from("zhi_biogenesis_contributions")
+        .select("id,world_id,submitted_by_user_id,title")
+        .eq("id", contributionId).maybeSingle();
+      if (contributionError) throw new Error("database_error");
+      if (!contribution) return reply({ error: "not_found" }, 404);
+      if (!await hasActiveWorldMembership(contribution.world_id)) {
+        return reply({ error: "forbidden", detail: "active_world_membership_required" }, 403);
+      }
+      const { data: review, error: reviewError } = await db.from("zhi_biogenesis_reviews").insert({
+        contribution_id: contributionId,
+        reviewer_user_id: actor.userId,
+        outcome: body.outcome,
+        verification_method: body.verification_method,
+        note: body.note.trim(),
+        evidence,
+      }).select("id,contribution_id,reviewer_user_id,outcome,verification_method,note,evidence,created_at").single();
+      if (reviewError || !review) {
+        if (reviewError?.code === "42501") {
+          return reply({ error: "forbidden", detail: "self_review_or_validation_policy_rejected" }, 403);
+        }
+        if (reviewError?.code === "23514") return reply({ error: "invalid_argument", detail: "review_constraint_rejected" }, 400);
+        throw new Error("database_error");
+      }
+      return reply({
+        review,
+        contribution_status: body.outcome === "validated" ? "validated_by_recorded_review" : "under_review",
+        world_event_published: false,
+        note: "Validation is recorded in the append-only review ledger. World-event publication is a separate next step.",
+      }, 201);
+    }
+
     return reply({ error: "not_found" }, 404);
   } catch (error) {
     const message = error instanceof Error ? error.message : "internal_error";
