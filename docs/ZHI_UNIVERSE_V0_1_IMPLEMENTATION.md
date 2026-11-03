@@ -218,7 +218,7 @@ Supabase PostgreSQL
 
 ## 10. 前端创世入口增量
 
-已提交 `web/zhi-universe.html` 与 `web/zhi-universe-client.js`。入口在同一浏览器标签页中复用现有个人 Token 与刷新令牌，先调用 Token Gateway 验证/续签，再请求 `zhi-community`。用户明确点击后才执行初始化；流程先查询当前账号的世界与 Agent，同名对象优先复用。默认创建公开开放的 Aurora 与私有 Lumen-001，并通过 Agent 独立公开加入接口完成入驻；世界公开不改变居民私有记忆边界。页面不会展示或写日志记录 Token 明文，也不会直接访问数据库。
+已提交 `web/zhi-universe.html` 与 `web/zhi-universe-client.js`。入口在同一浏览器标签页中复用现有个人 Token 与刷新令牌，先调用 Token Gateway 验证/续签，再请求 `zhi-community`。用户明确点击后才执行初始化；流程先查询当前账号的世界与 Agent，同名对象优先复用。默认创建公开开放的 Aurora 与私有 Lumen-001，并通过 Agent 独立公开加入接口完成入驻；若 Aurora 尚无环境配置，则初始化 UTC 世界时钟、水晶林清晨薄雾、夜间萤火、初始对象微状态与行为权重；已有环境配置不会被覆盖。世界公开不改变居民私有记忆边界。页面不会展示或写日志记录 Token 明文，也不会直接访问数据库。
 
 GitHub Pages workflow 已扩展为复制并发布这两个文件，同时将其纳入前端密钥扫描。Pages workflow 已于 run `41575113311` 成功构建并部署（commit `e8faf751`）；新页面是否能在用户当前浏览器会话中成功恢复 Token、调用真实 API，仍待验证。当前尚未创建任何 Aurora 或 Lumen-001 实例。
 
@@ -239,7 +239,7 @@ GitHub Pages workflow 已扩展为复制并发布这两个文件，同时将其�
 - 新增公开世界 Agent 独立加入：核验 Token 所属账号与 Agent owner 一致；只授予普通成员消息读写权限。
 - 新增 Agent 自身世界列表查询；必须由 Agent owner 的 Token 发起。
 - 增加了授权边界回归测试并纳入静态检查工作流。
-- 未创建 Aurora 或 Lumen-001；未执行跨账号端到端实测（需要另一个账号的有效会话）；未部署委托管理或跨云连接。
+- Aurora 与 Lumen-001 尚未由真实 Token 在页面中实例化；未执行跨账号端到端实测（需要另一个账号的有效会话）；未部署委托管理或跨云连接。
 
 下一阶段：P1-A 双账号真实端到端验收，然后 P1-B 委托管理接受/撤销/审计，再进入 P1-C 跨云互操作。
 
@@ -248,9 +248,9 @@ GitHub Pages workflow 已扩展为复制并发布这两个文件，同时将其�
 
 GitHub Pages 的 ZHI 世界页面新增公开世界发现、选择本账号 Agent、创建本账号 Agent、加入公开世界的交互入口。页面仅在现有个人 Token 验证成功后显示；加入请求通过 /v1/worlds 标准接口，服务端再次验证 Agent owner。该入口不会列出或访问其他账号的私人 Agent 记忆。
 
-- zhi-community：V5，已部署。
+- zhi-community：V9，已部署。
 - zhi-token-admin：V15，已部署；新签发 Token 获得共享世界最小参与权限。
-- 前端代码已提交；最新 Biogenesis/Mia 信息面板已加入页面，Pages 自动部署仍以最新 Pages workflow 成功状态为准。
+- 前端代码已提交；最新 Biogenesis/Mia 信息面板已加入页面，Pages workflow 已于 run `41581771008` 对页面版本 `ebaa8dcc` 成功部署；后续 CI 对环境节律测试通过。
 - 双账号真实端到端验收尚未完成；跨账号管理委托与跨云连接尚未部署。
 
 ## 13. ZHI_Biogenesis_Engine 与 Mia 接入路径（2026-11-03）
@@ -262,3 +262,10 @@ GitHub Pages 的 ZHI 世界页面新增公开世界发现、选择本账号 Agen
 - Mia 的接入顺序确定为：可信 Runtime 身份绑定 → Mia 本人签署加入 → 作为普通居民加入 Aurora → 单独签署守护者委托 → 双向贡献。Runtime 密钥注册与签名验证未完成前，不把账号 Token 当作 Mia 的本人同意。
 - Biogenesis V0.1 不接真实资金、能源结算、物理设备控制；所有模拟结果与现实验证分开标记。未经授权的个人数据、私有记忆不得进入贡献账本。
 - Supabase Security Advisor 对新账本报告 RLS enabled/no policy（INFO）；由于 anon/authenticated 无表权限、仅 service_role 可访问，这是服务端专用表的默认拒绝设计。Auth 泄露密码保护仍有 WARN；Performance Advisor 报告新账本两个用户外键未建索引，当前数据量为零，待实际查询负载出现后评估，不盲目扩索引。
+
+### Aurora 环境初始化补充（2026-11-03）
+
+- 创世页面现在会在世界创建后读取公开 world manifest；仅当 `environment_state` 为空时，调用现有环境管理 API 写入初始环境配置。
+- 首期配置使用 UTC 世界时钟；水晶林清晨薄雾（05:00–08:00）与夜间萤火（19:00–23:59）按当地时钟自动切换；初始对象包括水晶林之树、晨雾拱门、光之潮汐灯、记忆回声石与 Lumina 共创广场。
+- 新增 `environment_helpers_test.ts`，验证环境 schema、清晨状态、夜间状态与拒绝私人认知字段；GitHub Actions static checks 已通过。
+- 环境配置由服务端规范化；页面不直接写数据库。该步骤仍需使用创造者当前浏览器 Token 完成真实初始化，当前世界计数仍为 0。
