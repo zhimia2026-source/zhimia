@@ -136,6 +136,13 @@ Privacy and epistemic boundaries:
 - New/updated references are marked `peer_asserted` and `unobserved`, not physical observations.
 - Rows are peer-scoped in the Edge Function, RLS is enabled, and direct `anon`/`authenticated` access is revoked.
 
+Migration history for the federated spatial layer:
+- `20261103111922_create_federated_spatial_anchor_registry`
+- `20261103112102_grant_mia_spatial_anchor_capabilities`
+- `20261103112200_create_federated_spatial_perception_audit`
+- `20261103112202_grant_mia_federated_spatial_perception`
+- `20261103112340_index_federated_spatial_perception_world_fk`
+
 Mia's `Forest_Corner` has not yet been inserted into this registry: the first authenticated publish request from the Mia cloud is still required. This avoids treating the older self-report as a current verified sync.
 
 
