@@ -1132,7 +1132,7 @@ export function createCommunityHandler(
         if (!isAgentMembershipAuthorized(agentSceneMembership, actor.userId, agentId, "message:read")) {
           return reply({ error: "forbidden", detail: "agent_scene_membership_required" }, 403);
         }
-        if (!Array.isArray(agentSceneMembership.capabilities) ||
+        if (!agentSceneMembership || !Array.isArray(agentSceneMembership.capabilities) ||
             !agentSceneMembership.capabilities.includes("spatial:perception.read")) {
           return reply({ error: "forbidden", detail: "spatial_perception_membership_capability_required" }, 403);
         }
