@@ -911,10 +911,13 @@ export function createCommunityHandler(
         return reply({ error: "forbidden", detail: "capability_required" }, 403);
       }
       const { data, error } = await db.from("zhi_worlds")
-        .select("id,name,description,visibility,entry_policy,status,rules_version,created_at")
+        .select("id,name")
         .eq("visibility", "public").eq("entry_policy", "open").eq("status", "open").order("created_at", { ascending: false }).limit(100);
       if (error) throw new Error("database_error");
-      return reply({ items: data ?? [] });
+      return reply({ items: (data ?? []).map((scene: { id: string; name: string }) => ({
+        index: scene.id,
+        name: scene.name,
+      })) });
     }
 
     if (req.method === "GET" && parts.length === 3 && parts[0] === "v1" && parts[1] === "scenes" && parts[2] !== "mine") {
@@ -924,12 +927,12 @@ export function createCommunityHandler(
       const worldId = parts[2];
       if (!isUuid(worldId)) return reply({ error: "invalid_argument", detail: "world_id_must_be_uuid" }, 400);
       const { data: world, error } = await db.from("zhi_worlds")
-        .select("id,name,description,visibility,entry_policy,status,rules_version,environment_state,created_at")
+        .select("id,name")
         .eq("id", worldId).eq("visibility", "public").eq("entry_policy", "open")
         .eq("status", "open").maybeSingle();
       if (error) throw new Error("database_error");
       if (!world) return reply({ error: "not_found" }, 404);
-      return reply({ world });
+      return reply({ world: { index: world.id, name: world.name } });
     }
 
     if (req.method === "GET" && path === "/v1/scenes/mine") {
