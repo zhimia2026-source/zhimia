@@ -1,0 +1,1 @@
+create index if not exists zhi_federated_spatial_perception_world_fk_idx on public.zhi_federated_spatial_perception_events(world_id);
