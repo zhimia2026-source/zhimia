@@ -59,7 +59,7 @@ export function createTokenClient() {
   }
 
   async function communityRequest(path, method = "GET", body = undefined) {
-    const send = () => fetch(COMMUNITY_API + "?path=" + encodeURIComponent(path), {
+    const send = () => fetch(COMMUNITY_API + "?__zhi_path=" + encodeURIComponent(path), {
       method,
       headers: {
         "apikey": API_KEY,
