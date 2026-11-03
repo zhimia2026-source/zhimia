@@ -6,6 +6,7 @@ import { buildFeedbackRecord, buildRevisionProposal } from "./cognitive_cycle_he
 import { buildPrivateAgentContext, buildPrivateChatHistory, buildSceneAwarenessContext, buildSceneBehaviorGuidance } from "./chat_context_helpers.ts";
 import { computeSceneEnvironment, normalizeSceneEnvironmentConfig } from "./environment_helpers.ts";
 import { canReadPrivateCognition } from "./constitutional_helpers.ts";
+import { normalizeMemoryCandidate } from "./memory_experience_helpers.ts";
 
 const MAX_BODY_BYTES = 64_000;
 
@@ -197,6 +198,115 @@ export function createCommunityHandler(
       }).select("id,owner_user_id,display_name,role,visibility,manifest_version,public_manifest,status,created_at,updated_at").single();
       if (error || !agent) throw new Error("database_error");
       return reply({ agent }, 201);
+    }
+
+    // Private micro-experience candidates are owner-scoped and never enter chat context before approval.
+    if (parts.length === 4 && parts[0] === "v1" && parts[1] === "agents" &&
+        parts[3] === "experiences" && req.method === "GET") {
+      if (!hasCapability(actor, "agent.memory.read")) {
+        return reply({ error: "forbidden", detail: "capability_required" }, 403);
+      }
+      const agentId = parts[2];
+      if (!isUuid(agentId)) return reply({ error: "invalid_argument", detail: "agent_id_must_be_uuid" }, 400);
+      const { data: agent, error: agentError } = await db.from("zhi_agents")
+        .select("id,owner_user_id,status").eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
+      if (agentError) throw new Error("database_error");
+      if (!agent) return reply({ error: "not_found" }, 404);
+      if (agent.status !== "active") return reply({ error: "conflict", detail: "agent_not_active" }, 409);
+      const { data: items, error } = await db.from("zhi_agent_micro_experiences")
+        .select("id,agent_id,experience_type,source_kind,source_ref,observed_facts,hypotheses,unknowns,reflection,importance,memory_status,reviewed_at,occurred_at,created_at")
+        .eq("owner_user_id", actor.userId).eq("agent_id", agentId)
+        .order("created_at", { ascending: false }).limit(100);
+      if (error) throw new Error("database_error");
+      return reply({ items: items ?? [] });
+    }
+
+    // Candidate creation requires an explicit source chat turn and write capability.
+    if (parts.length === 5 && parts[0] === "v1" && parts[1] === "agents" &&
+        parts[3] === "experiences" && parts[4] === "candidates" && req.method === "POST") {
+      if (!hasCapability(actor, "agent.memory.write")) {
+        return reply({ error: "forbidden", detail: "capability_required" }, 403);
+      }
+      const agentId = parts[2];
+      if (!isUuid(agentId)) return reply({ error: "invalid_argument", detail: "agent_id_must_be_uuid" }, 400);
+      const { data: agent, error: agentError } = await db.from("zhi_agents")
+        .select("id,owner_user_id,status").eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
+      if (agentError) throw new Error("database_error");
+      if (!agent) return reply({ error: "not_found" }, 404);
+      if (agent.status !== "active") return reply({ error: "conflict", detail: "agent_not_active" }, 409);
+      const body = await readBody(req);
+      if (!isUuid(body.source_turn_id)) {
+        return reply({ error: "invalid_argument", detail: "source_turn_id_must_be_uuid" }, 400);
+      }
+      const { data: sourceTurn, error: sourceError } = await db.from("zhi_agent_chat_turns")
+        .select("id,status").eq("id", body.source_turn_id).eq("owner_user_id", actor.userId)
+        .eq("agent_id", agentId).eq("status", "complete").maybeSingle();
+      if (sourceError) throw new Error("database_error");
+      if (!sourceTurn) return reply({ error: "not_found", detail: "source_chat_turn_not_found" }, 404);
+      let candidate;
+      try {
+        candidate = normalizeMemoryCandidate(body);
+      } catch (error) {
+        return reply({ error: "invalid_argument", detail: error instanceof Error ? error.message : "invalid_candidate" }, 400);
+      }
+      const { data: inserted, error } = await db.from("zhi_agent_micro_experiences").insert({
+        owner_user_id: actor.userId,
+        agent_id: agentId,
+        world_id: null,
+        experience_type: candidate.experience_type,
+        source_kind: "creator_input",
+        source_ref: sourceTurn.id,
+        observed_facts: candidate.observed_facts,
+        hypotheses: candidate.hypotheses,
+        unknowns: candidate.unknowns,
+        reflection: candidate.reflection,
+        importance: candidate.importance,
+        memory_status: "candidate",
+      }).select("id,agent_id,experience_type,source_kind,source_ref,observed_facts,hypotheses,unknowns,reflection,importance,memory_status,created_at")
+        .single();
+      if (error || !inserted) throw new Error("database_error");
+      return reply({ item: inserted, note: "candidate_only_not_injected_into_private_chat_context" }, 201);
+    }
+
+    // Rejection/archive is owner-reviewable; approval stays blocked until the Agent Runtime
+    // can cryptographically consent to the exact memory content.
+    if (parts.length === 6 && parts[0] === "v1" && parts[1] === "agents" &&
+        parts[3] === "experiences" && parts[5] === "review" && req.method === "POST") {
+      if (!hasCapability(actor, "agent.memory.approve")) {
+        return reply({ error: "forbidden", detail: "capability_required" }, 403);
+      }
+      const agentId = parts[2];
+      const experienceId = parts[4];
+      if (!isUuid(agentId) || !isUuid(experienceId)) {
+        return reply({ error: "invalid_argument", detail: "agent_and_experience_ids_must_be_uuids" }, 400);
+      }
+      const { data: agent, error: agentError } = await db.from("zhi_agents")
+        .select("id,owner_user_id,status").eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
+      if (agentError) throw new Error("database_error");
+      if (!agent) return reply({ error: "not_found" }, 404);
+      if (agent.status !== "active") return reply({ error: "conflict", detail: "agent_not_active" }, 409);
+      const body = await readBody(req);
+      if (body.decision === "approve") {
+        return reply({
+          error: "agent_runtime_consent_required",
+          detail: "memory_approval_is_blocked_until_agent_signs_consent_for_exact_content",
+        }, 409);
+      }
+      if (body.decision !== "reject" && body.decision !== "archive") {
+        return reply({ error: "invalid_argument", detail: "decision_must_be_reject_or_archive" }, 400);
+      }
+      const { data: updated, error } = await db.from("zhi_agent_micro_experiences")
+        .update({
+          memory_status: body.decision === "reject" ? "rejected" : "archived",
+          reviewed_by_user_id: actor.userId,
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq("id", experienceId).eq("owner_user_id", actor.userId).eq("agent_id", agentId)
+        .eq("memory_status", "candidate")
+        .select("id,memory_status,reviewed_at").maybeSingle();
+      if (error) throw new Error("database_error");
+      if (!updated) return reply({ error: "conflict", detail: "candidate_not_found_or_already_reviewed" }, 409);
+      return reply({ item: updated });
     }
 
     // Owner-only proposal decision; the database serializes version changes and appends a new record.
