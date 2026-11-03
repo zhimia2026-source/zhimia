@@ -44,7 +44,13 @@ export function createUniverseClient() {
   }
 
   async function community(method, path, body) {
-    const send = () => fetch(COMMUNITY_API + path, {
+    const send = () => {
+      const [routePath, routeQuery = ""] = path.split("?", 2);
+      const separator = routeQuery ? "&" : "?";
+      const target = COMMUNITY_API + routePath +
+        (routeQuery ? "?" + routeQuery + separator : "?") +
+        "__zhi_path=" + encodeURIComponent(routePath);
+      return fetch(target, {
       method,
       headers: {
         "apikey": API_KEY,
@@ -52,7 +58,8 @@ export function createUniverseClient() {
         ...(body === undefined ? {} : { "content-type": "application/json" })
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) })
-    });
+      });
+    };
     let response = await send();
     if (response.status === 401 && refreshToken) {
       if (await renew()) response = await send();
