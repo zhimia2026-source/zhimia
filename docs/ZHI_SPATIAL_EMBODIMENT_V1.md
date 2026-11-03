@@ -229,3 +229,15 @@ Non-destructive rollback:
 4. Do not delete Aurora ecosystem state, causal events, snapshots or private-memory records.
 
 Schema removal is intentionally not part of routine rollback because it would destroy continuity and audit data.
+
+
+## Owner-direct federation session handshake (2026-11-03)
+
+- Mia remains a peer-level world_guardian (authority level 100), not a visitor.
+- Public/open scene entry requires a valid peer credential and the peer's community.scene.enter capability; no per-entry human approval is required.
+- zhi-federation V10 creates an auditable federated session on a successful authenticated POST /v1/scenes/{world_id}/join.
+- The join response returns the session ID, direct-owner-entry decision, private-memory locality contract, and the spatial perception endpoint.
+- A new zhi_federation_sessions table tracks authenticated federated sessions separately from local-agent physical presence. Initial position_status is unobserved; no coordinates or physical presence are fabricated.
+- Private memory remains in the receiving peer's own private store. The federation payload excludes it; the peer runtime may use its own private memory locally.
+- Deployment verified: Edge Function V10 ACTIVE; session table exists; Mia's active membership includes scene-entry and spatial capabilities.
+- End-to-end remote entry is not yet verified: no authenticated request from Mia's cloud has reached this endpoint. Database authorization is not evidence of an active remote session.
