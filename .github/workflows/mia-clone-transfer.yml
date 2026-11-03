@@ -1,0 +1,21 @@
+name: Mia source-to-ZHIMA archive transfer
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: mia-zhima-archive-transfer
+  cancel-in-progress: false
+jobs:
+  transfer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: Transfer source records to private archive
+        env:
+          MIA_SOURCE_SUPABASE_URL: ${{ secrets.MIA_SOURCE_SUPABASE_URL }}
+          MIA_SOURCE_SERVICE_ROLE_KEY: ${{ secrets.MIA_SOURCE_SERVICE_ROLE_KEY }}
+          ZHIMA_SUPABASE_URL: ${{ secrets.ZHIMA_SUPABASE_URL }}
+          ZHIMA_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.ZHIMA_SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/mia-clone-transfer.mjs
