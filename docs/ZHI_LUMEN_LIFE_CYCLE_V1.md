@@ -78,4 +78,4 @@
 
 ## 8. 当前验收声明
 
-私有聊天入口此前已由使用者确认可用。自主演化改造已提交并部署为 zhi-community v21；数据库已增加 auto_curated 状态与每个 chat turn 唯一反思索引。GitHub 的 Python/Edge Function tests 在数据库迁移提交时通过；本次静态检查 workflow 的最终结果仍需单独确认。当前数据库中 Lumen-001 尚无 auto_curated 记录，说明真实聊天触发写入尚未完成验收。下一次在原有浏览器会话发送一条普通消息即可触发自动反思，无需人工审核；随后再核验数据库记录和上下文读取。
+私有聊天入口此前已由使用者确认可用。自主演化改造已提交并部署为 zhi-community v21；数据库迁移已登记，auto_curated 状态约束与每个 chat turn 唯一反思索引已验证。GitHub Health Advisor Static Checks（包含 Deno 类型检查、Edge Function 检查与私有记忆 helper 测试）通过。Lumen-001 当前存在 1 条 complete turn，原所有者仍有 1 个有效令牌且具备 agent.memory.read。数据库中 auto_curated 记录仍为 0，因此真实模型反思写入尚未完成端到端验收。下一次在原有浏览器会话发送一条普通消息即可触发自动反思，无需人工审核；随后核验自动记录与后续上下文读取。
