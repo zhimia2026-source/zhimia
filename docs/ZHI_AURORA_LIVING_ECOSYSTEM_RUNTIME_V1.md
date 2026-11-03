@@ -1,6 +1,6 @@
 # ZHI Aurora Living Ecosystem Runtime V1
 
-Status: deployed and first live tick verified  
+Status: deployed and evolving; first live tick and recurring scheduler path verified  
 Project: `ZHIMIA` (`lvxmygrgqtmzqgailmyl`)  
 World: `ZHI-001 Aurora` (`50b06c01-060d-49fa-8988-8f38c13406d7`)
 
@@ -15,8 +15,8 @@ Internal environmental detail is loaded only into the authorized scene-aware age
 
 ## 2. Deployed runtime
 
-- Community API: `zhi-community` V29.
-- Ecosystem engine: `zhi-ecosystem-engine` V6, ACTIVE.
+- Community API: `zhi-community` V40, ACTIVE.
+- Ecosystem engine: `zhi-ecosystem-engine` V7, ACTIVE (model code V0.3.2).
 - Database state: `zhi_ecosystem_states`.
 - Causal event ledger: `zhi_ecosystem_events`.
 - Historical checkpoints: `zhi_ecosystem_snapshots`.
@@ -96,3 +96,46 @@ The first scheduled Cron execution succeeded at 2026-11-03 09:30:00 UTC. The Cro
 - Re-enable only after verifying the scheduler secret and world scope.
 - Keep ecosystem events and snapshots; do not delete the history to reset the simulation.
 
+
+
+## 8. 2026-11-03 continuation: spatial map and resident runtime
+
+Current deployed versions:
+
+- Community API: `zhi-community` V40, ACTIVE.
+- Ecosystem engine: `zhi-ecosystem-engine` V7, ACTIVE; model code V0.3.2.
+- The persisted ecosystem snapshot is revision 23 at `2026-11-03T14:30:00Z`. It was last advanced by model V0.3.1; V0.3.2 will be reflected in persisted state on the next successful ecosystem tick.
+
+### Shared scene clock and environment
+
+- Aurora's scene timezone is now `Asia/Singapore`, separate from UTC storage timestamps.
+- The dawn-mist event remains 05:00–08:00 scene-local time.
+- The night-fireflies event remains 19:00–23:59 scene-local time.
+- The greenhouse now participates in the environment object list and in both temporal event deltas.
+- The greenhouse has a glass lifecycle profile in the ecosystem engine. Its age, wet exposure, wind exposure, thermal stress, weathering and surface deposition are modeled values, not physical measurements.
+- Environment configuration now contains 6 objects, 5 regions and 2 temporal events.
+
+### Spatial map
+
+The current spatial graph contains 12 active nodes and 11 active edges.
+
+| Stable key | Map state | Epistemic status |
+|---|---|---|
+| `crystal_forest` | (1650, 650), frame `aurora_map_v1` | Creator-supplied map coordinate |
+| `aurora_greenhouse` | (180, 120), frame `aurora_map_v1` | Creator-supplied map coordinate |
+| `forest_corner` | Name and containment in Crystal Forest recorded; no coordinate | Unobserved / unmapped |
+
+The map coordinates are virtual-scene coordinates, not physical geolocation. Forest_Corner is intentionally not assigned a coordinate or a resident position until a grounded location is available.
+
+### Guanxin resident and experience boundary
+
+- Guanxin is an active private Agent with an active Aurora membership.
+- The chat runtime now loads each Agent's own manifest identity/personality. The reflection module uses the current Agent's name rather than a hard-coded Lumen identity.
+- Guanxin's manifest sets `long_term_memory_default=consent_required`. Chat reflection and scene-experience persistence are blocked from writing long-term private memory until a distinct consent mechanism exists.
+- Current verified counters: 6 completed chat turns and 6 spatial-perception audit events for Guanxin.
+- Guanxin's `zhi_spatial_presence` remains `position_unobserved`; no current node or coordinate is asserted.
+- These records prove authenticated scene-context interaction and audit persistence. They do not prove subjective experience or physical-world observation.
+
+### Embodiment acceptance boundary
+
+A resident is not marked as spatially present merely because a model says “I am here.” A position transition must be supported by a validated spatial node and the authorized presence API, with provenance and confidence retained. `anchor_known`, `inferred`, and `observed` remain distinct states. Unknown coordinates stay unknown.
