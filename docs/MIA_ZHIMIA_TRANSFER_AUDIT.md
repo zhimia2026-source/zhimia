@@ -101,3 +101,15 @@ Storage object bytes, source Edge Function code, environment configuration, AGNE
 - Tracked the exact deployed function source and import map in `supabase/functions/mia-private-import/` on this PR branch to reduce deployed/repository drift.
 - Deployment was confirmed ACTIVE v2. The verification route has not yet been invoked with the service-role credential; this environment does not expose that secret to the assistant. Archive remains empty and batch remains planned.
 - **Important:** this is the target-side verification half only. The source exporter still needs matching canonical sanitization, keyset pagination, stable source snapshot/upper-bound policy, source rowset digests, and a fail-closed comparison before any import run. No transfer was started by this deployment.
+
+
+## 2026-11-04 deployment increment: keyset exporter and fail-closed digest gate
+
+- Updated `scripts/mia-clone-transfer.mjs` to use each table's declared primary key with keyset pagination and a per-table maximum-PK upper bound; OFFSET pagination has been removed.
+- The exporter now strips the same secret-like keys and computes recursively key-sorted canonical JSON SHA-256 row hashes before transfer.
+- The exporter sends an explicit `action: "import"`, then calls the target's read-only `action: "verify"` route and compares every table's row count and deterministic sorted rowset digest. Any mismatch fails the run.
+- Added a second execution gate: `MIA_SOURCE_SNAPSHOT_CONFIRMED=CONFIRMED_STABLE_SOURCE_SNAPSHOT`, in addition to the existing CLI flag and approval secret.
+- Target function is ACTIVE version 4. The matching deployed source is tracked under `supabase/functions/mia-private-import/` in this PR branch.
+- The exporter has **not** been executed. The GitHub workflow still does not pass `--execute`; archive row count remains 0 and batch status remains `planned`.
+- **Consistency limitation:** keyset paging plus a maximum-PK bound prevents later inserts from extending the scan and avoids OFFSET drift, but it is not itself a database-wide repeatable-read snapshot. Before execution, a stable source snapshot/maintenance window must be established and independently confirmed. Do not set the snapshot confirmation variable while source rows can still be updated or deleted.
+- The verifier has not been called with the service-role credential yet. A post-deploy authenticated verification smoke test is still required before the first import.
