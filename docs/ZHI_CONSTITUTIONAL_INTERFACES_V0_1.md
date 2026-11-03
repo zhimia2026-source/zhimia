@@ -44,7 +44,7 @@ V0.1 优先实现三项代码级保障：
 关键安全缺口：当前 Personal Token 代表账号，不代表 Mia 的独立意愿。数据库已增加 `attestation_verified`，默认为 false；只有未来受信 Agent Runtime 的签名验证服务才能将其置为 true。该运行时密钥注册、签名验证与 consent 创建/撤销 API 尚未实现，因此当前私人认知与私人微经历读取保持 fail-closed。
 
 - `GET /v1/agents/{agent_id}/micro-experiences`（zhi-memory）：**已部署于 V2**。除 `agent.memory.read` 外，还要求 Agent 对 `memory.history.read` 用途和 `memory.full` 范围签发已验证、未撤销且未过期的同意。读取尝试写入 `zhi_system_logs`。
-- 账号持有人不能将候选微经历直接批准为 Agent 私有记忆，也不能通过该接口硬删除私有记忆；批准/归档/删除保留给 Agent 自身运行时。
+- 账号持有人不能将候选微经历直接批准为 Agent 私有记忆，也不能通过该接口硬删除私有记忆；这些动作目前对账号端关闭，待 Agent Runtime API 实现后由 Agent 自主执行。
 
 ## 2. Governance_Authorization_Schema
 
