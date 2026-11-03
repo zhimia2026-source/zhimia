@@ -124,7 +124,14 @@ export function createCommunityHandler(
 
     const url = new URL(req.url);
     const marker = "/functions/v1/zhi-community";
-    const rawPath = url.pathname.includes(marker) ? url.pathname.slice(url.pathname.indexOf(marker) + marker.length) : url.pathname;
+    // Supabase gateways may normalize function subpaths differently across runtimes.
+    // The client supplies an authenticated route hint in the query string as a stable fallback.
+    const hintedPath = url.searchParams.get("__zhi_path");
+    const rawPath = hintedPath && hintedPath.startsWith("/v1/")
+      ? hintedPath
+      : url.pathname.includes(marker)
+        ? url.pathname.slice(url.pathname.indexOf(marker) + marker.length)
+        : url.pathname;
     // Stable public protocol name; keep /v1/scenes as a backward-compatible alias.
     const path = normalizeWorldProtocolPath(rawPath);
     const parts = path.split("/").filter(Boolean);
