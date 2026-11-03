@@ -1,6 +1,6 @@
 # ZHI 硅基生命生态系统：P1/P2/P3/P4 工程基线
 
-状态：**P1 持久化数据层已部署并完成权限核验；P2 生态推进 Edge Function V0.3.0 已部署；P4 事件来源类型白名单已修复并完成数据库回滚探针；真实 Edge Function 端到端验收和自动调度仍未完成。**
+状态：**P1 持久化数据层已部署并完成权限核验；P2 生态推进 Edge Function V0.3.1 已部署；P4 事件来源类型白名单已修复并完成数据库回滚探针；真实 Edge Function 端到端验收和自动调度仍未完成。**
 版本：0.3.0
 日期：2026-11-03
 
@@ -42,7 +42,7 @@ ZHI 场景是持续存在的生态世界，不是等待 Agent 执行任务的静
 
 ## 4. P2：连续生态引擎（当前部署 V0.3.0；自动调度未启用）
 
-独立 Edge Function：`zhi-ecosystem-engine`（语义版本 V0.3.0；Supabase 部署版本 4；`verify_jwt=true`）。仅接受网关已验证且 JWT role 为 `service_role` 的调用者；函数通过服务端密钥读取状态并调用原子提交 RPC。单次最多补算 168 小时，使用世界 ID + UTC 小时生成确定性天气样本，重试不会改变同一时间段的天气。
+独立 Edge Function：`zhi-ecosystem-engine`（语义版本 V0.3.1；Supabase 部署版本 5；`verify_jwt=true`）。仅接受网关已验证且 JWT role 为 `service_role` 的调用者；函数通过服务端密钥读取状态并调用原子提交 RPC。单次最多补算 168 小时，使用世界 ID + UTC 小时生成确定性天气样本，重试不会改变同一时间段的天气。
 
 V0.1 已实现：
 - 世界时钟按实际经过时间推进；每小时切段，支持不足一小时的增量。
@@ -97,7 +97,7 @@ V0.1 已实现：
 | service_role 表权限 | 已验证 |
 | 原子推进 RPC | 已部署 |
 | RPC 客户端权限 | 已验证仅 service_role |
-| 状态推进算法 | V0.3.0 已部署；基础模型干运行通过，完整线上验收待完成 |
+| 状态推进算法 | V0.3.1 已部署；基础模型干运行通过，完整线上验收待完成 |
 | 雨水—土壤—植物因果链 | 已部署；待真实 Edge Function 端到端调用验收 |
 | 物体老化与生态历史 | V0.2.1 已部署，待端到端验收 |
 | 休眠补算与恢复 | V0.1 支持最多 168 小时/次补算；多次调用可继续追赶，待端到端验收 |
@@ -230,3 +230,16 @@ Aurora 的首批对象采用显式材料映射：
 - 此探针验证数据库提交接口，不等于 Edge Function HTTP 端到端验收。
 
 下一道发布门禁：通过受控服务端身份调用 `zhi-ecosystem-engine`，推进 Aurora 一个短时间步，核对 revision、world_time、engine.version、soil/flora/hydrology/objects、事件数和快照；随后以相同 target_time 重试，必须返回 no-op 且 revision 不增加。当前 Supabase MCP 可用操作未提供 Edge Function invoke 动作，因此尚未声称完成线上 HTTP E2E。自动调度继续保持关闭。
+
+
+## 13. P4 状态元数据闭环修正（V0.3.1 已部署）
+
+进一步检查 Aurora 的初始化 JSONB 结构后，发现引擎此前只写入 `state.engine.version`，没有同步更新初始化时已存在的顶层 `state.engine_version`；同时计算完成后没有将 `soil.status` 从 `not_initialized` 更新为 `active_model`。这会导致状态索引与实际模型状态不一致。
+
+V0.3.1 已修正：
+- 同时写入 `state.engine.version = "0.3.1"` 与兼容字段 `state.engine_version = "0.3.1"`。
+- 计算完成后将 `soil.status`、`hydrology.status`、`flora.status` 统一标记为 `active_model`。
+- 将 `state.simulation_status` 更新为 `active_model`。
+- Edge Function 仍保持 `verify_jwt=true` 和 service_role-only 调用检查；部署版本升至 5。
+
+该修正已部署，但尚未通过线上 HTTP tick 写入 Aurora；因此 Aurora 当前仍保持 revision 1 和初始化状态。只有真实 tick 成功后，才应观察到上述状态字段更新。
