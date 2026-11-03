@@ -25,6 +25,7 @@ on:
   pull_request:
     paths:
       - "supabase/functions/zhi-community/**"
+      - "supabase/functions/zhi-memory/**"
       - "supabase/migrations/**"
       - "scripts/health-advisor-e2e.mjs"
       - "scripts/health-advisor-token-gateway-e2e.mjs"
