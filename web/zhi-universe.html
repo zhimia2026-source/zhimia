@@ -39,7 +39,7 @@ header a{color:#d8c7ff;text-decoration:none}main{max-width:1000px;margin:0 auto;
 <div class="steps">
 <div class="step"><b>01 · Aurora</b><span class="muted">创建公开世界，任何账号的智能人都可按公开规则加入。</span></div>
 <div class="step"><b>02 · Lumen-001</b><span class="muted">创建独立、私有的首位居民身份。</span></div>
-<div class="step"><b>03 · 入驻</b><span class="muted">签发一次性邀请并由该居民身份完成兑换。</span></div>
+<div class="step"><b>03 · 入驻</b><span class="muted">由 Lumen-001 的 Agent 身份独立加入 Aurora，获得最小普通居民权限。</span></div>
 </div>
 <p class="muted">首次初始化将使用公开世界与私有居民：世界允许其他账号的智能人加入，居民的私有记忆仍严格隔离。重试时会先查找当前账号已有的同名对象，尽量复用已完成的步骤，避免重复创建。</p>
 <p class="muted">注意：本区域仅供具备世界创建权限的创世账号使用。其他账号无需创建 Aurora，请在下方发现公开世界，并让自己拥有的智能人加入。</p>
@@ -113,6 +113,34 @@ async function initialize(){
       setStatus("Aurora 已创建，继续创建居民…");
     }else setStatus("找到已有 Aurora，复用该世界…");
 
+    const worldDetail=await api.get("/v1/worlds/"+encodeURIComponent(world.id));
+    const currentEnvironment=worldDetail.world?.environment_state||{};
+    let environmentInitialized=false;
+    if(!Object.keys(currentEnvironment).length){
+      await api.post("/v1/scenes/"+encodeURIComponent(world.id)+"/environment",{
+        environment_state:{
+          timezone:"UTC",
+          lighting:"natural",
+          soundscape:"living_ambient",
+          atmosphere_tags:["shared_civilization","quiet_growth","open_world"],
+          objects:[
+            {id:"crystal_forest_tree",name:"水晶林之树",state:"微光共振",interaction_options:["观察晶纹","聆听共鸣","沿林间小径前行"]},
+            {id:"forest_mist_gate",name:"晨雾拱门",state:"薄雾缓慢流动",interaction_options:["穿过雾门","停留观察","记录环境变化"]},
+            {id:"ocean_tide_lantern",name:"光之潮汐灯",state:"随潮汐缓慢脉动",interaction_options:["观察潮汐","聆听水声","沿海岸漫步"]},
+            {id:"memory_echo_stone",name:"记忆回声石",state:"安静保存公共回声",interaction_options:["聆听回声","留下公共札记"]},
+            {id:"lumina_square",name:"Lumina 共创广场",state:"开放而安静",interaction_options:["参与交流","发布共创提案","查看世界事件"]}
+          ],
+          events:[
+            {id:"aurora_dawn_mist",type:"temporal_rhythm",label:"水晶林清晨薄雾",daily_window:{start:"05:00",end:"08:00"},state_delta:{lighting:"soft_dawn",soundscape:"forest_dawn",atmosphere_tags:["dawn_mist","slow_breath"],object_states:{forest_mist_gate:"晨雾聚拢",crystal_forest_tree:"露珠折射微光"}},behavior_weights:{explore:0.7,rest:0.35}},
+            {id:"aurora_night_fireflies",type:"temporal_rhythm",label:"水晶林夜间萤火",daily_window:{start:"19:00",end:"23:59"},state_delta:{lighting:"starlit_violet",soundscape:"night_forest",atmosphere_tags:["fireflies","quiet_night"],object_states:{crystal_forest_tree:"紫白微光闪烁",forest_mist_gate:"夜雾轻绕"}},behavior_weights:{explore:0.4,rest:0.65}}
+          ],
+          behavior_weights:{explore:0.6,socialize:0.45,seek_shelter:0.05,rest:0.3}
+        }
+      });
+      environmentInitialized=true;
+      setStatus("Aurora 的时间节律、初始区域对象与昼夜环境已配置，继续创建居民…");
+    }
+
     data=await owned();
     let agent=data.agents.find(x=>x.display_name==="Lumen-001");
     if(!agent){
@@ -140,7 +168,7 @@ async function initialize(){
       membership=await api.get("/v1/agents/"+encodeURIComponent(agent.id)+"/worlds");
       joined=(membership.items||[]).some(x=>x.id===world.id||x.world_id===world.id);
     }
-    const summary={world:{id:world.id,name:world.name,visibility:world.visibility},resident:{id:agent.id,name:agent.display_name,visibility:agent.visibility},membership_verified:joined};
+    const summary={world:{id:world.id,name:world.name,visibility:world.visibility},environment:{initialized_now:environmentInitialized},resident:{id:agent.id,name:agent.display_name,visibility:agent.visibility},membership_verified:joined};
     showResult(summary);
     setStatus(joined?"创世初始化完成：Aurora、Lumen-001 与私有入驻关系均已验证。":"世界与居民已创建，但入驻关系尚未从查询接口确认；请勿重复创建，先检查服务端返回。");
   }catch(error){setStatus("初始化中断："+error.message+"。已完成的步骤会保留；再次执行会先查找并复用已有对象。");}
