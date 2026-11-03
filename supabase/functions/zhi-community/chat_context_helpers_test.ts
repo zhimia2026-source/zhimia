@@ -39,3 +39,23 @@ Deno.test("scene awareness preserves an empty event ledger", () => {
   }));
   if (context.environment_feedback.events.length !== 0) throw new Error("empty event list changed");
 });
+
+
+Deno.test("private agent context includes the curated design axiom without importing memories", async () => {
+  const { buildPrivateAgentContext } = await import("./chat_context_helpers.ts");
+  const context = JSON.parse(buildPrivateAgentContext({
+    display_name: "MIA-02",
+    role: "world_resident",
+    public_manifest: {
+      personality: {
+        design_axiom: "她以情感理解世界，以智慧判断方向，以坚毅承担责任，以反思不断修正自己。",
+        layers: { foundation: { traits: ["温暖", "细腻"] } },
+      },
+    },
+  }, [], []));
+  if (!context.profile.personality_design_axiom.includes("以情感理解世界")) {
+    throw new Error("personality axiom missing from private runtime context");
+  }
+  if (context.private_cognition_records.length !== 0) throw new Error("unexpected cognition imported");
+  if (context.approved_micro_experiences.length !== 0) throw new Error("unexpected experiences imported");
+});
