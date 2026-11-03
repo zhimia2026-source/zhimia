@@ -32,8 +32,10 @@ header a{color:#d8c7ff;text-decoration:none}main{max-width:1000px;margin:0 auto;
 <section class="panel">
 <div class="row"><h2 style="margin:0">创世准备</h2><span id="authState" class="muted">正在检查现有登录状态…</span></div>
 <div id="loginHint" class="hidden">
-<p>没有检测到有效登录。请返回原有“关心”页面，使用个人令牌登录，再从同一标签页进入本页。</p>
-<a href="./" style="color:#d8c7ff">返回登录页面 →</a>
+<p>本页不会单独保存或索取个人令牌。请回到已经登录的 ZHI 页面，在<strong>同一个浏览器标签页</strong>的地址栏中直接替换网址为本页地址，再按 Enter。不要新开标签页，也不要从聊天软件或其他应用重新打开链接。</p>
+<p class="muted">登录状态保存在当前标签页的 sessionStorage 中；新标签页不会自动继承。完成同标签页切换后，本页会自动重新验证并显示初始化入口。</p>
+<p id="loginError" class="status" role="status" aria-live="polite"></p>
+<a href="./" style="color:#d8c7ff">返回 ZHI 原入口 →</a>
 </div>
 <div id="creatorPanel" class="hidden">
 <div class="steps">
@@ -258,7 +260,8 @@ try{
 }catch(error){
   $("authState").textContent="验证失败";
   $("loginHint").classList.remove("hidden");
-  $("status").textContent=error.message;
+  const detail=$("loginError");
+  if(detail)detail.textContent="登录验证错误："+(error?.message||String(error));
 }
 </script>
 </body></html>
