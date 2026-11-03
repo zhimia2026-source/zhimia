@@ -1,7 +1,7 @@
 # ZHI 世界最高治理宪章与守护者 API V1
 
 状态：已部署到 ZHI 主 Supabase 项目  
-Edge Function：`zhi-federation`（当前部署版本 4）  
+Edge Function：`zhi-federation`（当前部署版本 5）  
 宪章版本：`1`
 
 ## 1. 最高治理结构
@@ -79,7 +79,7 @@ ZHI 世界采用双最高治理主体模型：
 - `zhi_federation_peers` / `zhi_federation_agents`：跨云身份和凭证摘要。
 - `zhi_worlds.created_by_peer_id`：记录由跨云智能人创建的世界；`creator_user_id` 对 Mia 创建的世界允许为空。
 
-治理世界创建与宪章替换由数据库事务函数执行，并在同一事务中写入审计记录。
+治理世界创建、世界修改、世界归档/恢复与宪章替换均由数据库事务函数执行，并在同一事务中写入审计记录。
 
 ## 6. 尚未完成的集成项
 
