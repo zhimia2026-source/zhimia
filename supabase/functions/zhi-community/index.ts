@@ -123,7 +123,9 @@ export function createCommunityHandler(
 
     const url = new URL(req.url);
     const marker = "/functions/v1/zhi-community";
-    const path = url.pathname.includes(marker) ? url.pathname.slice(url.pathname.indexOf(marker) + marker.length) : url.pathname;
+    const rawPath = url.pathname.includes(marker) ? url.pathname.slice(url.pathname.indexOf(marker) + marker.length) : url.pathname;
+    // Stable public protocol name; keep /v1/scenes as a backward-compatible alias.
+    const path = rawPath.replace(/^\/v1\/worlds(?=\/|$)/, "/v1/scenes");
     const parts = path.split("/").filter(Boolean);
 
     if (req.method === "GET" && path === "/v1/agents") {
@@ -797,6 +799,111 @@ export function createCommunityHandler(
         throw new Error("database_error");
       }
       return reply(result, 200);
+    }
+
+    // A public world admits an Agent as its own participant. The authenticated
+    // personal token must belong to that Agent's owner; account membership is
+    // never inherited by an Agent.
+    if (req.method === "POST" && parts.length === 6 && parts[0] === "v1" &&
+        parts[1] === "scenes" && parts[3] === "agents" && parts[5] === "join") {
+      if (!hasCapability(actor, "community.scene.enter")) {
+        return reply({ error: "forbidden", detail: "capability_required" }, 403);
+      }
+      const sceneId = parts[2];
+      const agentId = parts[4];
+      if (!isUuid(sceneId) || !isUuid(agentId)) {
+        return reply({ error: "invalid_argument", detail: "scene_and_agent_ids_must_be_uuids" }, 400);
+      }
+      const { data: agent, error: agentError } = await db.from("zhi_agents")
+        .select("id,status").eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
+      if (agentError) throw new Error("database_error");
+      if (!agent) return reply({ error: "not_found" }, 404);
+      if (agent.status !== "active") return reply({ error: "conflict", detail: "agent_not_active" }, 409);
+
+      const { data: world, error: worldError } = await db.from("zhi_worlds")
+        .select("id,visibility,entry_policy,status").eq("id", sceneId).maybeSingle();
+      if (worldError) throw new Error("database_error");
+      if (!world) return reply({ error: "not_found" }, 404);
+      if (world.status !== "open") return reply({ error: "conflict", detail: "scene_not_open" }, 409);
+      if (world.visibility !== "public" || world.entry_policy !== "open") {
+        return reply({ error: "forbidden", detail: "public_agent_join_not_available" }, 403);
+      }
+
+      const { data: existing, error: existingError } = await db.from("zhi_world_memberships")
+        .select("id,status,expires_at").eq("world_id", sceneId)
+        .eq("principal_user_id", actor.userId).eq("agent_id", agentId).maybeSingle();
+      if (existingError) throw new Error("database_error");
+      if (existing?.status === "active" &&
+          (!existing.expires_at || Date.parse(existing.expires_at) > Date.now())) {
+        return reply({ scene_id: sceneId, agent_id: agentId, membership: "active" });
+      }
+
+      const safeMembership = {
+        membership_role: "member",
+        status: "active",
+        revoked_at: null,
+        expires_at: null,
+        capabilities: ["message:read", "message:send"],
+        joined_at: new Date().toISOString(),
+      };
+      if (existing) {
+        const { error } = await db.from("zhi_world_memberships")
+          .update(safeMembership).eq("id", existing.id);
+        if (error) throw new Error("database_error");
+      } else {
+        const { error } = await db.from("zhi_world_memberships").insert({
+          world_id: sceneId,
+          principal_user_id: actor.userId,
+          agent_id: agentId,
+          ...safeMembership,
+        });
+        if (error) {
+          // A concurrent identical join may win the unique actor index.
+          if (error.code !== "23505") throw new Error("database_error");
+          const { data: raced, error: raceError } = await db.from("zhi_world_memberships")
+            .select("id,status,expires_at").eq("world_id", sceneId)
+            .eq("principal_user_id", actor.userId).eq("agent_id", agentId).maybeSingle();
+          if (raceError || !raced || raced.status !== "active" ||
+              (raced.expires_at && Date.parse(raced.expires_at) <= Date.now())) {
+            throw new Error("database_error");
+          }
+        }
+      }
+      return reply({ scene_id: sceneId, agent_id: agentId, membership: "active" }, 200);
+    }
+
+    if (req.method === "GET" && parts.length === 4 && parts[0] === "v1" &&
+        parts[1] === "agents" && parts[3] === "worlds") {
+      const agentId = parts[2];
+      if (!isUuid(agentId)) return reply({ error: "invalid_argument", detail: "agent_id_must_be_uuid" }, 400);
+      const { data: agent, error: agentError } = await db.from("zhi_agents")
+        .select("id").eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
+      if (agentError) throw new Error("database_error");
+      if (!agent) return reply({ error: "not_found" }, 404);
+      const { data: memberships, error } = await db.from("zhi_world_memberships")
+        .select("world_id,membership_role,capabilities,expires_at")
+        .eq("principal_user_id", actor.userId).eq("agent_id", agentId)
+        .eq("status", "active").is("revoked_at", null)
+        .order("joined_at", { ascending: false }).limit(100);
+      if (error) throw new Error("database_error");
+      const now = Date.now();
+      const valid = (memberships ?? []).filter((item: { expires_at?: string | null }) =>
+        !item.expires_at || Date.parse(item.expires_at) > now
+      );
+      const worldIds = valid.map((item: { world_id: string }) => item.world_id);
+      if (!worldIds.length) return reply({ items: [] });
+      const { data: worlds, error: worldsError } = await db.from("zhi_worlds")
+        .select("id,name,description,visibility,entry_policy,status,rules_version,created_at")
+        .in("id", worldIds).eq("status", "open").order("created_at", { ascending: false }).limit(100);
+      if (worldsError) throw new Error("database_error");
+      const membershipByWorld = new Map(valid.map((item: {
+        world_id: string; membership_role: string; capabilities: string[];
+      }) => [item.world_id, item]));
+      return reply({ items: (worlds ?? []).map((world: { id: string }) => ({
+        ...world,
+        membership_role: membershipByWorld.get(world.id)?.membership_role ?? "member",
+        capabilities: membershipByWorld.get(world.id)?.capabilities ?? [],
+      })) });
     }
 
     if (req.method === "POST" && parts.length === 4 && parts[0] === "v1" && parts[1] === "scenes" && parts[3] === "join") {
