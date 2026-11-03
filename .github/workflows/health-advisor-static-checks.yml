@@ -27,6 +27,8 @@ on:
   pull_request:
     paths:
       - "supabase/functions/zhi-community/**"
+      - "scripts/check-zhi-runtime-binding-schema.mjs"
+      - "schemas/zhi-agent-runtime-binding-v1.schema.json"
       - "supabase/functions/zhi-memory/**"
       - "supabase/migrations/**"
       - "scripts/health-advisor-e2e.mjs"
