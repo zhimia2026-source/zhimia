@@ -124,3 +124,13 @@ Storage object bytes, source Edge Function code, environment configuration, AGNE
 - Before dispatch, confirm the repository Actions secrets `ZHIMA_SUPABASE_URL` and `ZHIMA_SUPABASE_SERVICE_ROLE_KEY` are configured. Then run **Actions → Mia target verifier smoke test → Run workflow** on branch `migration/mia-archive-transfer`.
 - Expected current result, if the target state is unchanged: PASS, 25 allowlisted table entries may be absent/zero depending on verifier response shape, archive rows 0, invalid row hashes 0. The workflow validates the actual response contract and reports the number of tables returned; it does not mistake an empty archive for a completed migration.
 - This is a read-only smoke test, not a migration approval. Source snapshot consistency and native runtime adaptation remain separate blockers.
+
+
+## 2026-11-04 source primary-key audit and snapshot decision
+
+- Read-only inspection of source `information_schema` confirmed a primary key exists for every one of the 25 allowlisted tables, and the column names match the exporter map.
+- Primary-key types are: UUID for 22 tables; bigint for `mia_growth_state_versions.version`; boolean for `mia_forest_autonomy_control.singleton`; text for `zhi_world_builder_config.config_key` and `zhi_world_builder_region_health.region_key`.
+- This confirms the declared cursor columns, but it does **not** establish a consistent snapshot. In particular, UUID/text/boolean key ordering is only a deterministic traversal order, not a transaction snapshot, and updates/deletes to already-scanned rows can still escape the exporter digest.
+- Target recheck on 2026-11-04: `mia_private.mia_archive_records` has 0 rows for this batch; `mia_private.mia_migration_batches.status` remains `planned`.
+- Snapshot approach selected for the next design stage: an additive, source-side immutable snapshot batch created within one PostgreSQL `REPEATABLE READ` transaction, covering all 25 tables and recording source PK, sanitized payload digest, and row count. Export then reads only the frozen snapshot. This avoids pausing Mia's live runtime and avoids pretending separate REST requests are one snapshot.
+- No source-side DDL or data writes were made during this audit. The snapshot staging schema/function is not yet deployed; its exact permissions, secret-field sanitization, retention, and rollback path must be reviewed before creating it.
