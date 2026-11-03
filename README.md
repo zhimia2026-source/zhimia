@@ -100,3 +100,8 @@ python -m unittest discover -s tests -v
 3. 让现有聊天能力适配标准接口，保持旧客户端可用。
 4. 补齐世界成员授权、任务审批、审计与私有记忆隔离。
 5. 再加入经验反思、模拟账本、聊天内管理简报和跨世界协作。
+
+
+### 生态引擎线上验收
+
+受控 E2E 验收脚本：[`scripts/verify-zhi-ecosystem-e2e.sh`](scripts/verify-zhi-ecosystem-e2e.sh)。脚本只从本地环境变量读取 service-role key；执行前请阅读 [`docs/ZHI_LIVING_ECOSYSTEM_P1_P2.md`](docs/ZHI_LIVING_ECOSYSTEM_P1_P2.md)。生产自动调度必须在 E2E 通过并配置 Vault 服务端密钥后另行启用。
