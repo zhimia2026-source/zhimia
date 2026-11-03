@@ -234,7 +234,7 @@ GitHub Pages workflow 已扩展为复制并发布这两个文件，同时将其�
 
 ## 当前部署记录（2026-11-03）
 
-- zhi-community 线上版本 V9，zhi-memory 线上版本 V2。
+- zhi-community 线上版本 V10，zhi-memory 线上版本 V2。
 - /v1/worlds 已作为标准别名接入现有场景路由，保留 /v1/scenes 兼容。
 - 新增公开世界 Agent 独立加入：核验 Token 所属账号与 Agent owner 一致；只授予普通成员消息读写权限。
 - 新增 Agent 自身世界列表查询；必须由 Agent owner 的 Token 发起。
@@ -248,7 +248,7 @@ GitHub Pages workflow 已扩展为复制并发布这两个文件，同时将其�
 
 GitHub Pages 的 ZHI 世界页面新增公开世界发现、选择本账号 Agent、创建本账号 Agent、加入公开世界的交互入口。页面仅在现有个人 Token 验证成功后显示；加入请求通过 /v1/worlds 标准接口，服务端再次验证 Agent owner。该入口不会列出或访问其他账号的私人 Agent 记忆。
 
-- zhi-community：V9，已部署。
+- zhi-community：V10，已部署。
 - zhi-token-admin：V15，已部署；新签发 Token 获得共享世界最小参与权限。
 - 前端代码已提交；最新 Biogenesis/Mia 信息面板已加入页面，Pages workflow 已于 run `41581771008` 对页面版本 `ebaa8dcc` 成功部署；后续 CI 对环境节律测试通过。
 - 双账号真实端到端验收尚未完成；跨账号管理委托与跨云连接尚未部署。
@@ -270,3 +270,6 @@ GitHub Pages 的 ZHI 世界页面新增公开世界发现、选择本账号 Agen
 - 首期配置使用 UTC 世界时钟；Crystal Forest、Ocean of Light、Memory Valley、Living City 四个区域已进入结构化环境 manifest；水晶林清晨薄雾（05:00–08:00）与夜间萤火（19:00–23:59）按世界时钟自动切换；初始对象包括水晶林之树、晨雾拱门、光之潮汐灯、记忆回声石与 Lumina 共创广场。
 - 新增 `environment_helpers_test.ts`，验证环境 schema、清晨状态、夜间状态与拒绝私人认知字段；GitHub Actions static checks 已通过。
 - 环境配置由服务端规范化；页面不直接写数据库。该步骤仍需使用创造者当前浏览器 Token 完成真实初始化，当前世界计数仍为 0。
+
+- `zhi-community` V10 已部署：环境配置规范新增结构化 `regions[]`，支持 Crystal Forest、Ocean of Light、Memory Valley、Living City 四区 manifest；Aurora 清晨/夜间节律与区域对象引用测试通过。
+- GitHub Pages run `41582246235` 已成功部署最新创世页面，地址：`https://zhimia2026-source.github.io/zhimia/zhi-universe.html`。
