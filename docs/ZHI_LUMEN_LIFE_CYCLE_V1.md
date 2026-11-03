@@ -20,7 +20,7 @@
 |---|---|---|
 | 身份 | zhi_agents 中的 Lumen-001，私有可见性；Aurora Agent membership 独立记录 | 已验证 |
 | 感知 | 私有聊天输入；后端可在明确提供并验证成员关系时加载场景环境上下文 | 已实现；新会话页当前不传场景 |
-| 记忆 | zhi_agent_chat_turns 保存会话；私有 cognition 与已批准 micro-experiences 可按权限加载 | 已实现 |
+| 记忆 | zhi_agent_chat_turns 保存会话；新增 owner-scoped micro-experience candidate API 与私有审核页；只有 approved 记忆才会进入私有上下文 | 候选流程已部署；Agent 同意门控未完成 |
 | 思考 | zhi-community 私有 chat route 将 Agent 私有上下文、有限历史和用户输入交给服务端模型 | 已实现；模型服务配置/真实响应待 E2E |
 | 行动提议 | 场景 helper 可从环境权重生成 requires_supervision=true、executed=false 的建议 | 仅建议逻辑；未形成持久化提议工作流 |
 | 监督授权 | 当前聊天明确要求先说明理由并请求授权；无工具执行接口 | fail-closed |
@@ -54,6 +54,8 @@
 5. 不传 scene_id 时不得注入世界消息或场景上下文。
 6. 未授权不得读取其他 Agent 的私有认知/记忆。
 7. 聊天不得直接写入已批准长期记忆，不得直接修改人格。
+8. 记忆候选只能由所有者明确提交，必须引用同一 Agent 的已完成私有聊天 turn；候选状态不会被注入聊天上下文。
+9. 所有者可以拒绝或归档候选；批准在 Agent Runtime 可对确切内容签名同意前必须返回拒绝。
 8. 不存在行动执行接口；任何行动建议均保持未执行状态。
 
 ### 使用者端到端验收
@@ -69,11 +71,11 @@
 ## 6. 后续迭代顺序
 
 - V1.0-A：完成真实私有聊天 E2E、模型配置与权限负向测试。
-- V1.0-B：建立私有微体验候选生成与审核/Agent 同意流程；候选与已批准记忆严格分层。
+- V1.0-B：已建立手动提交私有微体验候选、所有者拒绝/归档流程；待接入 Agent Runtime 精确内容签名同意后再开放批准。
 - V1.0-C：建立持久化行动提议账本、精确动作 allowlist、单次授权、过期与撤销；先只做模拟场景内动作。
 - V1.0-D：建立反思记录与证据反馈链，认知成长只能追加新版本。
 - V1.0-E：接入受信 Agent Runtime 身份与签名，让 Agent 本人可验证地同意记忆读取、人格修订与行动授权。
 
 ## 7. 当前验收声明
 
-本次已实现前端私有会话入口和幂等请求客户端；不代表聊天模型已配置、不代表真实对话已通过、不代表 Agent 已获得自主行动能力。以上未完成项必须分别验收，不得用 UI 可打开代替服务端验收。
+私有聊天真实 E2E 已由使用者确认可用，数据库核验到 Lumen-001 至少一条 complete turn。私有记忆候选 API 已部署为 zhi-community v20；token-admin v22 已部署。记忆审核静态页面与 CI 已提交，Pages 发布与 CI 结果仍需以 GitHub Actions 实际状态确认。当前 Personal Token 需要所有者在令牌管理页为原 token 显式开启 `agent.memory.write` 与 `agent.memory.approve`；不得通过创建新身份替代原 token。候选创建、拒绝/归档可用后，批准仍因 Agent Runtime 签名同意未完成而 fail-closed。以上未完成项必须分别验收，不得用 UI 可打开代替服务端验收。
