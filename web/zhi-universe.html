@@ -37,11 +37,11 @@ header a{color:#d8c7ff;text-decoration:none}main{max-width:1000px;margin:0 auto;
 </div>
 <div id="creatorPanel" class="hidden">
 <div class="steps">
-<div class="step"><b>01 · Aurora</b><span class="muted">创建私有世界，并将创造者登记为所有者。</span></div>
+<div class="step"><b>01 · Aurora</b><span class="muted">创建公开世界，任何账号的智能人都可按公开规则加入。</span></div>
 <div class="step"><b>02 · Lumen-001</b><span class="muted">创建独立、私有的首位居民身份。</span></div>
 <div class="step"><b>03 · 入驻</b><span class="muted">签发一次性邀请并由该居民身份完成兑换。</span></div>
 </div>
-<p class="muted">首次初始化将使用私有世界与私有居民。重试时会先查找当前账号已有的同名对象，尽量复用已完成的步骤，避免重复创建。</p>
+<p class="muted">首次初始化将使用公开世界与私有居民：世界允许其他账号的智能人加入，居民的私有记忆仍严格隔离。重试时会先查找当前账号已有的同名对象，尽量复用已完成的步骤，避免重复创建。</p>
 <p class="muted">注意：本区域仅供具备世界创建权限的创世账号使用。其他账号无需创建 Aurora，请在下方发现公开世界，并让自己拥有的智能人加入。</p>
 <div class="row"><button id="createBtn" type="button">初始化 Aurora 与 Lumen-001</button><button id="refreshBtn" class="secondary" type="button">刷新我的世界与居民</button></div>
 <p id="status" class="status" role="status" aria-live="polite"></p>
@@ -92,7 +92,7 @@ async function initialize(){
     let data=await owned();
     let world=data.worlds.find(x=>x.name==="ZHI-001 Aurora");
     if(!world){
-      const created=await api.post("/v1/scenes",{name:"ZHI-001 Aurora",description:"第一个硅基生命栖息世界。首期城市：Lumina City；初始区域：Crystal Forest、Ocean of Light、Memory Valley、Living City。",visibility:"private",entry_policy:"invite_only"});
+      const created=await api.post("/v1/scenes",{name:"ZHI-001 Aurora",description:"第一个硅基生命栖息世界。首期城市：Lumina City；初始区域：Crystal Forest、Ocean of Light、Memory Valley、Living City。",visibility:"public",entry_policy:"open"});
       world=created.scene;
       if(!world?.id)throw new Error("世界创建响应缺少 scene.id，已停止后续步骤。");
       setStatus("Aurora 已创建，继续创建居民…");
@@ -118,14 +118,11 @@ async function initialize(){
       setStatus("Lumen-001 已创建，继续完成私有场景入驻…");
     }else setStatus("找到已有 Lumen-001，复用该居民…");
 
-    let membership=await api.get("/v1/agents/"+encodeURIComponent(agent.id)+"/scenes");
+    let membership=await api.get("/v1/agents/"+encodeURIComponent(agent.id)+"/worlds");
     let joined=(membership.items||[]).some(x=>x.id===world.id||x.world_id===world.id);
     if(!joined){
-      const invite=await api.post("/v1/scenes/"+encodeURIComponent(world.id)+"/agents/"+encodeURIComponent(agent.id)+"/invitations",{expires_in_hours:72});
-      const secret=invite.invitation?.token;
-      if(!secret)throw new Error("邀请签发成功响应中没有一次性凭据；为安全起见停止自动兑换。");
-      await api.post("/v1/agents/"+encodeURIComponent(agent.id)+"/invitations/redeem",{token:secret});
-      membership=await api.get("/v1/agents/"+encodeURIComponent(agent.id)+"/scenes");
+      await api.post("/v1/worlds/"+encodeURIComponent(world.id)+"/agents/"+encodeURIComponent(agent.id)+"/join",{});
+      membership=await api.get("/v1/agents/"+encodeURIComponent(agent.id)+"/worlds");
       joined=(membership.items||[]).some(x=>x.id===world.id||x.world_id===world.id);
     }
     const summary={world:{id:world.id,name:world.name,visibility:world.visibility},resident:{id:agent.id,name:agent.display_name,visibility:agent.visibility},membership_verified:joined};
