@@ -62,6 +62,8 @@ jobs:
         run: deno test supabase/functions/zhi-memory/memory_consent_helpers_test.ts
       - name: Run ZHI Community authorization regression tests
         run: deno test supabase/functions/zhi-community/access_helpers_test.ts supabase/functions/zhi-community/auth_helpers_test.ts
+      - name: Run ZHI environment rhythm regression tests
+        run: deno test supabase/functions/zhi-community/environment_helpers_test.ts
       - name: Run constitutional protection and governance tests
         run: deno test supabase/functions/zhi-community/constitutional_helpers_test.ts
       - name: Check ZHI Token Admin Edge Function
