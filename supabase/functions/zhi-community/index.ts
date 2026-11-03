@@ -546,10 +546,22 @@ export function createCommunityHandler(
       const agentId = parts[2];
       if (!isUuid(agentId)) return reply({ error: "invalid_argument", detail: "agent_id_must_be_uuid" }, 400);
       const { data: agent, error: agentError } = await db.from("zhi_agents")
-        .select("id,owner_user_id,status,display_name").eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
+        .select("id,owner_user_id,status,display_name,public_manifest").eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
       if (agentError) throw new Error("database_error");
       if (!agent) return reply({ error: "not_found" }, 404);
       if (agent.status !== "active") return reply({ error: "conflict", detail: "agent_not_active" }, 409);
+      const sceneMemoryPrivacy = agent.public_manifest && typeof agent.public_manifest === "object" &&
+          !Array.isArray(agent.public_manifest) &&
+          (agent.public_manifest as Record<string, unknown>).privacy &&
+          typeof (agent.public_manifest as Record<string, unknown>).privacy === "object"
+        ? (agent.public_manifest as Record<string, unknown>).privacy as Record<string, unknown>
+        : {};
+      if (sceneMemoryPrivacy.long_term_memory_default === "consent_required") {
+        return reply({
+          error: "consent_required",
+          detail: "long_term_memory_consent_required_before_scene_experience_persistence",
+        }, 409);
+      }
 
       const body = await readBody(req);
       if (!isUuid(body.world_id)) return reply({ error: "invalid_argument", detail: "world_id_must_be_uuid" }, 400);
@@ -1240,6 +1252,16 @@ export function createCommunityHandler(
         reflection: "unavailable",
         memory: "not_saved",
       };
+      const privacyPolicy = agent.public_manifest && typeof agent.public_manifest === "object" &&
+          !Array.isArray(agent.public_manifest) &&
+          (agent.public_manifest as Record<string, unknown>).privacy &&
+          typeof (agent.public_manifest as Record<string, unknown>).privacy === "object"
+        ? (agent.public_manifest as Record<string, unknown>).privacy as Record<string, unknown>
+        : {};
+      const longTermMemoryRequiresConsent = privacyPolicy.long_term_memory_default === "consent_required";
+      if (longTermMemoryRequiresConsent) {
+        growth = { reflection: "not_persisted", memory: "consent_required" };
+      } else {
       try {
         const reflectionPrompt = [
           "你现在是 " + agent.display_name + " 的私有自我反思模块。只分析本轮对话，不执行任何工具或外部行动。",
@@ -1302,6 +1324,7 @@ export function createCommunityHandler(
         }
       } catch {
         growth = { reflection: "unavailable", memory: "not_saved" };
+      }
       }
       return reply({ turn: completed, growth, idempotent_replay: false }, 201);
     }
