@@ -203,6 +203,23 @@ begin
     raise exception 'zhi_revision_proposals_are_append_only' using errcode = '42501';
   end if;
 
+  if tg_op = 'INSERT' then
+    if new.proposed_state is null or jsonb_typeof(new.proposed_state) <> 'object' then
+      raise exception 'zhi_revision_proposal_payload_invalid' using errcode = '22023';
+    end if;
+    new.proposed_state_sha256 := encode(
+      extensions.digest(convert_to(new.proposed_state::text, 'UTF8'), 'sha256'), 'hex'
+    );
+    new.agent_consent_status := 'awaiting_agent_consent';
+    new.agent_consent_event_id := null;
+    new.agent_consented_content_sha256 := null;
+    new.agent_consented_base_version := null;
+    new.agent_consented_at := null;
+    new.agent_consent_expires_at := null;
+    new.agent_consent_revoked_at := null;
+    return new;
+  end if;
+
   if new.owner_user_id is distinct from old.owner_user_id
      or new.agent_id is distinct from old.agent_id
      or new.target_object_type is distinct from old.target_object_type
@@ -213,6 +230,22 @@ begin
      or new.proposed_state_sha256 is distinct from old.proposed_state_sha256
      or new.initiator_kind is distinct from old.initiator_kind then
     raise exception 'zhi_revision_proposal_payload_immutable' using errcode = '42501';
+  end if;
+
+  if old.agent_consent_status = 'agent_consented' then
+    if new.agent_consent_event_id is distinct from old.agent_consent_event_id
+       or new.agent_consented_content_sha256 is distinct from old.agent_consented_content_sha256
+       or new.agent_consented_base_version is distinct from old.agent_consented_base_version
+       or new.agent_consented_at is distinct from old.agent_consented_at
+       or new.agent_consent_expires_at is distinct from old.agent_consent_expires_at then
+      raise exception 'zhi_agent_consent_proof_immutable' using errcode = '42501';
+    end if;
+    if new.agent_consent_status not in ('agent_consented','revoked','expired') then
+      raise exception 'zhi_agent_consent_status_transition_invalid' using errcode = '42501';
+    end if;
+    if new.agent_consent_status in ('revoked','expired') and new.agent_consent_revoked_at is null then
+      raise exception 'zhi_agent_consent_revocation_timestamp_required' using errcode = '22023';
+    end if;
   end if;
 
   if new.agent_consent_status = 'agent_consented'
@@ -259,7 +292,7 @@ $function$;
 
 drop trigger if exists zhi_cognition_revision_proposals_integrity on public.zhi_cognition_revision_proposals;
 create trigger zhi_cognition_revision_proposals_integrity
-before update or delete on public.zhi_cognition_revision_proposals
+before insert or update or delete on public.zhi_cognition_revision_proposals
 for each row execute function public.zhi_guard_revision_proposal_integrity();
 
 alter table public.zhi_system_logs enable row level security;
