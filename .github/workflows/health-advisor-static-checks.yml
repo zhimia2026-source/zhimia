@@ -24,6 +24,7 @@ on:
   pull_request:
     paths:
       - "supabase/functions/zhi-community/**"
+      - "supabase/migrations/**"
       - "scripts/health-advisor-e2e.mjs"
       - "scripts/health-advisor-token-gateway-e2e.mjs"
       - "scripts/check-zee-persona-config.mjs"
