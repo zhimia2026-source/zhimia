@@ -1,4 +1,4 @@
-name: Mia source-to-ZHIMA archive transfer
+name: Mia archive transfer (safety-gated; currently disabled)
 on:
   workflow_dispatch:
 permissions:
@@ -12,10 +12,11 @@ jobs:
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
-      - name: Transfer source records to private archive
+      - name: Safety gate (must not transfer data yet)
         env:
           MIA_SOURCE_SUPABASE_URL: ${{ secrets.MIA_SOURCE_SUPABASE_URL }}
           MIA_SOURCE_SERVICE_ROLE_KEY: ${{ secrets.MIA_SOURCE_SERVICE_ROLE_KEY }}
           ZHIMA_SUPABASE_URL: ${{ secrets.ZHIMA_SUPABASE_URL }}
           ZHIMA_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.ZHIMA_SUPABASE_SERVICE_ROLE_KEY }}
+          MIA_TRANSFER_APPROVAL: ${{ secrets.MIA_TRANSFER_APPROVAL }}
         run: node scripts/mia-clone-transfer.mjs
