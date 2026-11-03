@@ -1,6 +1,6 @@
 # ZHI 硅基生命生态系统：P1/P2/P3/P4 工程基线
 
-状态：**P1 持久化数据层已部署并完成权限核验；P2 生态推进 Edge Function V0.3.0 已部署（P2–P4，待端到端验收）；自动调度和真实端到端调用验收尚未完成。**
+状态：**P1 持久化数据层已部署并完成权限核验；P2 生态推进 Edge Function V0.3.0 已部署；P4 事件来源类型白名单已修复并完成数据库回滚探针；真实 Edge Function 端到端验收和自动调度仍未完成。**
 版本：0.3.0
 日期：2026-11-03
 
@@ -208,3 +208,25 @@ Aurora 的首批对象采用显式材料映射：
 | 真实物种、分解者与生态区域校准 | 后续阶段 |
 | 自动调度 | 未启用 |
 
+
+
+## 12. P4 闭环阻塞修复：生态事件来源类型一致性（数据库迁移已部署）
+
+线上静态核查发现：V0.3.0 事件生产端使用了 `material_process`、`biogeochemical_process`、`life_cycle_process` 三种来源类型，但事件表 CHECK 约束和 `zhi_ecosystem_commit_tick` RPC 的来源白名单最初只接受 `natural_process`、`environmental_event`、`scheduled_event`、`agent_action`、`system`。这会使首次 tick 产生的物体生命周期事件触发整笔事务回滚，状态与事件无法提交。
+
+已部署增量迁移：`20261103074050_extend_ecosystem_event_source_kinds`。
+
+修复内容：
+- 扩展 `zhi_ecosystem_events_source_kind_check`，新增上述三种合法来源。
+- 同步扩展 `zhi_ecosystem_commit_tick` RPC 的来源类型白名单。
+- 未放宽表权限、RLS 或 RPC 执行权限；anon/authenticated 仍无访问权，服务端权限边界保持不变。
+- 不修改 Aurora 现有状态、事件或快照。
+
+验证：
+- 数据库约束查询确认三种来源类型已加入。
+- RPC 定义查询确认三种来源类型均被接受。
+- 在 PL/pgSQL 子事务中执行三种来源事件的真实 RPC 调用，再主动触发回滚；探针成功返回，证明 RPC 接受事件且探针数据未持久化。
+- Aurora 仍为 revision 1；当前事件数仍为 1、快照数仍为 1，证明上述探针没有改变生产世界状态。
+- 此探针验证数据库提交接口，不等于 Edge Function HTTP 端到端验收。
+
+下一道发布门禁：通过受控服务端身份调用 `zhi-ecosystem-engine`，推进 Aurora 一个短时间步，核对 revision、world_time、engine.version、soil/flora/hydrology/objects、事件数和快照；随后以相同 target_time 重试，必须返回 no-op 且 revision 不增加。当前 Supabase MCP 可用操作未提供 Edge Function invoke 动作，因此尚未声称完成线上 HTTP E2E。自动调度继续保持关闭。
