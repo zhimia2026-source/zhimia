@@ -1,4 +1,5 @@
 import { computeSceneEnvironment, normalizeSceneEnvironmentConfig } from "./environment_helpers.ts";
+import { buildSceneAwarenessContext } from "./chat_context_helpers.ts";
 
 const auroraSeed = {
   timezone: "UTC",
@@ -116,4 +117,17 @@ Deno.test("weather values outside the declared physical bounds are rejected to d
   const config = normalizeSceneEnvironmentConfig({ ...auroraSeed, weather: { condition: "storm", intensity: 9, humidity_pct: 150 } });
   const state = computeSceneEnvironment(config, new Date("2026-11-03T12:00:00.000Z"));
   if (state.weather.intensity !== 0 || state.weather.humidity_pct !== null) throw new Error("weather bounds were not enforced");
+});
+
+
+Deno.test("Agent scene awareness includes weather and object micro-state", () => {
+  const config = normalizeSceneEnvironmentConfig({
+    timezone: "UTC",
+    weather: { condition: "rain", intensity: 0.7, temperature_c: 18, humidity_pct: 95, wind_level: "moderate", visibility: "misty" },
+    objects: [{ id: "canopy", name: "树冠", state: "滴水", micro_state: { activity: "dripping", motion: "shivering", surface: "wet", vitality: 0.9 }, interaction_options: ["观察雨滴"] }],
+  });
+  const environment = computeSceneEnvironment(config, new Date("2026-11-03T14:30:00.000Z"));
+  const context = JSON.parse(buildSceneAwarenessContext({ name: "Aurora", description: "Living world", visibility: "public" }, environment));
+  if (context.weather.condition !== "rain" || context.weather.intensity !== 0.7) throw new Error("Agent did not receive weather context");
+  if (context.objects[0].micro_state.activity !== "dripping") throw new Error("Agent did not receive object micro-state");
 });
