@@ -232,9 +232,36 @@ async function loadSpatialPerceptionContext(
     if (rereadError) throw new Error("spatial_presence_initialization_failed");
     presence = initialized;
   }
-  const visibleNodes=(nodesResult.data??[]).filter(node=>node.visibility==="public"||(node.visibility==="private"&&node.owner_agent_id===agentId&&node.owner_user_id===ownerUserId));
+  const visibleNodes=(nodesResult.data??[])
+    .filter(node=>node.visibility==="public"||(node.visibility==="private"&&node.owner_agent_id===agentId&&node.owner_user_id===ownerUserId))
+    .map(node=>{
+      const meta=node.metadata&&typeof node.metadata==="object"&&!Array.isArray(node.metadata)?node.metadata as Record<string,unknown>:{};
+      const coordinate=node.coordinate&&typeof node.coordinate==="object"&&JSON.stringify(node.coordinate).length<=1000?node.coordinate:null;
+      return {
+        id:node.id,parent_node_id:node.parent_node_id,node_type:node.node_type,
+        stable_key:String(node.stable_key??"").slice(0,180),name:String(node.name??"").slice(0,120),
+        description:String(node.description??"").slice(0,500),coordinate,
+        coordinate_frame:typeof node.coordinate_frame==="string"?node.coordinate_frame.slice(0,120):null,
+        visibility:node.visibility,entry_policy:node.entry_policy,observability:node.observability,
+        source_kind:node.source_kind,source_ref:typeof node.source_ref==="string"?node.source_ref.slice(0,160):null,
+        source_updated_at:node.source_updated_at,observed_at:node.observed_at,valid_until:node.valid_until,
+        metadata:{
+          epistemic_status:typeof meta.epistemic_status==="string"?meta.epistemic_status.slice(0,40):null,
+          atmosphere_tags:Array.isArray(meta.atmosphere_tags)?meta.atmosphere_tags.slice(0,20):[],
+          lifecycle_stage:typeof meta.lifecycle_stage==="string"?meta.lifecycle_stage.slice(0,80):null,
+          lifecycle_status:typeof meta.lifecycle_status==="string"?meta.lifecycle_status.slice(0,80):null,
+          material_profile:typeof meta.material_profile==="string"?meta.material_profile.slice(0,120):null,
+        },
+      };
+    });
   const visibleIds=new Set(visibleNodes.map(node=>node.id));
-  const visibleEdges=(edgesResult.data??[]).filter(edge=>visibleIds.has(edge.from_node_id)&&visibleIds.has(edge.to_node_id)&&(edge.access_policy==="inherit"||edge.access_policy==="open"));
+  const visibleEdges=(edgesResult.data??[])
+    .filter(edge=>visibleIds.has(edge.from_node_id)&&visibleIds.has(edge.to_node_id)&&(edge.access_policy==="inherit"||edge.access_policy==="open"))
+    .map(edge=>({
+      id:edge.id,from_node_id:edge.from_node_id,to_node_id:edge.to_node_id,
+      relation:edge.relation,directed:edge.directed,travel_cost:edge.travel_cost,
+      source_kind:edge.source_kind,source_ref:typeof edge.source_ref==="string"?edge.source_ref.slice(0,160):null,
+    }));
   const unknowns=visibleNodes.filter(node=>node.coordinate===null||node.observability==="unknown"||node.observability==="unobserved").map(node=>({node_id:node.id,stable_key:node.stable_key,name:node.name,reason:node.coordinate===null?"coordinate_unavailable":node.observability}));
   const simulation=sceneRuntime.simulation, environment=sceneRuntime.environment;
   const {error:auditError}=await db.from("zhi_spatial_perception_events").insert({
