@@ -22,3 +22,8 @@ export function isTokenExpiryValid(
   const expiry = Date.parse(expiresAt);
   return Number.isFinite(expiry) && expiry > now;
 }
+
+/** Exact capability match; absent or malformed grants fail closed. */
+export function hasCapability(actor: { capabilities?: string[] }, capability: string): boolean {
+  return Array.isArray(actor.capabilities) && actor.capabilities.includes(capability);
+}
