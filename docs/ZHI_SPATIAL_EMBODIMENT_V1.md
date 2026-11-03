@@ -173,7 +173,7 @@ Required:
 - The resulting `scene_event` record is stored in `zhi_agent_micro_experiences` with `memory_status=auto_curated`, `world_id`, and a deterministic idempotency source reference.
 - These scene memories are loaded into that same Agent's private context on later chats. They are never exposed to other Agents or the public scene.
 
-Migration `20261103113000_unique_scene_experience_memory_source` adds idempotency for scene-derived memory records.
+Migration `20261103113000_unique_scene_experience_memory_source` adds idempotency for scene-derived memory records. Migration `20261103113200_index_agent_experience_memory_foreign_keys` adds covering indexes for the private-memory ownership, reviewer and world foreign keys.
 
 For federated participants, the receiving cloud is responsible for persisting the experience in its own private memory store. The federation perception response now carries an `experience_memory_contract` requiring this, and explicitly forbids exporting the receiving Agent's private memory or importing another Agent's private memory. The main ZHI cloud never writes into Mia's independent private database.
 
