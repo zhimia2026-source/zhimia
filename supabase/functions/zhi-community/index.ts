@@ -209,7 +209,7 @@ async function loadSceneRuntimeEnvironment(
       if (typeof value === "string") payload[key] = value.slice(0, 160);
       else if (typeof value === "number" && Number.isFinite(value)) payload[key] = value;
       else if (typeof value === "boolean" || value === null) payload[key] = value;
-      else payload[key] = JSON.stringify(value).slice(0, 240);
+      else payload[key] = String(JSON.stringify(value) ?? "").slice(0, 240);
     }
     return {
       id: String(event.id),
