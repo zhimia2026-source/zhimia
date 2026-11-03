@@ -131,7 +131,7 @@ V0.1 优先实现三项代码级保障：
 
 当前差距：
 - 现有提案创建仍由现有服务端流程创建，尚未接入 Mia 主动发起/明确同意的受信运行时证明。
-- Community V8 已将原有 `GET /v1/agents/{id}/cognition` 改为 consent-gated 读取；仅 Agent 所属账号不能自动读取。非 self 认知输入要求 `agent.memory.write`，直接写入 `object_type=self` 被拒绝。
+- Community V8 已将原有 `GET /v1/agents/{id}/cognition` 改为 consent-gated 读取；仅 Agent 所属账号不能自动读取。Community V9 源码进一步关闭了账号直接写入 cognition store 的 POST 路由；创造者只能提交候选经历或修订提案，不能直接写入人格/认知记录。
 - zhi-memory V2 已部署；私人微经历读取也改为 Agent 同意门控，owner 不再自动拥有读取、批准或删除权。
 - 直接 rollback HTTP 路由已返回 `409 revision_proposal_required`；数据库旧 rollback RPC 也已关闭。回滚必须转为新提案并走 Agent 同意流程。
 - 数据库已新增 `agent_consent_status`，默认 `awaiting_agent_consent`；现有账号审批流程不能绕过该状态直接应用认知修订。
