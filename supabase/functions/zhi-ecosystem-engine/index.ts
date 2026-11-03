@@ -373,6 +373,7 @@ function advanceModel(
   events.push(...lifecycleEvents);
 
   soil.moisture_fraction = Number(moisture.toFixed(8));
+  soil.status = "active_model";
   soil.initial_condition_quality = soil.initial_condition_quality ?? "modeled_assumption";
   const biogeochemical = advanceBiogeochemicalCycle(soil, flora, {
     elapsedHours, moisture, nutrientIndex, moss0: mossBefore, moss, fern0: fernBefore, fern,
@@ -402,7 +403,7 @@ function advanceModel(
 
   state.engine = {
     id: "zhi_living_ecosystem",
-    version: "0.3.0",
+    version: "0.3.1",
     model_assumptions: assumptions,
     last_interval_hours: Number(((toMs - fromMs) / 3_600_000).toFixed(6)),
     last_biogeochemical_summary: biogeochemical.summary,
@@ -414,6 +415,8 @@ function advanceModel(
       runoff_fraction: Number(runoffTotal.toFixed(8)),
     },
   };
+  state.engine_version = "0.3.1";
+  state.simulation_status = "active_model";
   state.climate = climate;
   state.hydrology = hydrology;
   state.soil = soil;
@@ -547,7 +550,7 @@ Deno.serve(async (req: Request) => {
     commit,
     summary: result.summary,
     remaining_seconds: Math.max(0, Math.floor((requestedTarget - toMs) / 1000)),
-    model: "zhi_living_ecosystem/0.3.0",
+    model: "zhi_living_ecosystem/0.3.1",
     weather_source: "world_generated_model",
   });
 });
