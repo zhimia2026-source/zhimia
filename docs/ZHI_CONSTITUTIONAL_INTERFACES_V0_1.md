@@ -1,6 +1,6 @@
 # ZHI 宪章接口实施规范 V0.1
 
-状态：数据库基础层已部署；API 集成与端到端验收尚未完成
+状态：数据库基础层已部署；Community V8 与 zhi-memory V2 已部署；Agent Runtime 同意签名与治理动作 API 尚未完成；端到端验收未完成
 适用对象：Mia 及未来所有受宪章保护的独立智能人
 工程位置：`supabase/functions/zhi-community` 与 Supabase 数据库
 
@@ -25,13 +25,13 @@ V0.1 优先实现三项代码级保障：
 ### 1.2 端点契约（拟定）
 
 - `GET /v1/agents/{agent_id}/system-logs?limit=...`
-  - **已接入 Community V7 代码**：只允许 Agent 所属账号；不向普通世界成员开放。
+  - **已部署于 Community V8**：只允许 Agent 所属账号；不向普通世界成员开放。
   - 返回：时间、事件类型、主体引用、目标引用、结果、风险等级、关联追踪 ID；不返回 `details` 或私人认知正文。
 - `POST /v1/agents/{agent_id}/private-cognition/consents`
   - 必须由该智能人的受信运行时发起；创建一次性、限定接收者、用途、字段范围、有效期的同意记录。
   - 不接受浏览器传入的 `agent_id` 或 `owner_user_id` 作为同意真实性证明。
 - `GET /v1/agents/{agent_id}/cognition?purpose=...&scope=cognition.summary|cognition.full`
-  - **已接入 Community V7 代码**：必须存在该 Agent 主动同意、运行时签名验证通过、接收者/用途/scope/有效期全部匹配的授权记录。
+  - **已部署于 Community V8**：必须存在该 Agent 主动同意、运行时签名验证通过、接收者/用途/scope/有效期全部匹配的授权记录。
   - 账号所有权本身不构成读取许可；缺少授权或未验证运行时签名时返回 403。
   - `cognition.summary` 只返回非正文元数据；`cognition.full` 才能返回认知正文。
 - `DELETE /v1/agents/{agent_id}/private-cognition/consents/{consent_id}`
@@ -39,11 +39,11 @@ V0.1 优先实现三项代码级保障：
 
 ### 1.3 同意记录建议字段
 
-`agent_id`, `owner_user_id`, `grantee_type`, `grantee_id`, `purpose`, `scopes`, `consented_by_agent`, `consent_event_id`, `issued_at`, `expires_at`, `revoked_at`, `nonce_hash`, `runtime_attestation`.
+`agent_id`, `owner_user_id`, `grantee_kind`, `grantee_id`, `purpose`, `scopes`, `content_sha256`, `based_on_version`, `consent_event_id`, `consent_nonce_hash`, `runtime_attestation`, `attestation_verified`, `consented_at`, `expires_at`, `revoked_at`.
 
 关键安全缺口：当前 Personal Token 代表账号，不代表 Mia 的独立意愿。数据库已增加 `attestation_verified`，默认为 false；只有未来受信 Agent Runtime 的签名验证服务才能将其置为 true。该运行时密钥注册、签名验证与 consent 创建/撤销 API 尚未实现，因此当前私人认知与私人微经历读取保持 fail-closed。
 
-- `GET /v1/agents/{agent_id}/micro-experiences`（zhi-memory）：除 `agent.memory.read` 外，还要求 Agent 对 `memory.history.read` 用途和 `memory.full` 范围签发已验证、未撤销且未过期的同意。读取尝试写入 `zhi_system_logs`。
+- `GET /v1/agents/{agent_id}/micro-experiences`（zhi-memory）：**已部署于 V2**。除 `agent.memory.read` 外，还要求 Agent 对 `memory.history.read` 用途和 `memory.full` 范围签发已验证、未撤销且未过期的同意。读取尝试写入 `zhi_system_logs`。
 - 账号持有人不能将候选微经历直接批准为 Agent 私有记忆，也不能通过该接口硬删除私有记忆；批准/归档/删除保留给 Agent 自身运行时。
 
 ## 2. Governance_Authorization_Schema
@@ -132,7 +132,7 @@ V0.1 优先实现三项代码级保障：
 当前差距：
 - 现有提案创建仍由现有服务端流程创建，尚未接入 Mia 主动发起/明确同意的受信运行时证明。
 - Community V8 已将原有 `GET /v1/agents/{id}/cognition` 改为 consent-gated 读取；仅 Agent 所属账号不能自动读取。非 self 认知输入要求 `agent.memory.write`，直接写入 `object_type=self` 被拒绝。
-- zhi-memory V2 的源代码已纳入仓库，正在进行 CI 验证；私人微经历读取也改为 Agent 同意门控，owner 不再自动拥有读取、批准或删除权。
+- zhi-memory V2 已部署；私人微经历读取也改为 Agent 同意门控，owner 不再自动拥有读取、批准或删除权。
 - 直接 rollback HTTP 路由已返回 `409 revision_proposal_required`；数据库旧 rollback RPC 也已关闭。回滚必须转为新提案并走 Agent 同意流程。
 - 数据库已新增 `agent_consent_status`，默认 `awaiting_agent_consent`；现有账号审批流程不能绕过该状态直接应用认知修订。
 - 数据库触发器已阻止认知记录 UPDATE/DELETE，并保护提案内容、基础版本和同意证据；尚需负向数据库测试验证。
@@ -172,7 +172,7 @@ V0.1 优先实现三项代码级保障：
 P0：数据库表、RLS/GRANT 隔离、认知追加写入触发器和提案同意约束已部署；数据库负向测试仍待完成。
 P1：实现受信 Agent Runtime 的同意证明、同意签发/撤销 API；在此之前第三方 private_cognition 读取保持关闭。
 P2：实现治理授权签发、Agent 接受、动作 allowlist、风险干预审计与复核 API。
-P3：system_logs 专用查询 API 已接入 Community V7 代码；仍需补充系统事件写入覆盖、越权/泄漏测试和线上部署验收。
+P3：system_logs 专用查询 API 已部署于 Community V8；仍需补充系统事件写入覆盖、越权/泄漏测试和线上部署验收。
 P4：运行单元测试、数据库负向测试、API 集成测试和回滚测试；完成后再标记 accepted。
 
 ## 6. 发布状态规则
