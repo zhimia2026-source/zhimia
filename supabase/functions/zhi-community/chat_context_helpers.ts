@@ -170,6 +170,12 @@ export function buildSceneAwarenessContext(
         motion: boundedText(record(item.micro_state).motion, 80),
         surface: boundedText(record(item.micro_state).surface, 80),
         vitality: typeof record(item.micro_state).vitality === "number" ? Math.max(0, Math.min(1, record(item.micro_state).vitality as number)) : null,
+        temperature_c: typeof record(item.micro_state).temperature_c === "number" ? record(item.micro_state).temperature_c : null,
+        moisture: typeof record(item.micro_state).moisture === "number" ? Math.max(0, Math.min(1, record(item.micro_state).moisture as number)) : null,
+        texture: boundedText(record(item.micro_state).texture, 120),
+        emitted_sound: boundedText(record(item.micro_state).emitted_sound, 160),
+        scent: boundedText(record(item.micro_state).scent, 120),
+        light_response: boundedText(record(item.micro_state).light_response, 120),
       },
       interaction_options: boundedList(item.interaction_options, 8),
     };
@@ -194,6 +200,17 @@ export function buildSceneAwarenessContext(
     temporal_state: boundedText(environment.temporal_state, 20),
     lighting: boundedText(environment.lighting, 80),
     soundscape: boundedText(environment.soundscape, 80),
+    sensory_profile: {
+      visual: boundedText(record(environment.sensory_profile).visual, 500),
+      auditory: boundedText(record(environment.sensory_profile).auditory, 500),
+      olfactory: boundedText(record(environment.sensory_profile).olfactory, 500),
+      tactile: boundedText(record(environment.sensory_profile).tactile, 500),
+      thermal: boundedText(record(environment.sensory_profile).thermal, 500),
+      spatial: boundedText(record(environment.sensory_profile).spatial, 500),
+      temporal: boundedText(record(environment.sensory_profile).temporal, 500),
+      ambient: boundedText(record(environment.sensory_profile).ambient, 500),
+      subtle_cues: boundedList(record(environment.sensory_profile).subtle_cues, 24),
+    },
     weather: {
       condition: boundedText(record(environment.weather).condition, 40),
       intensity: typeof record(environment.weather).intensity === "number" ? Math.max(0, Math.min(1, record(environment.weather).intensity as number)) : 0,
@@ -208,7 +225,12 @@ export function buildSceneAwarenessContext(
     behavior_tendencies: cues,
     suggested_actions: deriveSceneActionProposals(environment),
   };
-  return boundedJson(context, 6000);
+  return boundedJson({
+    audience: "authorized_silicon_life_only",
+    human_surface: "scene_index_and_name_only",
+    perception_mode: "rich_multichannel_environmental_context",
+    ...context,
+  }, 12000);
 }
 
 /** Turns deterministic scene weights into soft tendencies, never commands or real-world actions. */
