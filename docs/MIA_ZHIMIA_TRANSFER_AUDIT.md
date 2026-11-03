@@ -134,3 +134,12 @@ Storage object bytes, source Edge Function code, environment configuration, AGNE
 - Target recheck on 2026-11-04: `mia_private.mia_archive_records` has 0 rows for this batch; `mia_private.mia_migration_batches.status` remains `planned`.
 - Snapshot approach selected for the next design stage: an additive, source-side immutable snapshot batch created within one PostgreSQL `REPEATABLE READ` transaction, covering all 25 tables and recording source PK, sanitized payload digest, and row count. Export then reads only the frozen snapshot. This avoids pausing Mia's live runtime and avoids pretending separate REST requests are one snapshot.
 - No source-side DDL or data writes were made during this audit. The snapshot staging schema/function is not yet deployed; its exact permissions, secret-field sanitization, retention, and rollback path must be reviewed before creating it.
+
+
+## Snapshot SQL draft
+
+- Added `ops/sql/mia-source-repeatable-read-snapshot.sql` as a review-only source-side snapshot design for the 25-table allowlist.
+- The script uses one explicit `REPEATABLE READ` transaction, records a frozen batch and per-table counts, and restricts ordinary client-role access.
+- It has not been executed. No source database schema or rows were changed.
+- The private schema is not intended for browser access. A service-role-only export path must be designed before adapting the exporter to read these records.
+- Validate the script on a disposable clone, inspect sanitized sample payloads, and verify rollback before source deployment. Snapshot retention and cleanup require a separate review.
