@@ -87,6 +87,7 @@ Deno.test("weather and object micro-states evolve through a natural event", () =
     objects: [
       { id: "canopy", name: "林间树冠", state: "舒展", micro_state: { activity: "swaying", motion: "gentle", surface: "dry", vitality: 0.8 } },
     ],
+    regions: [],
     events: [{
       id: "forest_rain",
       type: "natural_event",
