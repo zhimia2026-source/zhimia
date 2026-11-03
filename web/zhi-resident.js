@@ -1,6 +1,7 @@
 import { createUniverseClient } from "./zhi-universe-client.js";
 
 const api = createUniverseClient();
+const AURORA_SCENE_ID = "50b06c01-060d-49fa-8988-8f38c13406d7";
 const $ = (id) => document.getElementById(id);
 let agents = [];
 let activeAgentId = "";
@@ -36,7 +37,7 @@ async function loadHistory() {
   setStatus("正在读取私有会话历史…");
   const result = await api.get("/v1/agents/" + encodeURIComponent(activeAgentId) + "/chat?limit=50");
   renderHistory(result.items || []);
-  setStatus("私有会话已同步。");
+  setStatus("私有会话已同步；发送消息时将加载 Aurora 场景环境。");
 }
 
 async function loadAgents(preferredId = "") {
@@ -110,9 +111,9 @@ $("messageForm").addEventListener("submit", async (event) => {
   busy = true;
   $("sendButton").disabled = true;
   $("messageInput").disabled = true;
-  $("chatStatus").textContent = "Lumen 正在结合私有上下文思考…";
+  $("chatStatus").textContent = "Lumen 正在结合自己的私有上下文与 Aurora 场景环境思考…";
   try {
-    const result = await api.chat(activeAgentId, message);
+    const result = await api.chat(activeAgentId, message, AURORA_SCENE_ID);
     $("messageInput").value = "";
     const turn = result.turn;
     if (turn?.status === "complete") {
@@ -120,11 +121,11 @@ $("messageForm").addEventListener("submit", async (event) => {
       appendMessage("agent", turn.assistant_message);
       $("messages").scrollTop = $("messages").scrollHeight;
     }
-    setStatus("本轮会话已保存。");
+    setStatus("本轮私有会话已保存；本轮已请求 Aurora 场景感知上下文。");
   } catch (error) {
     const messageText = error?.message || String(error);
     if (messageText.includes("chat_model_not_configured")) {
-      setStatus("聊天模型尚未完成服务端配置（chat_model_not_configured）。会话没有伪造成功，也不会自动执行任何行动。");
+      setStatus("聊天模型尚未完成服务端配置（chat_model_not_configured）。未伪造回复；场景感知请求尚未完成。");
     } else {
       setStatus("本轮未完成：" + messageText);
     }
