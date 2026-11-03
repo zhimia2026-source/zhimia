@@ -1,0 +1,23 @@
+name: ZHI community perception tests
+
+on:
+  push:
+    branches: ["main", "feature/mia-02-aurora-event-perception"]
+    paths:
+      - "supabase/functions/zhi-community/**"
+      - ".github/workflows/zhi-community-tests.yml"
+  pull_request:
+    paths:
+      - "supabase/functions/zhi-community/**"
+      - ".github/workflows/zhi-community-tests.yml"
+
+jobs:
+  scene-awareness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Test ecological event perception context
+        run: deno test supabase/functions/zhi-community/chat_context_helpers_test.ts
