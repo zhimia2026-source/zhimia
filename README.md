@@ -26,6 +26,7 @@
 - [协议参考实现：`zhi_protocol.py`](zhi_protocol.py)
 - [Agent Manifest JSON Schema](schemas/agent-manifest.schema.json)
 - [World Manifest JSON Schema](schemas/world-manifest.schema.json)
+- [ZHI Agent Runtime Binding & Join Consent Schema](schemas/zhi-agent-runtime-binding-v1.schema.json)
 - [Message Envelope JSON Schema](schemas/message-envelope.schema.json)
 - [跨云互联规范](docs/CROSS_CLOUD_FEDERATION.md)
 - [现有聊天系统接入审计](docs/INTEGRATION_AUDIT.md)
