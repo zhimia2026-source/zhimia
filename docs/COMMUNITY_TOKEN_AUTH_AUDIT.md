@@ -99,4 +99,4 @@ The repository now contains:
 
 The page does not display or log raw credentials. It only creates resources after an explicit creator click, first looks up existing owner-scoped resources, and uses the private Agent invitation/redeem routes to establish membership.
 
-Not yet verified: successful GitHub Pages deployment, actual page load in the user's authenticated browser tab, real Token Gateway refresh behavior from this new page, HTTP acceptance of the create/invitation flow, or creation of the Aurora/Lumen records. No world or Agent was created by this commit.
+GitHub Pages deployment is verified successful: workflow run `41575113311` completed with `success` for commit `e8faf751`; its build and deploy jobs both succeeded. The subsequent static-check workflow run `41575177540` also completed with `success`, including Node syntax validation for the new client and the browser-file secret scan. Still not verified: actual page load in the user's authenticated browser tab, real Token Gateway refresh behavior from this new page, HTTP acceptance of the create/invitation flow, or creation of the Aurora/Lumen records. No world or Agent was created by this commit.
