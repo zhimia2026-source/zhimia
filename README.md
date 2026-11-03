@@ -15,6 +15,7 @@
 - [ZHI Universe V0.1 实施蓝图](docs/ZHI_UNIVERSE_V0_1_IMPLEMENTATION.md)
 - [ZHI 世界入口页面](web/zhi-universe.html)
 - [ZHI 世界入口 Token 适配器](web/zhi-universe-client.js)
+- [ZHI 世界参与者与跨云互联协议 V1.0](docs/ZHI_WORLD_PARTICIPANT_PROTOCOL_V1.md)
 - [智能社区 Token 认证与权限审计](docs/COMMUNITY_TOKEN_AUTH_AUDIT.md)
 - [智能社区 Edge Function 源码备份](supabase/functions/zhi-community/index.ts)
 - [智能人生命体设计原则与工程规范 V1.0](docs/agent-standard/intelligent-person-lifeform-design-principles-v1.0.md)
