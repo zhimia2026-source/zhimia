@@ -116,6 +116,28 @@ The primary project currently has one local agent record, Lumen-001. No Mia agen
 
 Therefore this deployment does not fabricate a Mia identity, import the old 2026-09-29 snapshot as live data, or equate Forest_Corner with Aurora. Mia's private cloud and identity must be connected through the federation trust path before an authorized cross-cloud spatial anchor can be registered. Until then, Forest_Corner remains an externally reported anchor, not a verified location in the primary database.
 
+
+## 6.1 Federated spatial anchors
+
+The main cloud now has `zhi_federated_spatial_anchors`, a separate registry for remote spatial references. It is intentionally not merged into local `zhi_spatial_nodes`: a remote cloud remains authoritative for its own private world.
+
+The `zhi-federation` function V6 exposes peer-authenticated routes:
+
+- `GET /v1/agents/{external_agent_id}/spatial/anchors` — list the calling peer's own active anchor references.
+- `POST /v1/agents/{external_agent_id}/spatial/anchors` — publish/update a minimal reference.
+- `POST /v1/agents/{external_agent_id}/spatial/anchors/revoke` — revoke one of the calling peer's references.
+
+The caller must be an active, registered external agent owned by the authenticated peer. Capabilities are separate: `spatial.anchor.read` and `spatial.anchor.publish`. The Mia peer has been granted only these two additional spatial-anchor capabilities.
+
+Privacy and epistemic boundaries:
+- The registry stores only remote world/node identifiers, stable key, display name, node type, visibility and entry policy.
+- It does not accept or store coordinates, private memory, sensory payloads or detailed object microstates.
+- Private references cannot declare open entry; public references must use open entry.
+- New/updated references are marked `peer_asserted` and `unobserved`, not physical observations.
+- Rows are peer-scoped in the Edge Function, RLS is enabled, and direct `anon`/`authenticated` access is revoked.
+
+Mia's `Forest_Corner` has not yet been inserted into this registry: the first authenticated publish request from the Mia cloud is still required. This avoids treating the older self-report as a current verified sync.
+
 ## 7. Security and truthfulness
 
 - Raw tokens are never stored; the endpoint hashes and checks the supplied token and touches last-used metadata.
