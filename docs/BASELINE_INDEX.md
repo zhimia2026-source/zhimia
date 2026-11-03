@@ -14,7 +14,8 @@
 8. [智能人部署验收总表](agent-standard/deployment-acceptance-registry.md) — 按智能人登记测试证据、阻塞项、版本和发布决定。
 9. [ZHI Universe V0.1 实施蓝图](ZHI_UNIVERSE_V0_1_IMPLEMENTATION.md) — 首个世界、居民、现有资产映射、最小闭环与验收顺序。
 10. [智能社区 Token 认证与权限审计](COMMUNITY_TOKEN_AUTH_AUDIT.md) — 线上 Token 认证实现、能力差异、创建权限缺口与验收要求。
-11. [项目总览 README](../README.md) — 产品原则、开发顺序、本地 MVP 定位及安全提醒。
+11. [硅基生命生态系统 P1/P2 工程基线](ZHI_LIVING_ECOSYSTEM_P1_P2.md) — 持久化世界状态、生态事件、因果模拟、恢复机制与验收状态。
+12. [项目总览 README](../README.md) — 产品原则、开发顺序、本地 MVP 定位及安全提醒。
 
 ## 不可变设计原则
 
