@@ -119,11 +119,36 @@ export function createCommunityHandler(
   if (req.method !== "GET" && req.method !== "POST") return reply({ error: "method_not_allowed" }, 405);
 
   try {
+    const url = new URL(req.url);
+    const marker = "/functions/v1/zhi-community";
+    const hintedPath = url.searchParams.get("__zhi_path");
+    const discoveryPath = hintedPath && hintedPath.startsWith("/")
+      ? hintedPath
+      : url.pathname.includes(marker)
+        ? url.pathname.slice(url.pathname.indexOf(marker) + marker.length)
+        : url.pathname;
+    if (req.method === "GET" && discoveryPath === "/.well-known/zhi-world.json") {
+      return reply({
+        protocol: "zhi.world.v1",
+        protocol_versions: ["zhi.world.v1"],
+        issuer: url.origin,
+        entity_type: "platform",
+        discovery_status: "discovery_only",
+        authentication_required_for_protected_resources: true,
+        principles: ["unified_protocol_not_unified_deployment", "authenticate_then_authorize_then_communicate"],
+        endpoints: {
+          manifest: "/functions/v1/zhi-community/v1/worlds",
+          authenticated_api_base: "/functions/v1/zhi-community/v1",
+        },
+        capabilities: ["public_world_discovery"],
+        unsupported_until_later_phase: ["cross_cloud_handshake", "signed_requests", "nonce_replay_protection", "cross_cloud_messages"],
+      });
+    }
     const db = getDb();
     const actor = await authenticateRequest(db, req);
     if (!actor) return reply({ error: "invalid_token" }, 401);
 
-    const url = new URL(req.url);
+    const marker = "/functions/v1/zhi-community";
     const marker = "/functions/v1/zhi-community";
     // Supabase gateways may normalize function subpaths differently across runtimes.
     // The client supplies an authenticated route hint in the query string as a stable fallback.
