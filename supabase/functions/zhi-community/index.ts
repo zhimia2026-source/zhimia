@@ -425,7 +425,7 @@ export function createCommunityHandler(
         .select(selection).eq("owner_user_id", agent.owner_user_id).eq("agent_id", agentId)
         .order("recorded_at", { ascending: false }).limit(limit);
       if (error) throw new Error("database_error");
-      return reply({ items: records ?? [], consent: { purpose, scope, expires_at: consentRow.expires_at } });
+      return reply({ items: records ?? [], consent: { purpose, scope, expires_at: consentRow?.expires_at ?? null } });
     }
 
     // Private cognition is scoped to the authenticated owner + an agent they own.
