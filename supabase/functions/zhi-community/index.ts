@@ -154,6 +154,15 @@ export function createCommunityHandler(
       if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
         return reply({ error: "invalid_argument", detail: "limit_must_be_1_to_100" }, 400);
       }
+      const { error: auditError } = await db.from("zhi_system_logs").insert({
+        event_type: "audit.system_logs.read",
+        actor_user_id: actor.userId,
+        target_type: "agent",
+        target_id: agentId,
+        result: "allowed",
+        risk_level: "low",
+      });
+      if (auditError) return reply({ error: "audit_unavailable" }, 503);
       const { data: logs, error } = await db.from("zhi_system_logs")
         .select("id,occurred_at,event_type,actor_user_id,actor_agent_id,world_id,target_type,target_id,result,risk_level,correlation_id")
         .or(`actor_agent_id.eq.${agentId},and(target_type.eq.agent,target_id.eq.${agentId})`)
@@ -411,9 +420,29 @@ export function createCommunityHandler(
         required_scope: scope,
         consent,
       })) {
+        const { error: auditError } = await db.from("zhi_system_logs").insert({
+          event_type: "cognition.private_read.denied",
+          actor_user_id: actor.userId,
+          target_type: "agent",
+          target_id: agentId,
+          result: "denied",
+          risk_level: "high",
+          details: { purpose, requested_scope: scope },
+        });
+        if (auditError) return reply({ error: "audit_unavailable" }, 503);
         return reply({ error: "forbidden", detail: "private_cognition_agent_consent_required" }, 403);
       }
 
+      const { error: auditError } = await db.from("zhi_system_logs").insert({
+        event_type: "cognition.private_read.allowed",
+        actor_user_id: actor.userId,
+        target_type: "agent",
+        target_id: agentId,
+        result: "allowed",
+        risk_level: scope === "cognition.full" ? "high" : "medium",
+        details: { purpose, granted_scope: scope, consent_event_id: consentRow?.consent_event_id ?? null },
+      });
+      if (auditError) return reply({ error: "audit_unavailable" }, 503);
       const limit = Number(url.searchParams.get("limit") ?? "50");
       if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
         return reply({ error: "invalid_argument", detail: "limit_must_be_1_to_100" }, 400);
