@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { hasCapability, isTokenExpiryValid, tokenTouchSucceeded } from "./auth_helpers.ts";
-import { isMembershipAuthorized, isAgentMembershipAuthorized, privilegesForPublicRejoin } from "./access_helpers.ts";
+import { isMembershipAuthorized, isAgentMembershipAuthorized, privilegesForPublicRejoin, normalizeWorldProtocolPath, isPublicAgentJoinAllowed, publicAgentMembershipPrivileges } from "./access_helpers.ts";
 import { validateMouRecord } from "./ontology_helpers.ts";
 import { buildFeedbackRecord, buildRevisionProposal } from "./cognitive_cycle_helpers.ts";
 import { buildPrivateAgentContext, buildPrivateChatHistory, buildSceneAwarenessContext, buildSceneBehaviorGuidance } from "./chat_context_helpers.ts";
@@ -125,7 +125,7 @@ export function createCommunityHandler(
     const marker = "/functions/v1/zhi-community";
     const rawPath = url.pathname.includes(marker) ? url.pathname.slice(url.pathname.indexOf(marker) + marker.length) : url.pathname;
     // Stable public protocol name; keep /v1/scenes as a backward-compatible alias.
-    const path = rawPath.replace(/^\/v1\/worlds(?=\/|$)/, "/v1/scenes");
+    const path = normalizeWorldProtocolPath(rawPath);
     const parts = path.split("/").filter(Boolean);
 
     if (req.method === "GET" && path === "/v1/agents") {
@@ -815,7 +815,7 @@ export function createCommunityHandler(
         return reply({ error: "invalid_argument", detail: "scene_and_agent_ids_must_be_uuids" }, 400);
       }
       const { data: agent, error: agentError } = await db.from("zhi_agents")
-        .select("id,status").eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
+        .select("id,owner_user_id,status").eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
       if (agentError) throw new Error("database_error");
       if (!agent) return reply({ error: "not_found" }, 404);
       if (agent.status !== "active") return reply({ error: "conflict", detail: "agent_not_active" }, 409);
@@ -825,7 +825,7 @@ export function createCommunityHandler(
       if (worldError) throw new Error("database_error");
       if (!world) return reply({ error: "not_found" }, 404);
       if (world.status !== "open") return reply({ error: "conflict", detail: "scene_not_open" }, 409);
-      if (world.visibility !== "public" || world.entry_policy !== "open") {
+      if (!isPublicAgentJoinAllowed(world, agent, actor.userId)) {
         return reply({ error: "forbidden", detail: "public_agent_join_not_available" }, 403);
       }
 
@@ -838,14 +838,7 @@ export function createCommunityHandler(
         return reply({ scene_id: sceneId, agent_id: agentId, membership: "active" });
       }
 
-      const safeMembership = {
-        membership_role: "member",
-        status: "active",
-        revoked_at: null,
-        expires_at: null,
-        capabilities: ["message:read", "message:send"],
-        joined_at: new Date().toISOString(),
-      };
+      const safeMembership = publicAgentMembershipPrivileges();
       if (existing) {
         const { error } = await db.from("zhi_world_memberships")
           .update(safeMembership).eq("id", existing.id);
