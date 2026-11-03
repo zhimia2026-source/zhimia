@@ -90,3 +90,14 @@ Do not add the execution flag or approval secret until all blockers above are im
 ## Scope not covered by this archive stage
 
 Storage object bytes, source Edge Function code, environment configuration, AGNES credentials, runtime adapters, forest/scene runtime integration, and Aurora ecosystem event perception are separate migration stages. No service-role credential belongs in Git or browser code.
+
+
+## 2026-11-04 deployment increment: archive verifier
+
+- Deployed `mia-private-import` as ACTIVE version 2 on the target project; JWT verification remains enabled and the function performs its own exact service-role bearer check.
+- Import hashing now uses recursive key-sorted canonical JSON after secret-like keys are stripped. This makes the payload digest independent of JSON object key order.
+- Added a read-only `{ "action": "verify" }` operation. It pages through the target batch archive, recalculates each payload digest, reports per-table counts and a deterministic rowset SHA-256, and reports any stored-row hash mismatch.
+- Import now requires explicit `{ "action": "import", "batch_id": ..., "rows": [...] }`; unknown actions are rejected.
+- Tracked the exact deployed function source and import map in `supabase/functions/mia-private-import/` on this PR branch to reduce deployed/repository drift.
+- Deployment was confirmed ACTIVE v2. The verification route has not yet been invoked with the service-role credential; this environment does not expose that secret to the assistant. Archive remains empty and batch remains planned.
+- **Important:** this is the target-side verification half only. The source exporter still needs matching canonical sanitization, keyset pagination, stable source snapshot/upper-bound policy, source rowset digests, and a fail-closed comparison before any import run. No transfer was started by this deployment.
