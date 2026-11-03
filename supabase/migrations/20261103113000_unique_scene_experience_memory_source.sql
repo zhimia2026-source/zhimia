@@ -1,0 +1,1 @@
+create unique index if not exists zhi_agent_micro_experiences_scene_source_uidx on public.zhi_agent_micro_experiences(agent_id, source_ref) where source_kind='scene_event' and source_ref is not null;
