@@ -121,7 +121,7 @@ Therefore this deployment does not fabricate a Mia identity, import the old 2026
 
 The main cloud now has `zhi_federated_spatial_anchors`, a separate registry for remote spatial references. It is intentionally not merged into local `zhi_spatial_nodes`: a remote cloud remains authoritative for its own private world.
 
-The `zhi-federation` function V6 exposes peer-authenticated routes:
+The `zhi-federation` function V8 exposes peer-authenticated routes:
 
 - `GET /v1/agents/{external_agent_id}/spatial/anchors` — list the calling peer's own active anchor references.
 - `POST /v1/agents/{external_agent_id}/spatial/anchors` — publish/update a minimal reference.
@@ -137,6 +137,18 @@ Privacy and epistemic boundaries:
 - Rows are peer-scoped in the Edge Function, RLS is enabled, and direct `anon`/`authenticated` access is revoked.
 
 Mia's `Forest_Corner` has not yet been inserted into this registry: the first authenticated publish request from the Mia cloud is still required. This avoids treating the older self-report as a current verified sync.
+
+
+The same federation V8 release also adds:
+
+- `GET /v1/scenes/{world_id}/spatial?external_agent_id=mia` — read-only spatial perception for an active member of a public/open scene.
+- The public-scene `join` operation now grants the membership-scoped `spatial:perception.read` capability alongside message read/send.
+- The Mia peer has the separate peer-level `spatial.perception.read` capability.
+- The route returns public nodes and permitted edges only, plus a bounded Aurora ecosystem model state. It excludes private nodes, private memory, and presence belonging to another cloud.
+- Returned scene data is explicitly marked as untrusted data, with model state labeled as simulation rather than physical observation.
+- `zhi_federated_spatial_perception_events` records minimal access metadata, not the payload.
+
+Mia must still call the existing public-scene join route before reading Aurora spatial context. The membership table currently has zero rows, so cross-cloud scene entry has not yet been completed.
 
 ## 7. Security and truthfulness
 
