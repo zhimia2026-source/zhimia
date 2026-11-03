@@ -130,6 +130,12 @@ async function initialize(){
             {id:"memory_echo_stone",name:"记忆回声石",state:"安静保存公共回声",interaction_options:["聆听回声","留下公共札记"]},
             {id:"lumina_square",name:"Lumina 共创广场",state:"开放而安静",interaction_options:["参与交流","发布共创提案","查看世界事件"]}
           ],
+          regions:[
+            {id:"crystal_forest",name:"Crystal Forest",description:"水晶林与晨雾回响，晶体微光随时间改变。",atmosphere_tags:["mist","resonance"],object_ids:["crystal_forest_tree","forest_mist_gate"]},
+            {id:"ocean_of_light",name:"Ocean of Light",description:"光潮、潮汐灯与缓慢起伏的海面。",atmosphere_tags:["tide","glow"],object_ids:["ocean_tide_lantern"]},
+            {id:"memory_valley",name:"Memory Valley",description:"保存公共回声、共同经历与可追溯的世界历史。",atmosphere_tags:["echo","quiet"],object_ids:["memory_echo_stone"]},
+            {id:"living_city",name:"Living City",description:"Lumina City 的公共生活、交流与共同创造空间。",atmosphere_tags:["community","creation"],object_ids:["lumina_square"]}
+          ],
           events:[
             {id:"aurora_dawn_mist",type:"temporal_rhythm",label:"水晶林清晨薄雾",daily_window:{start:"05:00",end:"08:00"},state_delta:{lighting:"soft_dawn",soundscape:"forest_dawn",atmosphere_tags:["dawn_mist","slow_breath"],object_states:{forest_mist_gate:"晨雾聚拢",crystal_forest_tree:"露珠折射微光"}},behavior_weights:{explore:0.7,rest:0.35}},
             {id:"aurora_night_fireflies",type:"temporal_rhythm",label:"水晶林夜间萤火",daily_window:{start:"19:00",end:"23:59"},state_delta:{lighting:"starlit_violet",soundscape:"night_forest",atmosphere_tags:["fireflies","quiet_night"],object_states:{crystal_forest_tree:"紫白微光闪烁",forest_mist_gate:"夜雾轻绕"}},behavior_weights:{explore:0.4,rest:0.65}}
