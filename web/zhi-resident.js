@@ -103,6 +103,13 @@ $("refreshButton").addEventListener("click", async () => {
   finally { $("refreshButton").disabled = false; }
 });
 
+// Enter 发送；Shift+Enter 换行。输入法组合期间不拦截 Enter。
+$("messageInput").addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" || event.shiftKey || event.isComposing || event.keyCode === 229) return;
+  event.preventDefault();
+  if (!busy && !event.repeat) $("messageForm").requestSubmit();
+});
+
 $("messageForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   if (busy || !activeAgentId) return;
