@@ -165,6 +165,12 @@ export function buildSceneAwarenessContext(
     return {
       name: boundedText(item.name, 120),
       state: boundedText(item.state, 80),
+      micro_state: {
+        activity: boundedText(record(item.micro_state).activity, 80),
+        motion: boundedText(record(item.micro_state).motion, 80),
+        surface: boundedText(record(item.micro_state).surface, 80),
+        vitality: typeof record(item.micro_state).vitality === "number" ? Math.max(0, Math.min(1, record(item.micro_state).vitality as number)) : null,
+      },
       interaction_options: boundedList(item.interaction_options, 8),
     };
   }) : [];
@@ -188,6 +194,14 @@ export function buildSceneAwarenessContext(
     temporal_state: boundedText(environment.temporal_state, 20),
     lighting: boundedText(environment.lighting, 80),
     soundscape: boundedText(environment.soundscape, 80),
+    weather: {
+      condition: boundedText(record(environment.weather).condition, 40),
+      intensity: typeof record(environment.weather).intensity === "number" ? Math.max(0, Math.min(1, record(environment.weather).intensity as number)) : 0,
+      temperature_c: typeof record(environment.weather).temperature_c === "number" ? record(environment.weather).temperature_c : null,
+      humidity_pct: typeof record(environment.weather).humidity_pct === "number" ? record(environment.weather).humidity_pct : null,
+      wind_level: boundedText(record(environment.weather).wind_level, 40),
+      visibility: boundedText(record(environment.weather).visibility, 40),
+    },
     atmosphere_tags: boundedList(environment.atmosphere_tags, 20),
     active_events: events,
     objects,
