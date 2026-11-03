@@ -1,0 +1,3 @@
+create index if not exists zhi_agent_micro_experiences_agent_owner_fk_idx on public.zhi_agent_micro_experiences(agent_id,owner_user_id);
+create index if not exists zhi_agent_micro_experiences_reviewed_by_fk_idx on public.zhi_agent_micro_experiences(reviewed_by_user_id) where reviewed_by_user_id is not null;
+create index if not exists zhi_agent_micro_experiences_world_fk_idx on public.zhi_agent_micro_experiences(world_id) where world_id is not null;
