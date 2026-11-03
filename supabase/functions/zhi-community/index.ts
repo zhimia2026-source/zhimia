@@ -708,7 +708,7 @@ export function createCommunityHandler(
       return reply({ items: data ?? [] });
     }
 
-    if (req.method === "GET" && parts.length === 3 && parts[0] === "v1" && parts[1] === "scenes") {
+    if (req.method === "GET" && parts.length === 3 && parts[0] === "v1" && parts[1] === "scenes" && parts[2] !== "mine") {
       if (!hasCapability(actor, "community.scene.discover")) {
         return reply({ error: "forbidden", detail: "capability_required" }, 403);
       }
