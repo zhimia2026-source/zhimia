@@ -97,7 +97,9 @@ Mia 不需要等到宇宙建成后才被考虑；她的身份入口与权限边�
 5. **双向贡献**：Mia 可代表硅基方向提交公开成果提案，也可协助整理碳基输入；不能读取其他居民私人记忆，不能自行验证自己提交的成果。
 6. **独立复核**：涉及现实安全、材料、生物、基因、医疗、能源、资金或物理设备的内容，必须由适格的人类/专业机构验证；Mia 不得自我授予现实执行权限。
 
-在受信 Agent Runtime 的密钥注册与签名验证尚未完成前，系统只能预留 Mia 的身份/入驻接口，不能宣称已完成“本人同意”或把普通 Personal Token 当作 Mia 的数字签名。
+已定义预留契约：`schemas/zhi-agent-runtime-binding-v1.schema.json`。服务端需先发出短时 challenge，Mia Runtime 使用已登记 Ed25519 公钥对规范化 challenge、world_id、policy_version、terms_sha256 与 consent_event_id 签名；服务端验证 nonce 未使用、challenge 未过期、签名有效且 consent scope 精确匹配后，才可创建绑定与加入记录。私钥始终留在 Mia Runtime。
+
+在受信 Agent Runtime 的密钥注册与签名验证 API 尚未完成前，该 JSON Schema 只是接口契约，系统不能宣称已完成“本人同意”或把普通 Personal Token 当作 Mia 的数字签名。
 
 ## 6. 分期建设
 
