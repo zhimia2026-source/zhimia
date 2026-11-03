@@ -180,20 +180,15 @@ Supabase PostgreSQL
 
 ## 9. 创造者身份：沿用 ZHI Personal Token 登录
 
-创造者使用现有 ZHI Personal Token 登录，不要求改用邮箱/密码，也不要求手工提供 Supabase Auth UID。
+创造者继续使用现有 ZHI Personal Token 登录，不要求改用邮箱/密码，也不要求手工提供 Supabase Auth UID。
 
-仓库中的 `docs/PERSONAL_TOKEN_AUTH.md` 已定义个人令牌方案：随机 256-bit token（`zhi_live_` 前缀），数据库只保存 SHA-256 哈希；服务端逐次校验有效期/撤销状态，并从令牌记录的 `user_id` 派生身份；浏览器不允许提交或覆盖 user_id。
+**线上核查已确认：** 当前部署的 `zhi-community` 已实现个人 Token 认证。服务端读取 Bearer Token、计算 SHA-256、查询 `zhi_personal_access_tokens`、校验过期/撤销状态，并通过条件更新确认 Token 仍有效；随后从令牌记录派生 `actor.userId` 和 `actor.capabilities`。请求体中的 owner 字段不会成为认证身份来源。
 
-但当前已检查的 `zhi-token-gateway` 是健康顾问专用网关，其 `identify()` 认证流程尚不能直接证明 `zhi-community` 已接入同一令牌认证。下一步必须在 `zhi-community` 的服务端认证入口复用/抽取同一 token 校验逻辑，或建立经过审计的共享认证 helper。禁止把 token 明文写入日志/GitHub，禁止接受请求体中的 owner_user_id/creator_user_id 作为可信身份。
+已将线上 `zhi-community` 的 7 个源文件备份到 GitHub 的 `supabase/functions/zhi-community/`，并新增 `auth_helpers_test.ts`。本次仅做源码备份和单元测试文件建设，没有重新部署线上函数。
 
-目标流程：
-1. 客户端携带现有个人 Token 调用受保护的 ZHI API。
-2. 服务端计算 SHA-256 并查询 `zhi_personal_access_tokens`，校验未撤销且未过期。
-3. 服务端从令牌行取得 `user_id`，作为唯一 actor/creator 身份。
-4. 所有世界创建、Agent 创建和成员授权都使用这个服务端派生的 user_id。
-5. 令牌无效/过期/撤销时返回 401；有效但缺少 capability 时返回 403。
+**权限差异：** 当前活动 Token 的元数据检查只看到健康顾问相关能力，没有社区发现、进入、消息等能力。因此认证成功不等于拥有社区操作权。另发现 `POST /v1/scenes` 和 `POST /v1/agents` 创建路由尚未要求专门的创建 capability；对外开放前必须补上最小权限门禁，并建立由创造者控制的授权/签发流程。不得静默扩大现有个人 Token 权限。
 
-在完成并测试 `zhi-community` 的 Token 认证接入前，不执行真实世界/居民创建。
+详细结论与验收矩阵见 `docs/COMMUNITY_TOKEN_AUTH_AUDIT.md`。
 
 ## 10. 状态声明
 
