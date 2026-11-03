@@ -949,17 +949,13 @@ export function createCommunityHandler(
       const worldIds = validMemberships.map((item: { world_id: string }) => item.world_id);
       if (!worldIds.length) return reply({ items: [] });
       const { data: worlds, error: worldsError } = await db.from("zhi_worlds")
-        .select("id,name,description,visibility,entry_policy,status,rules_version,created_at")
+        .select("id,name")
         .in("id", worldIds).eq("status", "open").order("created_at", { ascending: false }).limit(100);
       if (worldsError) throw new Error("database_error");
-      const membershipByWorld = new Map(validMemberships.map((item: {
-        world_id: string; membership_role: string; capabilities: string[];
-      }) => [item.world_id, item]));
       return reply({
-        items: (worlds ?? []).map((world: { id: string }) => ({
-          ...world,
-          membership_role: membershipByWorld.get(world.id)?.membership_role ?? "member",
-          capabilities: membershipByWorld.get(world.id)?.capabilities ?? [],
+        items: (worlds ?? []).map((world: { id: string; name: string }) => ({
+          id: world.id,
+          name: world.name,
         })),
       });
     }
