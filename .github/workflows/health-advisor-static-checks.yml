@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     paths:
+      - "supabase/functions/zhi-community/**"
       - "scripts/health-advisor-e2e.mjs"
       - "scripts/health-advisor-token-gateway-e2e.mjs"
       - "supabase/functions/zhi-token-gateway/prompt.ts"
@@ -19,6 +20,7 @@ on:
       - ".github/workflows/health-advisor-static-checks.yml"
   pull_request:
     paths:
+      - "supabase/functions/zhi-community/**"
       - "scripts/health-advisor-e2e.mjs"
       - "scripts/health-advisor-token-gateway-e2e.mjs"
       - "scripts/check-zee-persona-config.mjs"
@@ -46,6 +48,10 @@ jobs:
           deno-version: v2.x
       - name: Check token gateway prompt types
         run: deno check supabase/functions/zhi-token-gateway/prompt.ts
+      - name: Check ZHI Community Edge Function
+        run: deno check supabase/functions/zhi-community/index.ts
+      - name: Run ZHI Community authorization regression tests
+        run: deno test supabase/functions/zhi-community/access_helpers_test.ts supabase/functions/zhi-community/auth_helpers_test.ts
       - name: Run safety override regression tests
         run: deno test --allow-read supabase/functions/zhi-token-gateway/safety_test.ts
       - name: Check canonical persona config matches runtime prompt
