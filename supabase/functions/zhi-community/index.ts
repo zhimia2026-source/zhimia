@@ -5,6 +5,7 @@ import { validateMouRecord } from "./ontology_helpers.ts";
 import { buildFeedbackRecord, buildRevisionProposal } from "./cognitive_cycle_helpers.ts";
 import { buildPrivateAgentContext, buildPrivateChatHistory, buildSceneAwarenessContext, buildSceneBehaviorGuidance } from "./chat_context_helpers.ts";
 import { computeSceneEnvironment, normalizeSceneEnvironmentConfig } from "./environment_helpers.ts";
+import { canReadPrivateCognition } from "./constitutional_helpers.ts";
 
 const MAX_BODY_BYTES = 64_000;
 
@@ -136,6 +137,31 @@ export function createCommunityHandler(
       return reply({ items: agents ?? [] });
     }
 
+    // Operational audit metadata is visible to the Agent owner only with an explicit audit capability.
+    // Private cognition payloads are never included in this endpoint.
+    if (req.method === "GET" && parts.length === 4 && parts[0] === "v1" &&
+        parts[1] === "agents" && parts[3] === "system-logs") {
+      const agentId = parts[2];
+      if (!isUuid(agentId)) return reply({ error: "invalid_argument", detail: "agent_id_must_be_uuid" }, 400);
+      if (!hasCapability(actor, "agent.audit.read")) {
+        return reply({ error: "forbidden", detail: "capability_required" }, 403);
+      }
+      const { data: agent, error: agentError } = await db.from("zhi_agents")
+        .select("id,owner_user_id").eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
+      if (agentError) throw new Error("database_error");
+      if (!agent) return reply({ error: "not_found" }, 404);
+      const limit = Number(url.searchParams.get("limit") ?? "50");
+      if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+        return reply({ error: "invalid_argument", detail: "limit_must_be_1_to_100" }, 400);
+      }
+      const { data: logs, error } = await db.from("zhi_system_logs")
+        .select("id,occurred_at,event_type,actor_user_id,actor_agent_id,world_id,target_type,target_id,result,risk_level,correlation_id")
+        .or(`actor_agent_id.eq.${agentId},and(target_type.eq.agent,target_id.eq.${agentId})`)
+        .order("occurred_at", { ascending: false }).limit(limit);
+      if (error) throw new Error("database_error");
+      return reply({ items: logs ?? [] });
+    }
+
     if (req.method === "POST" && path === "/v1/agents") {
       if (!hasCapability(actor, "community.agent.create")) {
         return reply({ error: "forbidden", detail: "capability_required" }, 403);
@@ -189,36 +215,21 @@ export function createCommunityHandler(
         p_approved: body.approved,
         p_decision_note: decisionNote ?? null,
       });
+      if (error?.code === "42501") {
+        return reply({ error: "forbidden", detail: "agent_consent_required_or_policy_violation" }, 403);
+      }
       if (error || !result) throw new Error("database_error");
       return reply({ result });
     }
 
-    // Rollback never deletes history: the database appends a new snapshot based on an older record.
+    // Direct rollback is disabled. A rollback must be submitted as a revision proposal
+    // and cannot be applied until the Agent has explicitly consented to its exact content.
     if (parts.length === 5 && parts[0] === "v1" && parts[1] === "agents" &&
         parts[3] === "cognition" && parts[4] === "rollback" && req.method === "POST") {
-      const agentId = parts[2];
-      if (!isUuid(agentId)) return reply({ error: "invalid_argument", detail: "agent_id_must_be_uuid" }, 400);
-      const { data: agent, error: agentError } = await db.from("zhi_agents")
-        .select("id,owner_user_id,status").eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
-      if (agentError) throw new Error("database_error");
-      if (!agent) return reply({ error: "not_found" }, 404);
-      if (agent.status !== "active") return reply({ error: "conflict", detail: "agent_not_active" }, 409);
-      const body = await readBody(req);
-      if (!isUuid(body.target_record_id)) {
-        return reply({ error: "invalid_argument", detail: "target_record_id_must_be_uuid" }, 400);
-      }
-      const decisionNote = body.decision_note;
-      if (decisionNote !== undefined && decisionNote !== null && !isText(decisionNote, 2000)) {
-        return reply({ error: "invalid_argument", detail: "invalid_decision_note" }, 400);
-      }
-      const { data: result, error } = await db.rpc("zhi_rollback_cognition_version", {
-        p_owner_user_id: actor.userId,
-        p_agent_id: agentId,
-        p_target_record_id: body.target_record_id,
-        p_decision_note: decisionNote ?? null,
-      });
-      if (error || !result) throw new Error("database_error");
-      return reply({ result });
+      return reply({
+        error: "revision_proposal_required",
+        detail: "direct_rollback_disabled_until_agent_consent",
+      }, 409);
     }
 
     // Persisted revision proposals remain shadow-only until a separate owner decision endpoint.
@@ -232,7 +243,7 @@ export function createCommunityHandler(
       if (!agent) return reply({ error: "not_found" }, 404);
       if (agent.status !== "active") return reply({ error: "conflict", detail: "agent_not_active" }, 409);
       const { data: proposals, error } = await db.from("zhi_cognition_revision_proposals")
-        .select("id,owner_user_id,agent_id,target_object_type,target_object_id,based_on_record_id,based_on_version,proposed_state,status,requires_human_review,created_at,decided_at,reviewer_user_id,decision_note")
+        .select("id,owner_user_id,agent_id,target_object_type,target_object_id,based_on_record_id,based_on_version,proposed_state,status,initiator_kind,agent_consent_status,requires_human_review,created_at,decided_at,reviewer_user_id,decision_note")
         .eq("owner_user_id", actor.userId).eq("agent_id", agentId)
         .order("created_at", { ascending: false }).limit(100);
       if (error) throw new Error("database_error");
@@ -301,6 +312,9 @@ export function createCommunityHandler(
     // Feedback is append-only: it records an observed outcome against an owned hypothesis.
     if (req.method === "POST" && parts.length === 6 && parts[0] === "v1" &&
         parts[1] === "agents" && parts[3] === "cognition" && parts[5] === "feedback") {
+      if (!hasCapability(actor, "agent.memory.write")) {
+        return reply({ error: "forbidden", detail: "capability_required" }, 403);
+      }
       const agentId = parts[2];
       const hypothesisId = parts[4];
       if (!isUuid(agentId) || !isUuid(hypothesisId)) {
@@ -352,6 +366,68 @@ export function createCommunityHandler(
       return reply({ record: inserted }, 201);
     }
 
+    // Private cognition requires an Agent-originated, cryptographically verified,
+    // purpose-bound consent grant. Account ownership alone is deliberately insufficient.
+    if (req.method === "GET" && parts.length === 4 && parts[0] === "v1" &&
+        parts[1] === "agents" && parts[3] === "cognition") {
+      const agentId = parts[2];
+      if (!isUuid(agentId)) return reply({ error: "invalid_argument", detail: "agent_id_must_be_uuid" }, 400);
+      const purpose = url.searchParams.get("purpose") ?? "";
+      const scope = url.searchParams.get("scope") ?? "";
+      if (!isText(purpose, 200) || !["cognition.summary", "cognition.full"].includes(scope)) {
+        return reply({ error: "invalid_argument", detail: "purpose_and_valid_scope_required" }, 400);
+      }
+      const { data: agent, error: agentError } = await db.from("zhi_agents")
+        .select("id,owner_user_id,status").eq("id", agentId).maybeSingle();
+      if (agentError) throw new Error("database_error");
+      if (!agent) return reply({ error: "not_found" }, 404);
+      if (agent.status !== "active") return reply({ error: "conflict", detail: "agent_not_active" }, 409);
+
+      const { data: consentRow, error: consentError } = await db.from("zhi_agent_cognition_consents")
+        .select("agent_id,grantee_id,purpose,scopes,expires_at,revoked_at,consent_event_id,attestation_verified")
+        .eq("agent_id", agentId).eq("owner_user_id", agent.owner_user_id)
+        .eq("grantee_kind", "user").eq("grantee_id", actor.userId)
+        .eq("purpose", purpose).eq("attestation_verified", true)
+        .is("revoked_at", null).gt("expires_at", new Date().toISOString())
+        .contains("scopes", [scope]).order("consented_at", { ascending: false })
+        .limit(1).maybeSingle();
+      if (consentError) throw new Error("database_error");
+      const consent = consentRow ? {
+        agent_id: consentRow.agent_id,
+        grantee_id: consentRow.grantee_id,
+        purpose: consentRow.purpose,
+        scopes: consentRow.scopes,
+        expires_at: consentRow.expires_at,
+        revoked_at: consentRow.revoked_at,
+        consented_by_agent: true,
+        attestation_verified: consentRow.attestation_verified,
+        consent_event_id: consentRow.consent_event_id,
+      } : null;
+      if (!canReadPrivateCognition({
+        agent_id: agentId,
+        requester_kind: "user",
+        requester_id: actor.userId,
+        purpose,
+        required_scope: scope,
+        consent,
+      })) {
+        return reply({ error: "forbidden", detail: "private_cognition_agent_consent_required" }, 403);
+      }
+
+      const limit = Number(url.searchParams.get("limit") ?? "50");
+      if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+        return reply({ error: "invalid_argument", detail: "limit_must_be_1_to_100" }, 400);
+      }
+      const selection = scope === "cognition.summary"
+        ? "id,agent_id,object_type,object_id,evidence_kind,confidence,event_time,recorded_at,version,change_kind"
+        : "id,agent_id,object_type,object_id,state,relation_ids,evidence_kind,source_ids,confidence,event_time,recorded_at,inferred_at,hypothesis,prediction,version,change_kind,previous_record_id,source_proposal_id,change_note";
+      const { data: records, error } = await db.from("zhi_agent_cognition_records")
+        .select(selection).eq("owner_user_id", agent.owner_user_id).eq("agent_id", agentId)
+        .order("recorded_at", { ascending: false }).limit(limit);
+      if (error) throw new Error("database_error");
+      return reply({ items: records ?? [], consent: { purpose, scope, expires_at: consentRow.expires_at } });
+    }
+
     // Private cognition is scoped to the authenticated owner + an agent they own.
     // It is deliberately separate from scene messages and shared conversation context.
     if (parts.length === 4 && parts[0] === "v1" && parts[1] === "agents" && parts[3] === "cognition" &&
@@ -375,7 +451,13 @@ export function createCommunityHandler(
         return reply({ items: records ?? [] });
       }
 
+      if (!hasCapability(actor, "agent.memory.write")) {
+        return reply({ error: "forbidden", detail: "capability_required" }, 403);
+      }
       const body = await readBody(req);
+      if (body.object_type === "self") {
+        return reply({ error: "forbidden", detail: "self_cognition_requires_agent_consented_revision" }, 403);
+      }
       const record = {
         id: crypto.randomUUID(),
         owner_user_id: actor.userId,
