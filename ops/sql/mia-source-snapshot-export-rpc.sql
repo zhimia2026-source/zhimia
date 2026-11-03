@@ -82,7 +82,7 @@ BEGIN
       '[]'::jsonb
     ),
     count(*) FILTER (WHERE rn <= p_limit)::integer,
-    max(source_pk) FILTER (WHERE rn <= p_limit),
+    (array_agg(source_pk ORDER BY source_pk COLLATE "C") FILTER (WHERE rn <= p_limit))[p_limit],
     count(*) > p_limit
   INTO v_records, v_page_count, v_next_pk, v_has_more
   FROM candidates;
