@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "supabase/functions/zhi-community/**"
+      - "supabase/migrations/**"
       - "supabase/functions/zhi-token-admin/**"
       - "scripts/check-zhi-universe-inline.mjs"
       - "scripts/health-advisor-e2e.mjs"
