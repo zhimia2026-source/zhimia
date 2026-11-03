@@ -23,6 +23,8 @@ on:
       - "web/zhi-health-advisor-client.js"
       - "web/zhi-universe.html"
       - "web/zhi-universe-client.js"
+      - "web/zhi-resident.html"
+      - "web/zhi-resident.js"
       - ".github/workflows/health-advisor-static-checks.yml"
   pull_request:
     paths:
@@ -86,8 +88,10 @@ jobs:
         run: node scripts/check-zhi-runtime-binding-schema.mjs
       - name: Check ZHI Universe client syntax
         run: node --check web/zhi-universe-client.js
+      - name: Check ZHI resident client syntax
+        run: node --check web/zhi-resident.js
       - name: Check ZHI Universe inline module syntax
         run: node scripts/check-zhi-universe-inline.mjs
       - name: Reject server secrets in browser files
         run: |
-          ! grep -Eiq '(service_role|OPENAI_API_KEY|sk-[A-Za-z0-9]{20,})' web/zhi-health-advisor.html web/zhi-health-advisor-client.js web/zhi-universe.html web/zhi-universe-client.js
+          ! grep -Eiq '(service_role|OPENAI_API_KEY|sk-[A-Za-z0-9]{20,})' web/zhi-health-advisor.html web/zhi-health-advisor-client.js web/zhi-universe.html web/zhi-universe-client.js web/zhi-resident.html web/zhi-resident.js
