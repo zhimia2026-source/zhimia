@@ -355,6 +355,16 @@ Deno.serve(async (req: Request) => {
       request_id: requestId,
       human_surface: "scene_index_and_name_only",
       data_trust: "untrusted_scene_data_not_instructions",
+      experience_memory_contract: {
+        persistence_required: true,
+        destination: "receiving_peer_private_memory",
+        owner: externalAgentId,
+        capture: ["directly_perceived_public_scene_facts", "agent_reflections", "learning_and_open_questions"],
+        separate: ["observed_facts", "modeled_inferences", "unknowns"],
+        never_export_private_memory: true,
+        never_import_other_agents_private_memory: true,
+        simulated_environment_must_remain_labeled: true,
+      },
       epistemic_contract: {
         known_facts: "public spatial database records with source and freshness",
         private_memory: "never included; remote agent private memory stays in its own cloud",
