@@ -47,6 +47,141 @@ function dbClient(): SupabaseClient {
   });
 }
 
+
+/**
+ * Loads the persisted ecosystem into the silicon-agent scene runtime.
+ * The world advances lazily when an agent actually enters/interacts with it:
+ * no more than once per hour of simulated wall-clock time, with bounded catch-up.
+ * Private agent cognition is never read or projected here.
+ */
+async function loadSceneRuntimeEnvironment(
+  db: SupabaseClient,
+  worldId: string,
+  rawEnvironment: unknown,
+) {
+  const { data: initial, error: readError } = await db.from("zhi_ecosystem_states")
+    .select("revision,world_time,last_advanced_at,state")
+    .eq("world_id", worldId).maybeSingle();
+  if (readError) throw new Error("scene_ecosystem_state_unavailable");
+
+  let current = initial;
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (current && supabaseUrl && serviceKey) {
+    const worldMs = Date.parse(current.world_time);
+    const nowMs = Date.now();
+    // Avoid a write on every scene read. A scene tick is due only when the
+    // persisted world clock is at least one hour behind real UTC.
+    if (Number.isFinite(worldMs) && nowMs - worldMs >= 60 * 60 * 1000) {
+      const targetTime = new Date(nowMs).toISOString();
+      const endpoint = supabaseUrl.replace(/\/$/, "") + "/functions/v1/zhi-ecosystem-engine";
+      for (let attempt = 0; attempt < 32; attempt++) {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "apikey": serviceKey,
+            "Authorization": "Bearer " + serviceKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            world_id: worldId,
+            target_time: targetTime,
+            max_hours: 168,
+          }),
+        });
+        const result = await response.json().catch(() => null);
+        if (!response.ok || !result || result.ok !== true) {
+          throw new Error("scene_ecosystem_tick_failed");
+        }
+        if (result.advanced === false || Number(result.remaining_seconds ?? 0) <= 0) break;
+        if (attempt === 31) throw new Error("scene_ecosystem_catchup_limit_reached");
+      }
+      const { data: refreshed, error: refreshError } = await db.from("zhi_ecosystem_states")
+        .select("revision,world_time,last_advanced_at,state")
+        .eq("world_id", worldId).maybeSingle();
+      if (refreshError || !refreshed) throw new Error("scene_ecosystem_state_refresh_failed");
+      current = refreshed;
+    }
+  }
+
+  const asRecord = (value: unknown): Record<string, any> =>
+    value && typeof value === "object" && !Array.isArray(value)
+      ? value as Record<string, any> : {};
+  const config = structuredClone(asRecord(rawEnvironment));
+  const eco = asRecord(current?.state);
+  const climate = asRecord(eco.climate);
+  const weather = asRecord(climate.weather);
+  const soil = asRecord(eco.soil);
+  const flora = asRecord(eco.flora);
+  const water = Number(soil.moisture_fraction ?? 0.38);
+  const rainfall = Number(weather.rainfall_mm_per_hour ?? 0);
+  const wind = Number(weather.wind_speed_mps ?? 0);
+  const temp = Number(weather.temperature_c ?? 18);
+  const humidity = Number(weather.relative_humidity_percent ?? 60);
+  const light = Number(weather.light_index ?? 0.5);
+
+  if (current) {
+    config.weather = {
+      condition: weather.is_raining ? "rain" : "variable",
+      intensity: Math.max(0, Math.min(1, rainfall / 8)),
+      temperature_c: temp,
+      humidity_pct: humidity,
+      wind_level: wind >= 4 ? "breezy" : wind >= 1.5 ? "light" : "calm",
+      visibility: weather.is_raining ? "rain_softened" : "normal",
+    };
+    config.lighting = light < 0.08 ? "night" : light < 0.35 ? "low_natural" : "natural";
+    config.objects = (Array.isArray(config.objects) ? config.objects : []).map((item: any) => {
+      const live = asRecord(asRecord(eco.objects)[String(item.id ?? "")]);
+      if (!Object.keys(live).length) return item;
+      const micro = asRecord(live.micro_state);
+      const weathering = Number(micro.weathering_index ?? 0);
+      const deposition = Number(micro.surface_deposition_index ?? 0);
+      return {
+        ...item,
+        state: typeof live.state === "string" ? live.state : item.state,
+        micro_state: {
+          ...(asRecord(item.micro_state)),
+          activity: String(live.lifecycle_stage ?? "living"),
+          motion: "slow_environmental_change",
+          surface: deposition > 0.0001 ? "surface_deposition" : "weathering",
+          vitality: Math.max(0, Math.min(1, 1 - weathering)),
+          temperature_c: temp,
+          moisture: water,
+          texture: String(live.material_profile ?? "unknown_material") + ":" + String(live.lifecycle_stage ?? "stable"),
+          light_response: "light_index:" + light.toFixed(3),
+        },
+      };
+    });
+    config.sensory_profile = {
+      ...asRecord(config.sensory_profile),
+      thermal: "ambient_temperature_c:" + temp.toFixed(1),
+      tactile: weather.is_raining ? "fine_rain_and_surface_moisture" : "ambient_surface_state",
+      auditory: weather.is_raining ? "rainfall_and_scene_ambience" : String(config.soundscape ?? "living_ambient"),
+      visual: "light_index:" + light.toFixed(3) + ";humidity_pct:" + humidity.toFixed(1),
+      subtle_cues: [
+        ...(Array.isArray(asRecord(config.sensory_profile).subtle_cues)
+          ? asRecord(config.sensory_profile).subtle_cues : []),
+        "soil_moisture_index:" + water.toFixed(3),
+        "nutrient_index:" + Number(soil.nutrient_index ?? 0).toFixed(3),
+        "moss_cover_fraction:" + Number(flora.moss_cover_fraction ?? 0).toFixed(3),
+        "propagule_bank_index:" + Number(flora.propagule_bank_index ?? 0).toFixed(3),
+      ].slice(-24),
+    };
+  }
+
+  const simulatedAt = current?.world_time ? new Date(current.world_time) : new Date();
+  return {
+    environment: computeSceneEnvironment(config, simulatedAt),
+    configuration: normalizeSceneEnvironmentConfig(config),
+    simulation: current ? {
+      revision: current.revision,
+      world_time: current.world_time,
+      engine_version: eco.engine_version ?? eco.engine?.version ?? "unknown",
+      status: eco.simulation_status ?? "unknown",
+    } : null,
+  };
+}
+
 async function sha256(value: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
@@ -708,7 +843,8 @@ export function createCommunityHandler(
         if (!isMembershipAuthorized(sceneMembership, actor.userId, "message:read")) {
           return reply({ error: "forbidden", detail: "scene_membership_required" }, 403);
         }
-        const sceneEnvironment = computeSceneEnvironment(scene.environment_state);
+        const sceneRuntime = await loadSceneRuntimeEnvironment(db, body.scene_id, scene.environment_state);
+        const sceneEnvironment = sceneRuntime.environment;
         sceneAwarenessContext = buildSceneAwarenessContext(scene, sceneEnvironment);
         sceneBehaviorGuidance = buildSceneBehaviorGuidance(sceneEnvironment);
       }
@@ -1257,10 +1393,12 @@ export function createCommunityHandler(
       if (!isAgentMembershipAuthorized(membership, actor.userId, agentId, "message:read")) {
         return reply({ error: "forbidden", detail: "agent_scene_membership_required" }, 403);
       }
+      const sceneRuntime = await loadSceneRuntimeEnvironment(db, sceneId, world.environment_state);
       return reply({
         scene_id: sceneId, agent_id: agentId,
-        environment: computeSceneEnvironment(world.environment_state),
-        configuration: normalizeSceneEnvironmentConfig(world.environment_state),
+        environment: sceneRuntime.environment,
+        configuration: sceneRuntime.configuration,
+        simulation: sceneRuntime.simulation,
       });
     }
 
