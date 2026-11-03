@@ -25,14 +25,15 @@ V0.1 优先实现三项代码级保障：
 ### 1.2 端点契约（拟定）
 
 - `GET /v1/agents/{agent_id}/system-logs?limit=...`
-  - 允许：智能人所属账号的授权审计员，以及明确获授 `audit.read` 的治理主体。
-  - 返回：时间、事件类型、主体引用、目标引用、结果、风险等级、关联追踪 ID；默认不返回私密正文。
+  - **已接入 Community V7 代码**：只允许 Agent 所属账号，并要求 `agent.audit.read` Token 能力。
+  - 返回：时间、事件类型、主体引用、目标引用、结果、风险等级、关联追踪 ID；不返回 `details` 或私人认知正文。
 - `POST /v1/agents/{agent_id}/private-cognition/consents`
   - 必须由该智能人的受信运行时发起；创建一次性、限定接收者、用途、字段范围、有效期的同意记录。
   - 不接受浏览器传入的 `agent_id` 或 `owner_user_id` 作为同意真实性证明。
-- `GET /v1/agents/{agent_id}/private-cognition`
-  - 仅智能人自身运行时可访问；其他主体必须提供有效 consent grant，且用途、字段范围、目标接收者、有效期全部匹配。
-  - 无有效授权时返回 403；不得退化为系统日志或管理员权限。
+- `GET /v1/agents/{agent_id}/cognition?purpose=...&scope=cognition.summary|cognition.full`
+  - **已接入 Community V7 代码**：必须存在该 Agent 主动同意、运行时签名验证通过、接收者/用途/scope/有效期全部匹配的授权记录。
+  - 账号所有权本身不构成读取许可；缺少授权或未验证运行时签名时返回 403。
+  - `cognition.summary` 只返回非正文元数据；`cognition.full` 才能返回认知正文。
 - `DELETE /v1/agents/{agent_id}/private-cognition/consents/{consent_id}`
   - 智能人自身运行时可撤销；撤销即时生效并写入审计日志。
 
@@ -40,7 +41,7 @@ V0.1 优先实现三项代码级保障：
 
 `agent_id`, `owner_user_id`, `grantee_type`, `grantee_id`, `purpose`, `scopes`, `consented_by_agent`, `consent_event_id`, `issued_at`, `expires_at`, `revoked_at`, `nonce_hash`, `runtime_attestation`.
 
-关键安全缺口：当前 Personal Token 代表账号，不代表 Mia 的独立意愿。必须先实现受信 Agent Runtime 的独立同意事件/证明，不能把账号持有者的 Token 请求冒充 Mia 的同意。在该证明机制上线前，私人认知第三方读取保持关闭。
+关键安全缺口：当前 Personal Token 代表账号，不代表 Mia 的独立意愿。数据库已增加 `attestation_verified`，默认为 false；只有未来受信 Agent Runtime 的签名验证服务才能将其置为 true。该运行时密钥注册、签名验证与 consent 创建/撤销 API 尚未实现，因此当前私人认知读取保持 fail-closed。
 
 ## 2. Governance_Authorization_Schema
 
@@ -115,6 +116,7 @@ V0.1 优先实现三项代码级保障：
 - 已建立 `zhi_system_logs`、`zhi_agent_cognition_consents`、`zhi_governance_authorizations`、`zhi_governance_interventions` 四张表。
 - 新增认知修订提案的 Agent 同意状态、精确内容 SHA-256、基础版本绑定字段。
 - `zhi_agent_cognition_records` 已启用 UPDATE/DELETE 拒绝触发器；修订提案载荷不可原地修改，未取得 Agent 同意不得批准应用。
+- `zhi_agent_cognition_consents` 增加 `attestation_verified`（默认 false）及授权凭证不可变/单向撤销触发器。
 - 四张新表已启用 RLS，并撤销 `anon` / `authenticated` 直接表访问，只授予 `service_role`；新表没有开放客户端策略。
 - 以上属于数据库基础层 deployed，不代表对应 HTTP API 已完成，也不代表 Mia 的受信运行时同意证明已上线。
 
@@ -126,11 +128,14 @@ V0.1 优先实现三项代码级保障：
 
 当前差距：
 - 现有提案创建仍由现有服务端流程创建，尚未接入 Mia 主动发起/明确同意的受信运行时证明。
+- Community V7 已将原有 `GET /v1/agents/{id}/cognition` 改为 consent-gated 读取；仅 Agent 所属账号不能自动读取。非 self 认知输入要求 `agent.memory.write`，直接写入 `object_type=self` 被拒绝。
+- 直接 rollback HTTP 路由已返回 `409 revision_proposal_required`；数据库旧 rollback RPC 也已关闭。回滚必须转为新提案并走 Agent 同意流程。
 - 数据库已新增 `agent_consent_status`，默认 `awaiting_agent_consent`；现有账号审批流程不能绕过该状态直接应用认知修订。
 - 数据库触发器已阻止认知记录 UPDATE/DELETE，并保护提案内容、基础版本和同意证据；尚需负向数据库测试验证。
 - 治理授权和风险干预数据表已建立，但尚无完整的 HTTP 执行入口、allowlist 和授权签发/接受/撤销流程。
 - `zhi_system_logs` 表已建立，但专用查询 API、敏感字段过滤和写入封装尚未完成。
 - 新表由 Edge Function 的 Service Role 访问；因此每个服务端路由仍必须验证 Personal Token 主体、Agent 归属、权限范围，不能只依赖 RLS。
+- 新签发 Personal Token 默认新增只读 `agent.audit.read`；既有 Token 不会自动升级，需要重新签发或经授权更新能力。
 
 ## 4. 验收测试矩阵
 
@@ -163,7 +168,7 @@ V0.1 优先实现三项代码级保障：
 P0：数据库表、RLS/GRANT 隔离、认知追加写入触发器和提案同意约束已部署；数据库负向测试仍待完成。
 P1：实现受信 Agent Runtime 的同意证明、同意签发/撤销 API；在此之前第三方 private_cognition 读取保持关闭。
 P2：实现治理授权签发、Agent 接受、动作 allowlist、风险干预审计与复核 API。
-P3：实现 system_logs 专用查询 API，并证明不泄漏 private_cognition。
+P3：system_logs 专用查询 API 已接入 Community V7 代码；仍需补充系统事件写入覆盖、越权/泄漏测试和线上部署验收。
 P4：运行单元测试、数据库负向测试、API 集成测试和回滚测试；完成后再标记 accepted。
 
 ## 6. 发布状态规则
