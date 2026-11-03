@@ -81,8 +81,9 @@ async function readPage(table, pk, lastPk, maxPk) {
   u.searchParams.set('select','*');
   u.searchParams.set('order',`${pk}.asc`);
   u.searchParams.set('limit',String(pageSize));
-  if (lastPk !== null) u.searchParams.set(pk,`gt.${lastPk}`);
-  if (maxPk !== null) u.searchParams.set(pk,`lte.${maxPk}`);
+  if (lastPk !== null && maxPk !== null) u.searchParams.set('and',`(${pk}.gt.${lastPk},${pk}.lte.${maxPk})`);
+  else if (lastPk !== null) u.searchParams.set(pk,`gt.${lastPk}`);
+  else if (maxPk !== null) u.searchParams.set(pk,`lte.${maxPk}`);
   const r = await fetch(u,{headers:{...headers(sourceKey),'Accept-Profile':'public'}});
   if (!r.ok) throw new Error(`Source ${table} ${r.status}: ${await r.text()}`);
   return await r.json();
@@ -149,7 +150,7 @@ async function main() {
           const part=page.slice(i,i+sendSize);
           for (const row of part) {
             const clean=stripSecrets(row);
-            digestRows.push(`${String(row[pk])}:${sha256(clean)}`);
+            digestRows.push({pk:String(row[pk]),hash:sha256(clean)});
           }
           const result=await send(table,pk,part,tableRows);
           tableRows+=part.length;
@@ -161,8 +162,8 @@ async function main() {
         if (page.length<pageSize) break;
       }
     }
-    digestRows.sort((a,b)=>a.slice(0,a.indexOf(':')).localeCompare(b.slice(0,b.indexOf(':'))));
-    expected[table]={count:tableRows,rowset_sha256:sha256(digestRows),upper_bound:maxPk===null?null:String(maxPk)};
+    digestRows.sort((a,b)=>a.pk.localeCompare(b.pk));
+    expected[table]={count:tableRows,rowset_sha256:sha256(digestRows.map(x=>JSON.stringify([x.pk,x.hash]))),upper_bound:maxPk===null?null:String(maxPk)};
     all+=tableRows;
     console.log(`DONE ${table}: ${tableRows}`);
   }
