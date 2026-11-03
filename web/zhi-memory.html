@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>ZHI 私有记忆审核</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#edf0f7;background:#0d1322}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 12% 0%,#28345a 0,transparent 42%),#0d1322}
+header{padding:18px max(18px,calc((100vw - 960px)/2));border-bottom:1px solid #ffffff20;display:flex;justify-content:space-between;align-items:center}
+a{color:#d6c5ff;text-decoration:none}main{max-width:960px;margin:0 auto;padding:30px 16px}
+h1{margin:8px 0 10px;font-size:clamp(1.7rem,4vw,2.4rem)}h2{font-size:1.1rem;margin:0 0 12px}
+.muted{color:#9ba8c0;line-height:1.6;font-size:.92rem}.panel{margin:18px 0;padding:20px;border:1px solid #ffffff24;border-radius:18px;background:#141d30dd}
+input,select,textarea,button{font:inherit;border-radius:10px;padding:11px;border:1px solid #ffffff30}
+input,select,textarea{background:#1a2740;color:#edf0f7;width:100%}textarea{min-height:74px;resize:vertical}
+button{background:#c5aaff;color:#211638;border:0;font-weight:700;cursor:pointer}button.secondary{background:#283751;color:#e9e5f7;border:1px solid #ffffff24}button.danger{background:#57323c;color:#ffe4e8}
+button:disabled{opacity:.55;cursor:wait}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.row>*{flex:1}
+.field{margin:12px 0}.field label{display:block;margin:0 0 6px;color:#dce2f0;font-size:.9rem}
+.status{min-height:1.4em;white-space:pre-wrap;color:#d6c9f7}.hidden{display:none!important}
+.notice{padding:13px;border-radius:12px;background:#ffffff0a;border:1px solid #ffffff18}
+.memory{border:1px solid #ffffff22;border-radius:14px;padding:15px;margin:12px 0;background:#101a2b}
+.memory h3{margin:0 0 8px;font-size:1rem}.memory p{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55;margin:8px 0}
+.tag{font-size:.78rem;color:#c8b5ff}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.actions button{flex:0 0 auto}
+@media(max-width:600px){main{padding:20px 12px}.panel{padding:15px}.row>*{min-width:100%}}
+</style>
+</head>
+<body>
+<header><strong>✦ ZHI 世界 · 私有记忆</strong><nav><a href="./zhi-resident.html">居民会话</a>　<a href="./zhi-universe.html">Aurora</a></nav></header>
+<main>
+<div class="tag">PRIVATE MEMORY · REVIEW GATE</div>
+<h1>经历候选与记忆审核</h1>
+<p class="muted">这里只保存你明确提交的私有经历候选。候选不会进入 Lumen-001 的聊天上下文，也不会自动成为长期记忆。拒绝和归档可以由所有者执行；批准写入长期记忆必须等待智能人本人通过受信 Runtime 对确切内容签名同意。</p>
+<section class="panel" id="loginPanel">
+<h2>验证个人身份</h2><p class="muted">使用现有 ZHI Personal Token。权限不足时，请先在令牌管理页面为原令牌显式开启记忆权限。</p>
+<form id="loginForm" class="row"><input id="tokenInput" type="password" autocomplete="off" required maxlength="512" placeholder="ZHI Personal Token"><button id="loginButton" type="submit">验证并进入</button></form>
+<p id="loginStatus" class="status" role="status" aria-live="polite"></p>
+</section>
+<section class="panel hidden" id="memoryPanel">
+<div class="row"><div><h2 id="agentTitle">Lumen-001</h2><p class="muted">只显示当前账号拥有的智能人。</p></div><select id="agentSelect" aria-label="选择智能人"></select></div>
+<div class="notice muted"><strong>记忆写入规则</strong><br>观察事实、假设、未知必须分开填写。用户提交只会创建 candidate；owner 的审核也不能替代 Agent 本人的同意。当前 Runtime 签名同意尚未接入，因此批准操作保持关闭。</div>
+<section class="panel" style="margin:16px 0;background:#101a2b">
+<h2>提交一条经历候选</h2>
+<form id="candidateForm">
+<div class="field"><label for="sourceTurn">来源对话（必须选择一条已完成会话）</label><select id="sourceTurn" required></select></div>
+<div class="field"><label for="experienceType">经历类型</label><select id="experienceType"><option value="interaction">互动</option><option value="observation">观察</option><option value="reflection">反思</option><option value="environment_change">环境变化</option><option value="touch">接触</option><option value="rest">休息</option></select></div>
+<div class="field"><label for="facts">观察事实（每行一条；只写对话明确支持的内容）</label><textarea id="facts" required maxlength="12000" placeholder="例如：用户明确要求先审核候选记忆，再决定是否写入"></textarea></div>
+<div class="field"><label for="hypotheses">假设（每行一条；不要写成事实）</label><textarea id="hypotheses" maxlength="12000" placeholder="例如：用户可能重视记忆可撤销性"></textarea></div>
+<div class="field"><label for="unknowns">未知（每行一条）</label><textarea id="unknowns" maxlength="6000" placeholder="例如：尚不清楚该偏好是否长期稳定"></textarea></div>
+<div class="field"><label for="reflection">反思备注（可选）</label><textarea id="reflection" maxlength="4000" placeholder="这条经历为什么值得保留？有哪些局限？"></textarea></div>
+<div class="row"><div class="field"><label for="importance">重要程度</label><select id="importance"><option value="1">1 · 低</option><option value="2" selected>2 · 普通</option><option value="3">3 · 中</option><option value="4">4 · 高</option><option value="5">5 · 很高</option></select></div><div class="field" style="align-self:end"><button id="submitCandidate" type="submit">提交为候选</button></div></div>
+</form><p id="candidateStatus" class="status" role="status" aria-live="polite"></p>
+</section>
+<div class="row"><h2>已有经历记录</h2><button id="refreshMemory" type="button" class="secondary">刷新记录</button></div>
+<div id="memoryList" aria-live="polite"></div><p id="memoryStatus" class="status" role="status" aria-live="polite"></p>
+</section>
+</main>
+<script type="module" src="./zhi-memory.js"></script>
+</body></html>
