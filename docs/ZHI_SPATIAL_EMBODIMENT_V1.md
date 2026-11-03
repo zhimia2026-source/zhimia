@@ -116,7 +116,7 @@ Verified after deployment on 2026-11-03:
   - `20261103093649_create_spatial_embodiment_foundation`
   - `20261103093821_seed_aurora_spatial_graph`
   - `20261103094012_spatial_embodiment_fk_indexes`
-  - `2026110309xxxx_spatial_node_owner_cascade_integrity` (exact migration version recorded in Supabase migration history)
+  - `20261103094032_spatial_node_owner_cascade_integrity` (exact migration version recorded in Supabase migration history)
 - `zhi-spatial` ACTIVE, V4.
 - Spatial graph counts: 1 world, 4 regions, 5 objects, 9 containment edges.
 - Presence rows: 0 (no agent position was invented).
