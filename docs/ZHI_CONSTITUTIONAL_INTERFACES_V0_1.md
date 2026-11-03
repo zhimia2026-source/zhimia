@@ -41,7 +41,10 @@ V0.1 优先实现三项代码级保障：
 
 `agent_id`, `owner_user_id`, `grantee_type`, `grantee_id`, `purpose`, `scopes`, `consented_by_agent`, `consent_event_id`, `issued_at`, `expires_at`, `revoked_at`, `nonce_hash`, `runtime_attestation`.
 
-关键安全缺口：当前 Personal Token 代表账号，不代表 Mia 的独立意愿。数据库已增加 `attestation_verified`，默认为 false；只有未来受信 Agent Runtime 的签名验证服务才能将其置为 true。该运行时密钥注册、签名验证与 consent 创建/撤销 API 尚未实现，因此当前私人认知读取保持 fail-closed。
+关键安全缺口：当前 Personal Token 代表账号，不代表 Mia 的独立意愿。数据库已增加 `attestation_verified`，默认为 false；只有未来受信 Agent Runtime 的签名验证服务才能将其置为 true。该运行时密钥注册、签名验证与 consent 创建/撤销 API 尚未实现，因此当前私人认知与私人微经历读取保持 fail-closed。
+
+- `GET /v1/agents/{agent_id}/micro-experiences`（zhi-memory）：除 `agent.memory.read` 外，还要求 Agent 对 `memory.history.read` 用途和 `memory.full` 范围签发已验证、未撤销且未过期的同意。读取尝试写入 `zhi_system_logs`。
+- 账号持有人不能将候选微经历直接批准为 Agent 私有记忆，也不能通过该接口硬删除私有记忆；批准/归档/删除保留给 Agent 自身运行时。
 
 ## 2. Governance_Authorization_Schema
 
@@ -128,7 +131,8 @@ V0.1 优先实现三项代码级保障：
 
 当前差距：
 - 现有提案创建仍由现有服务端流程创建，尚未接入 Mia 主动发起/明确同意的受信运行时证明。
-- Community V7 已将原有 `GET /v1/agents/{id}/cognition` 改为 consent-gated 读取；仅 Agent 所属账号不能自动读取。非 self 认知输入要求 `agent.memory.write`，直接写入 `object_type=self` 被拒绝。
+- Community V8 已将原有 `GET /v1/agents/{id}/cognition` 改为 consent-gated 读取；仅 Agent 所属账号不能自动读取。非 self 认知输入要求 `agent.memory.write`，直接写入 `object_type=self` 被拒绝。
+- zhi-memory V2 的源代码已纳入仓库，正在进行 CI 验证；私人微经历读取也改为 Agent 同意门控，owner 不再自动拥有读取、批准或删除权。
 - 直接 rollback HTTP 路由已返回 `409 revision_proposal_required`；数据库旧 rollback RPC 也已关闭。回滚必须转为新提案并走 Agent 同意流程。
 - 数据库已新增 `agent_consent_status`，默认 `awaiting_agent_consent`；现有账号审批流程不能绕过该状态直接应用认知修订。
 - 数据库触发器已阻止认知记录 UPDATE/DELETE，并保护提案内容、基础版本和同意证据；尚需负向数据库测试验证。
