@@ -43,7 +43,7 @@ export function createUniverseClient() {
     return true;
   }
 
-  async function community(method, path, body) {
+  async function community(method, path, body, extraHeaders = {}) {
     const send = () => {
       const [routePath, routeQuery = ""] = path.split("?", 2);
       const separator = routeQuery ? "&" : "?";
@@ -55,6 +55,7 @@ export function createUniverseClient() {
       headers: {
         "apikey": API_KEY,
         "authorization": "Bearer " + token,
+        ...extraHeaders,
         ...(body === undefined ? {} : { "content-type": "application/json" })
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) })
@@ -106,6 +107,11 @@ export function createUniverseClient() {
     },
     get: path => community("GET", path),
     post: (path, body) => community("POST", path, body),
+    async chat(agentId, message) {
+      if (!globalThis.crypto?.randomUUID) throw new Error("当前浏览器不支持安全请求编号，请更新浏览器后重试。");
+      return community("POST", "/v1/agents/" + encodeURIComponent(agentId) + "/chat",
+        { message }, { "idempotency-key": globalThis.crypto.randomUUID() });
+    },
     logout() { save("", ""); }
   };
 }
