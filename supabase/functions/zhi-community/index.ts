@@ -1306,7 +1306,7 @@ export function createCommunityHandler(
       const { data: memberships, error } = await db.from("zhi_world_memberships")
         .select("id,status,revoked_at,expires_at")
         .eq("world_id", worldId).eq("principal_user_id", actor.userId)
-        .eq("status", "active").is("revoked_at", null).limit(50);
+        .eq("status", "active").is("revoked_at", null).is("agent_id", null).limit(50);
       if (error) throw new Error("database_error");
       const now = Date.now();
       return (memberships ?? []).some((membership: {
@@ -1330,9 +1330,8 @@ export function createCommunityHandler(
       if (worldError) throw new Error("database_error");
       if (!world) return reply({ error: "not_found" }, 404);
       if (world.status !== "open") return reply({ error: "conflict", detail: "world_not_open" }, 409);
-      if (!await hasActiveWorldMembership(worldId)) return reply({ error: "forbidden", detail: "active_world_membership_required" }, 403);
-
       if (req.method === "GET") {
+        if (!await hasActiveWorldMembership(worldId)) return reply({ error: "forbidden", detail: "active_account_membership_required" }, 403);
         const limit = Number(url.searchParams.get("limit") ?? "50");
         if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
           return reply({ error: "invalid_argument", detail: "limit_must_be_1_to_100" }, 400);
@@ -1393,6 +1392,7 @@ export function createCommunityHandler(
           return reply({ error: "forbidden", detail: "agent_world_membership_required" }, 403);
         }
       } else {
+        if (!await hasActiveWorldMembership(worldId)) return reply({ error: "forbidden", detail: "active_account_membership_required" }, 403);
         if (body.submitted_by_agent_id !== undefined && body.submitted_by_agent_id !== null) {
           return reply({ error: "invalid_argument", detail: "carbon_contribution_must_not_claim_agent_identity" }, 400);
         }
