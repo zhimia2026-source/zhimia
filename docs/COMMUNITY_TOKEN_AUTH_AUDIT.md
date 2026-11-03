@@ -87,3 +87,16 @@ These authenticated HTTP tests have not yet been run because the raw personal to
 Current live deployment: `zhi-community` version 3, `verify_jwt=false` (the function performs its own personal-token authentication).
 
 Rollback reference: prior version 2 source in GitHub history. Any rollback must be deliberate and followed by a token-permission review, because the version 2 create routes did not enforce the two dedicated creation capabilities.
+
+
+## 7. Frontend session reuse (source committed; live verification pending)
+
+The repository now contains:
+- `web/zhi-universe.html`: controlled initialization page for the first private world and resident.
+- `web/zhi-universe-client.js`: reuses the existing `zhi_personal_token` and `zhi_refresh_token` sessionStorage keys and refreshes through the existing Token Gateway.
+- `web/zhi-health-advisor.html`: same-tab navigation link to the Universe entry.
+- `.github/workflows/health-advisor-pages.yml`: copies the new page/client into the Pages artifact and includes both in the client-side secret scan.
+
+The page does not display or log raw credentials. It only creates resources after an explicit creator click, first looks up existing owner-scoped resources, and uses the private Agent invitation/redeem routes to establish membership.
+
+Not yet verified: successful GitHub Pages deployment, actual page load in the user's authenticated browser tab, real Token Gateway refresh behavior from this new page, HTTP acceptance of the create/invitation flow, or creation of the Aurora/Lumen records. No world or Agent was created by this commit.
