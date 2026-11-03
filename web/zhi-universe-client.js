@@ -107,10 +107,12 @@ export function createUniverseClient() {
     },
     get: path => community("GET", path),
     post: (path, body) => community("POST", path, body),
-    async chat(agentId, message) {
+    async chat(agentId, message, sceneId = "") {
       if (!globalThis.crypto?.randomUUID) throw new Error("当前浏览器不支持安全请求编号，请更新浏览器后重试。");
+      const payload = { message };
+      if (sceneId) payload.scene_id = sceneId;
       return community("POST", "/v1/agents/" + encodeURIComponent(agentId) + "/chat",
-        { message }, { "idempotency-key": globalThis.crypto.randomUUID() });
+        payload, { "idempotency-key": globalThis.crypto.randomUUID() });
     },
     logout() { save("", ""); }
   };
