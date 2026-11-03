@@ -46,6 +46,29 @@ function eventActive(event: JsonRecord, now: Date, localTime: string): boolean {
 function clampWeight(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : null;
 }
+function boundedNumber(value: unknown, min: number, max: number): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max ? value : null;
+}
+function normalizeWeather(value: unknown): JsonRecord {
+  const item = record(value);
+  return {
+    condition: boundedText(item.condition, 40) ?? "clear",
+    intensity: boundedNumber(item.intensity, 0, 1) ?? 0,
+    temperature_c: boundedNumber(item.temperature_c, -80, 70),
+    humidity_pct: boundedNumber(item.humidity_pct, 0, 100),
+    wind_level: boundedText(item.wind_level, 40) ?? "calm",
+    visibility: boundedText(item.visibility, 40) ?? "normal",
+  };
+}
+function normalizeMicroState(value: unknown): JsonRecord {
+  const item = record(value);
+  return {
+    activity: boundedText(item.activity, 80) ?? "still",
+    motion: boundedText(item.motion, 80) ?? "none",
+    surface: boundedText(item.surface, 80) ?? "unchanged",
+    vitality: boundedNumber(item.vitality, 0, 1) ?? 0.5,
+  };
+}
 
 /** Deterministic, read-time scene state. It never reads or writes private memories. */
 export function computeSceneEnvironment(raw: unknown, now = new Date()) {
@@ -67,6 +90,7 @@ export function computeSceneEnvironment(raw: unknown, now = new Date()) {
 
   let lighting = boundedText(state.lighting, 80) ?? "natural";
   let soundscape = boundedText(state.soundscape, 80) ?? "ambient";
+  let weather = normalizeWeather(state.weather);
   let atmosphereTags = boundedList(state.atmosphere_tags);
   const objects = (Array.isArray(state.objects) ? state.objects : []).slice(0, 100).flatMap((value) => {
     const item = record(value);
@@ -74,7 +98,7 @@ export function computeSceneEnvironment(raw: unknown, now = new Date()) {
     const name = boundedText(item.name, 120);
     const objectState = boundedText(item.state, 80);
     if (!id || !name || !objectState) return [];
-    return [{ id, name, state: objectState, interaction_options: boundedList(item.interaction_options, 12) }];
+    return [{ id, name, state: objectState, micro_state: normalizeMicroState(item.micro_state), interaction_options: boundedList(item.interaction_options, 12) }];
   });
   const regions = (Array.isArray(state.regions) ? state.regions : []).slice(0, 20).flatMap((value) => {
     const item = record(value);
@@ -106,10 +130,16 @@ export function computeSceneEnvironment(raw: unknown, now = new Date()) {
     soundscape = boundedText(delta.soundscape, 80) ?? soundscape;
     const tags = boundedList(delta.atmosphere_tags);
     atmosphereTags = [...new Set([...atmosphereTags, ...tags])].slice(0, 30);
+    if (delta.weather && typeof delta.weather === "object") weather = normalizeWeather(delta.weather);
     const objectStates = record(delta.object_states);
+    const objectMicroStates = record(delta.object_micro_states);
     for (const object of objects) {
       const nextState = boundedText(objectStates[object.id], 80);
       if (nextState) object.state = nextState;
+      const nextMicroState = objectMicroStates[object.id];
+      if (nextMicroState && typeof nextMicroState === "object") {
+        object.micro_state = { ...object.micro_state, ...normalizeMicroState(nextMicroState) };
+      }
     }
     const weights = record(event.behavior_weights);
     for (const [key, value] of Object.entries(weights)) {
@@ -123,6 +153,7 @@ export function computeSceneEnvironment(raw: unknown, now = new Date()) {
     temporal_state: temporalState,
     lighting,
     soundscape,
+    weather,
     atmosphere_tags: atmosphereTags,
     objects,
     regions,
@@ -140,7 +171,7 @@ export function computeSceneEnvironment(raw: unknown, now = new Date()) {
 export function normalizeSceneEnvironmentConfig(raw: unknown): JsonRecord {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("invalid_environment_config");
   const input = record(raw);
-  const allowed = new Set(["timezone", "lighting", "soundscape", "atmosphere_tags", "objects", "regions", "events", "behavior_weights"]);
+  const allowed = new Set(["timezone", "lighting", "soundscape", "weather", "atmosphere_tags", "objects", "regions", "events", "behavior_weights"]);
   if (Object.keys(input).some((key) => !allowed.has(key))) throw new Error("unsupported_environment_field");
 
   const timezone = boundedText(input.timezone, 80) ?? "UTC";
@@ -155,7 +186,7 @@ export function normalizeSceneEnvironmentConfig(raw: unknown): JsonRecord {
     const name = boundedText(item.name, 120);
     const state = boundedText(item.state, 80);
     if (!id || !name || !state) throw new Error("invalid_environment_object");
-    return { id, name, state, interaction_options: boundedList(item.interaction_options, 12) };
+    return { id, name, state, micro_state: normalizeMicroState(item.micro_state), interaction_options: boundedList(item.interaction_options, 12) };
   });
   if (new Set(objects.map((item) => item.id)).size !== objects.length) throw new Error("duplicate_environment_object_id");
 
@@ -194,11 +225,18 @@ export function normalizeSceneEnvironmentConfig(raw: unknown): JsonRecord {
     }
     const delta = record(item.state_delta);
     const objectStates = record(delta.object_states);
+    const objectMicroStates = record(delta.object_micro_states);
     const knownObjectIds = new Set(objects.map((object) => object.id));
     const safeObjectStates: Record<string, string> = {};
+    const safeObjectMicroStates: Record<string, JsonRecord> = {};
     for (const [objectId, state] of Object.entries(objectStates)) {
       const safeState = boundedText(state, 80);
       if (knownObjectIds.has(objectId) && safeState) safeObjectStates[objectId] = safeState;
+    }
+    for (const [objectId, microState] of Object.entries(objectMicroStates)) {
+      if (knownObjectIds.has(objectId) && microState && typeof microState === "object" && !Array.isArray(microState)) {
+        safeObjectMicroStates[objectId] = normalizeMicroState(microState);
+      }
     }
     const weights: Record<string, number> = {};
     for (const [key, value] of Object.entries(record(item.behavior_weights))) {
@@ -214,6 +252,8 @@ export function normalizeSceneEnvironmentConfig(raw: unknown): JsonRecord {
         soundscape: boundedText(delta.soundscape, 80),
         atmosphere_tags: boundedList(delta.atmosphere_tags),
         object_states: safeObjectStates,
+        object_micro_states: safeObjectMicroStates,
+        weather: delta.weather && typeof delta.weather === "object" ? normalizeWeather(delta.weather) : null,
       },
       behavior_weights: weights,
     };
@@ -229,6 +269,7 @@ export function normalizeSceneEnvironmentConfig(raw: unknown): JsonRecord {
     timezone,
     lighting: boundedText(input.lighting, 80) ?? "natural",
     soundscape: boundedText(input.soundscape, 80) ?? "ambient",
+    weather: normalizeWeather(input.weather),
     atmosphere_tags: boundedList(input.atmosphere_tags),
     objects,
     regions,
