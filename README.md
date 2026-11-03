@@ -13,6 +13,8 @@
 ## 基准文档与 GitHub 备份
 - [基准文档索引与备份规则](docs/BASELINE_INDEX.md)
 - [ZHI Universe V0.1 实施蓝图](docs/ZHI_UNIVERSE_V0_1_IMPLEMENTATION.md)
+- [ZHI_Biogenesis_Engine V0.1：硅基—碳基双向反哺](docs/ZHI_BIOGENESIS_ENGINE_V0_1.md)
+- [ZHI 宪章接口实施规范 V0.1](docs/ZHI_CONSTITUTIONAL_INTERFACES_V0_1.md)
 - [ZHI 世界入口页面](web/zhi-universe.html)
 - [ZHI 世界入口 Token 适配器](web/zhi-universe-client.js)
 - [ZHI 世界参与者与跨云互联协议 V1.0](docs/ZHI_WORLD_PARTICIPANT_PROTOCOL_V1.md)
