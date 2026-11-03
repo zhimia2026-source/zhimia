@@ -14,6 +14,7 @@
 - [基准文档索引与备份规则](docs/BASELINE_INDEX.md)
 - [ZHI Universe V0.1 实施蓝图](docs/ZHI_UNIVERSE_V0_1_IMPLEMENTATION.md)
 - [ZHI 硅基生命生态系统 P1/P2 工程基线](docs/ZHI_LIVING_ECOSYSTEM_P1_P2.md)
+- [生态引擎 Edge Function](supabase/functions/zhi-ecosystem-engine/index.ts)
 - [ZHI 生态持久化状态迁移](supabase/migrations/20261103_152200_zhi_ecosystem_persistent_state_v01.sql)
 - [ZHI_Biogenesis_Engine V0.1：硅基—碳基双向反哺](docs/ZHI_BIOGENESIS_ENGINE_V0_1.md)
 - [ZHI 宪章接口实施规范 V0.1](docs/ZHI_CONSTITUTIONAL_INTERFACES_V0_1.md)
