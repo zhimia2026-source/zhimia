@@ -63,10 +63,13 @@ Deno.test("private cognition is private by default and requires exact agent cons
   if (canReadPrivateCognition(base)) throw new Error("owner identity alone must not grant access");
   const consent = { agent_id: "mia-agent", grantee_id: "creator", purpose: "constitutional_review",
     scopes: ["cognition.summary"], expires_at: "2029-01-02T00:00:00Z", revoked_at: null,
-    consented_by_agent: true, consent_event_id: "consent-1" };
+    consented_by_agent: true, attestation_verified: true, consent_event_id: "consent-1" };
   if (!canReadPrivateCognition({ ...base, consent })) throw new Error("valid explicit consent expected");
   if (canReadPrivateCognition({ ...base, consent: { ...consent, revoked_at: "2029-01-01T01:00:00Z" } })) {
     throw new Error("revoked consent must be denied");
+  }
+  if (canReadPrivateCognition({ ...base, consent: { ...consent, attestation_verified: false } })) {
+    throw new Error("unverified runtime attestation must be denied");
   }
 });
 
