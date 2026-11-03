@@ -454,60 +454,14 @@ export function createCommunityHandler(
       return reply({ items: records ?? [], consent: { purpose, scope, expires_at: consentRow?.expires_at ?? null } });
     }
 
-    // Private cognition is scoped to the authenticated owner + an agent they own.
-    // It is deliberately separate from scene messages and shared conversation context.
-    if (parts.length === 4 && parts[0] === "v1" && parts[1] === "agents" && parts[3] === "cognition" &&
-        (req.method === "GET" || req.method === "POST")) {
-      const agentId = parts[2];
-      if (!isUuid(agentId)) return reply({ error: "invalid_argument", detail: "agent_id_must_be_uuid" }, 400);
-      const { data: agent, error: agentError } = await db.from("zhi_agents")
-        .select("id,owner_user_id,status").eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
-      if (agentError) throw new Error("database_error");
-      if (!agent) return reply({ error: "not_found" }, 404);
-      if (agent.status !== "active") return reply({ error: "conflict", detail: "agent_not_active" }, 409);
-
-      if (req.method === "GET") {
-        const limit = Number(url.searchParams.get("limit") ?? "50");
-        if (!Number.isInteger(limit) || limit < 1 || limit > 100) return reply({ error: "invalid_argument", detail: "limit_must_be_1_to_100" }, 400);
-        const { data: records, error } = await db.from("zhi_agent_cognition_records")
-          .select("id,owner_user_id,agent_id,object_type,object_id,state,relation_ids,evidence_kind,source_ids,confidence,event_time,recorded_at,inferred_at,hypothesis,prediction,version,change_kind,previous_record_id,source_proposal_id,change_note")
-          .eq("owner_user_id", actor.userId).eq("agent_id", agentId)
-          .order("recorded_at", { ascending: false }).limit(limit);
-        if (error) throw new Error("database_error");
-        return reply({ items: records ?? [] });
-      }
-
+    // Creator accounts cannot write directly into the Agent's cognition store.
+    // External inputs remain proposals or unapproved candidate experiences.
+    if (req.method === "POST" && parts.length === 4 && parts[0] === "v1" &&
+        parts[1] === "agents" && parts[3] === "cognition") {
       return reply({
         error: "agent_runtime_required",
         detail: "creator_input_must_be_submitted_as_candidate_memory_or_revision_proposal",
       }, 403);
-      const body = await readBody(req);
-      const record = {
-        id: crypto.randomUUID(),
-        owner_user_id: actor.userId,
-        agent_id: agentId,
-        object_type: body.object_type,
-        object_id: body.object_id,
-        state: body.state,
-        relation_ids: body.relation_ids ?? [],
-        evidence_kind: body.evidence_kind,
-        source_ids: body.source_ids ?? [],
-        confidence: body.confidence ?? null,
-        event_time: body.event_time ?? null,
-        recorded_at: new Date().toISOString(),
-        inferred_at: body.inferred_at ?? null,
-        hypothesis: body.hypothesis ?? null,
-        prediction: body.prediction ?? null,
-        version: 1,
-      };
-      const validation = validateMouRecord(record);
-      if (!validation.valid) return reply({ error: "invalid_argument", detail: "invalid_mou_record", fields: validation.errors }, 400);
-      const { data: inserted, error } = await db.from("zhi_agent_cognition_records")
-        .insert(record)
-        .select("id,owner_user_id,agent_id,object_type,object_id,state,relation_ids,evidence_kind,source_ids,confidence,event_time,recorded_at,inferred_at,hypothesis,prediction,version,change_kind,previous_record_id,source_proposal_id,change_note")
-        .single();
-      if (error || !inserted) throw new Error("database_error");
-      return reply({ record: inserted }, 201);
     }
 
     // Private agent chat: session history and private cognition are loaded only
