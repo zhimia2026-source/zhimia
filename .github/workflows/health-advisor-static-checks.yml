@@ -6,6 +6,7 @@ on:
     paths:
       - "supabase/functions/zhi-community/**"
       - "supabase/functions/zhi-token-admin/**"
+      - "scripts/check-zhi-universe-inline.mjs"
       - "scripts/health-advisor-e2e.mjs"
       - "scripts/health-advisor-token-gateway-e2e.mjs"
       - "supabase/functions/zhi-token-gateway/prompt.ts"
@@ -67,6 +68,8 @@ jobs:
         run: node --check scripts/health-advisor-token-gateway-e2e.mjs
       - name: Check ZHI Universe client syntax
         run: node --check web/zhi-universe-client.js
+      - name: Check ZHI Universe inline module syntax
+        run: node scripts/check-zhi-universe-inline.mjs
       - name: Reject server secrets in browser files
         run: |
           ! grep -Eiq '(service_role|OPENAI_API_KEY|sk-[A-Za-z0-9]{20,})' web/zhi-health-advisor.html web/zhi-health-advisor-client.js web/zhi-universe.html web/zhi-universe-client.js
