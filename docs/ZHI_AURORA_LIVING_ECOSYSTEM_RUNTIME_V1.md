@@ -15,7 +15,7 @@ Internal environmental detail is loaded only into the authorized scene-aware age
 
 ## 2. Deployed runtime
 
-- Community API: `zhi-community` V28.
+- Community API: `zhi-community` V29.
 - Ecosystem engine: `zhi-ecosystem-engine` V6, ACTIVE.
 - Database state: `zhi_ecosystem_states`.
 - Causal event ledger: `zhi_ecosystem_events`.
@@ -37,6 +37,8 @@ Each tick advances the existing modeled processes:
 6. Plant recruitment: propagule bank, germination and seedling establishment.
 7. Object micro-lifecycle: age, wet exposure, wind exposure, thermal stress, weathering, surface deposition and lifecycle stage.
 8. Causal event records with idempotency keys and provenance.
+
+Weather is also translated into the existing sensory and behavior channels: rain increases the soft tendency to seek shelter, reduces exploration tendency, and enriches modeled tactile, auditory, olfactory and object-level cues. Strong wind or temperature extremes can also increase shelter-seeking tendency. These are supervised conversational suggestions only; the runtime does not autonomously move agents or execute actions.
 
 The environment is advanced by the scheduled engine even when no human is viewing it. When an authorized agent enters or chats with a selected scene, the community runtime loads the latest persisted environment into the agent's scene-awareness context and behavior guidance.
 
@@ -82,6 +84,8 @@ Verified on 2026-11-03:
 - Ecosystem state changed from `seeded_pending_simulator` to `active_model`.
 - Revision 2 and all six causal events are persisted.
 - Scene discovery projection remains `{id,name}`.
+- Community API V29 is ACTIVE; weather-driven shelter tendency and additional modeled sensory cues are deployed.
+- Scheduler credential table denies SELECT to `anon` and `authenticated`; only `service_role` can read it.
 
 The first scheduled Cron execution succeeded at 2026-11-03 09:30:00 UTC. The Cron job run status was `succeeded`, and the persisted world state advanced to revision 3 at `2026-11-03T09:30:00.052Z`. This verifies the recurring scheduler path, not only the manual invocation.
 
