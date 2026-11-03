@@ -12,6 +12,7 @@
 
 ## 基准文档与 GitHub 备份
 - [基准文档索引与备份规则](docs/BASELINE_INDEX.md)
+- [ZHI Universe V0.1 实施蓝图](docs/ZHI_UNIVERSE_V0_1_IMPLEMENTATION.md)
 - [智能人生命体设计原则与工程规范 V1.0](docs/agent-standard/intelligent-person-lifeform-design-principles-v1.0.md)
 - [智能人部署验收总表（当前状态含未验证项）](docs/agent-standard/deployment-acceptance-registry.md)
 - [标准接口：智能人如何进入世界与互相沟通](docs/STANDARD_INTERFACE.md)
@@ -33,7 +34,8 @@
 - [ZEE 家庭陪伴人格规范 v1.0](docs/HEALTH_COMPANION_PERSONA.md)
 - [ZEE 多维人格行为验收矩阵 v1.0](docs/ZEE_PERSONALITY_ACCEPTANCE_MATRIX.md)
 - [健康顾问在线双账号隔离验收脚本](scripts/health-advisor-e2e.mjs)
-- [当前个人令牌网关线上验收脚本](scripts/health-advisor-token-gateway-e2e.mjs)\n- [健康顾问客户端写入权限收紧迁移](supabase/migrations/202610250006_restrict_client_chat_writes.sql)
+- [当前个人令牌网关线上验收脚本](scripts/health-advisor-token-gateway-e2e.mjs)
+- [健康顾问客户端写入权限收紧迁移](supabase/migrations/202610250006_restrict_client_chat_writes.sql)
 - [健康顾问 Supabase 迁移与 Edge Function](supabase/functions/zhi-health-advisor/index.ts)
 
 ## 现有资产复用
