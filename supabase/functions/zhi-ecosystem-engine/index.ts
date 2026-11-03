@@ -47,7 +47,7 @@ type ModelState = {
 };
 
 type ObjectProfile = {
-  material: "crystal" | "stone" | "crafted" | "masonry";
+  material: "crystal" | "stone" | "crafted" | "masonry" | "glass";
   weatheringRate: number;
   depositionRate: number;
   thermalSensitivity: number;
@@ -59,6 +59,7 @@ const OBJECT_PROFILES: Record<string, ObjectProfile> = {
   ocean_tide_lantern: { material: "crafted", weatheringRate: 0.00000045, depositionRate: 0.000001, thermalSensitivity: 0.5 },
   memory_echo_stone: { material: "stone", weatheringRate: 0.0000012, depositionRate: 0.0000013, thermalSensitivity: 0.35 },
   lumina_square: { material: "masonry", weatheringRate: 0.0000009, depositionRate: 0.0000008, thermalSensitivity: 0.3 },
+  aurora_greenhouse: { material: "glass", weatheringRate: 0.00000035, depositionRate: 0.0000015, thermalSensitivity: 0.85 },
 };
 
 function advanceObjectLifecycles(
@@ -403,7 +404,7 @@ function advanceModel(
 
   state.engine = {
     id: "zhi_living_ecosystem",
-    version: "0.3.1",
+    version: "0.3.2",
     model_assumptions: assumptions,
     last_interval_hours: Number(((toMs - fromMs) / 3_600_000).toFixed(6)),
     last_biogeochemical_summary: biogeochemical.summary,
@@ -415,7 +416,7 @@ function advanceModel(
       runoff_fraction: Number(runoffTotal.toFixed(8)),
     },
   };
-  state.engine_version = "0.3.1";
+  state.engine_version = "0.3.2";
   state.simulation_status = "active_model";
   state.climate = climate;
   state.hydrology = hydrology;
