@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 const executeRequested = process.argv.includes('--execute');
 if (!executeRequested) {
   console.log('SAFE STOP: no archive data was transferred.');
-  console.log('Use --execute only after the source snapshot has been independently frozen and reviewed.');
+  console.log('Use --execute only after the source snapshot SQL and service-role export RPC have been approved, deployed, and independently verified.');
   process.exit(0);
 }
 if (process.env.MIA_TRANSFER_APPROVAL !== 'APPROVE_MIA_ARCHIVE_TRANSFER_AFTER_VERIFICATION') {
@@ -66,27 +66,19 @@ function sha256(value) {
 function headers(key) {
   return { apikey:key, Authorization:`Bearer ${key}` };
 }
-async function maxPrimaryKey(table, pk) {
-  const u = new URL(`/rest/v1/${encodeURIComponent(table)}`, sourceUrl);
-  u.searchParams.set('select',pk);
-  u.searchParams.set('order',`${pk}.desc`);
-  u.searchParams.set('limit','1');
-  const r = await fetch(u,{headers:{...headers(sourceKey),'Accept-Profile':'public'}});
-  if (!r.ok) throw new Error(`Source upper-bound ${table} ${r.status}: ${await r.text()}`);
-  const rows = await r.json();
-  return rows.length ? rows[0][pk] : null;
-}
-async function readPage(table, pk, lastPk, maxPk) {
-  const u = new URL(`/rest/v1/${encodeURIComponent(table)}`, sourceUrl);
-  u.searchParams.set('select','*');
-  u.searchParams.set('order',`${pk}.asc`);
-  u.searchParams.set('limit',String(pageSize));
-  if (lastPk !== null && maxPk !== null) u.searchParams.set('and',`(${pk}.gt.${lastPk},${pk}.lte.${maxPk})`);
-  else if (lastPk !== null) u.searchParams.set(pk,`gt.${lastPk}`);
-  else if (maxPk !== null) u.searchParams.set(pk,`lte.${maxPk}`);
-  const r = await fetch(u,{headers:{...headers(sourceKey),'Accept-Profile':'public'}});
-  if (!r.ok) throw new Error(`Source ${table} ${r.status}: ${await r.text()}`);
-  return await r.json();
+async function readSnapshotPage(table, afterPk) {
+  const u = new URL('/rest/v1/rpc/mia_export_snapshot_page', sourceUrl);
+  const r = await fetch(u,{method:'POST',headers:{...headers(sourceKey),'Content-Type':'application/json'},
+    body:JSON.stringify({p_batch_id:batchId,p_table:table,p_after_pk:afterPk,p_limit:pageSize})});
+  if (!r.ok) throw new Error(`Source snapshot RPC ${table} ${r.status}: ${await r.text()}`);
+  const page = await r.json();
+  if (!page.ok || page.batch_id !== batchId || page.status !== 'frozen' || page.table !== table) {
+    throw new Error(`Source returned an invalid or unfrozen snapshot page for ${table}`);
+  }
+  if (!Array.isArray(page.records) || page.records.length !== page.page_count) {
+    throw new Error(`Source snapshot page contract mismatch for ${table}`);
+  }
+  return page;
 }
 async function send(table, pk, rows, baseOrder) {
   const mapped = rows.map((row,i) => {
@@ -138,34 +130,45 @@ async function main() {
   const expected = {};
   let all = 0;
   for (const [table,pk] of tables) {
-    const maxPk = await maxPrimaryKey(table,pk);
-    let lastPk = null, tableRows = 0;
+    let afterPk = null, tableRows = 0, declaredCount = null;
     const digestRows = [];
-    console.log(`START ${table} (keyset PK ${pk}; upper bound ${maxPk ?? 'empty'})`);
-    if (maxPk !== null) {
-      while (true) {
-        const page = await readPage(table,pk,lastPk,maxPk);
-        if (!page.length) break;
-        for (let i=0;i<page.length;i+=sendSize) {
-          const part=page.slice(i,i+sendSize);
-          for (const row of part) {
-            const clean=stripSecrets(row);
-            digestRows.push({pk:String(row[pk]),hash:sha256(clean)});
-          }
-          const result=await send(table,pk,part,tableRows);
-          tableRows+=part.length;
-          console.log(`${table}: accepted=${result.accepted}; progress=${tableRows}`);
+    console.log(`START ${table} (frozen snapshot keyset PK ${pk})`);
+    while (true) {
+      const page = await readSnapshotPage(table,afterPk);
+      if (declaredCount === null) declaredCount = page.table_count;
+      if (page.table_count !== declaredCount) throw new Error(`${table}: frozen manifest count changed between pages`);
+      const records = page.records.map(record => {
+        if (typeof record.source_pk !== 'string' || !record.payload || typeof record.payload !== 'object') {
+          throw new Error(`${table}: malformed snapshot record`);
         }
-        const nextPk=page[page.length-1][pk];
-        if (nextPk===lastPk) throw new Error(`${table}: keyset cursor did not advance`);
-        lastPk=nextPk;
-        if (page.length<pageSize) break;
+        if (String(record.payload[pk]) !== record.source_pk) {
+          throw new Error(`${table}: snapshot PK does not match payload PK field ${pk}`);
+        }
+        return record.payload;
+      });
+      for (let i=0;i<records.length;i+=sendSize) {
+        const part=records.slice(i,i+sendSize);
+        for (const row of part) {
+          const clean=stripSecrets(row);
+          digestRows.push({pk:String(row[pk]),hash:sha256(clean)});
+        }
+        const result=await send(table,pk,part,tableRows);
+        tableRows+=part.length;
+        console.log(`${table}: accepted=${result.accepted}; progress=${tableRows}/${declaredCount}`);
       }
+      if (!page.has_more) break;
+      if (!page.next_after_pk || page.next_after_pk === afterPk) {
+        throw new Error(`${table}: frozen snapshot cursor did not advance`);
+      }
+      afterPk=page.next_after_pk;
+    }
+    if (tableRows !== declaredCount) {
+      throw new Error(`${table}: frozen snapshot count mismatch; expected ${declaredCount}, read ${tableRows}`);
     }
     digestRows.sort((a,b)=>a.pk < b.pk ? -1 : a.pk > b.pk ? 1 : 0);
-    expected[table]={count:tableRows,rowset_sha256:sha256(digestRows.map(x=>x.pk+':'+x.hash)),upper_bound:maxPk===null?null:String(maxPk)};
+    expected[table]={count:tableRows,rowset_sha256:sha256(digestRows.map(x=>x.pk+':'+x.hash))};
     all+=tableRows;
-    console.log(`DONE ${table}: ${tableRows}`);
+    console.log(`DONE ${table}: ${tableRows}/${declaredCount}`);
   }
   await verifyTarget(expected);
   console.log(`ARCHIVE TRANSFER VERIFIED: ${all} rows across ${tables.length} allowlisted tables.`);
