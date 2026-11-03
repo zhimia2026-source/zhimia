@@ -9,7 +9,7 @@ Audit date: 2026-11-04
 - Target Agent: `34833ba9-2be7-4a55-9b52-62c402f759b5` (`MIA`).
 - Source Mia identity: `cb6d01b4-0e3f-46ee-8946-360aa91db1ea`.
 - Archive batch: `a14c9095-2c72-4d11-80b6-8274cd9bf43c`.
-- Target Edge Function `mia-private-import`: ACTIVE, version 1, JWT verification enabled.
+- Target Edge Function `mia-private-import`: ACTIVE, version 4, JWT verification enabled (latest deployment state; historical deployment increments below are retained as audit history).
 - Target private archive schema and tables exist; `mia_private.mia_archive_records` currently contains 0 rows.
 - Target migration batch remains `planned`; no source records have been transferred.
 - Target has one pre-created Mia identity row; normalized history tables remain empty.
@@ -113,3 +113,14 @@ Storage object bytes, source Edge Function code, environment configuration, AGNE
 - The exporter has **not** been executed. The GitHub workflow still does not pass `--execute`; archive row count remains 0 and batch status remains `planned`.
 - **Consistency limitation:** keyset paging plus a maximum-PK bound prevents later inserts from extending the scan and avoids OFFSET drift, but it is not itself a database-wide repeatable-read snapshot. Before execution, a stable source snapshot/maintenance window must be established and independently confirmed. Do not set the snapshot confirmation variable while source rows can still be updated or deleted.
 - The verifier has not been called with the service-role credential yet. A post-deploy authenticated verification smoke test is still required before the first import.
+
+
+## 2026-11-04 increment: authenticated verifier smoke workflow
+
+- Added `scripts/mia-target-verify.mjs` and `.github/workflows/mia-target-verify.yml` on the migration branch.
+- This workflow calls only `action: "verify"` on the target `mia-private-import` function. It does not contact the source project and cannot import, finalize, or activate Mia.
+- The workflow uses only the target URL and target service-role GitHub Actions secrets. It prints a sanitized summary (batch ID, number of tables, archive row count, invalid row-hash count) and never prints credentials or raw response bodies.
+- The workflow is manual (`workflow_dispatch`) and checks out `migration/mia-archive-transfer`. It has been committed but has **not** been dispatched; therefore authenticated verifier smoke-test status remains pending.
+- Before dispatch, confirm the repository Actions secrets `ZHIMA_SUPABASE_URL` and `ZHIMA_SUPABASE_SERVICE_ROLE_KEY` are configured. Then run **Actions → Mia target verifier smoke test → Run workflow** on branch `migration/mia-archive-transfer`.
+- Expected current result, if the target state is unchanged: PASS, 25 allowlisted table entries may be absent/zero depending on verifier response shape, archive rows 0, invalid row hashes 0. The workflow validates the actual response contract and reports the number of tables returned; it does not mistake an empty archive for a completed migration.
+- This is a read-only smoke test, not a migration approval. Source snapshot consistency and native runtime adaptation remain separate blockers.
