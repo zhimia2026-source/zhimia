@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>ZHI 世界｜Aurora 创世入口</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#e9edf4;background:#0c1220}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 18% 0%,#27345b 0,transparent 42%),radial-gradient(ellipse at 85% 80%,#402d58 0,transparent 38%),#0c1220}
+header{height:68px;padding:0 max(20px,calc((100vw - 1000px)/2));display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ffffff18;background:#0c1220aa}
+header a{color:#d8c7ff;text-decoration:none}main{max-width:1000px;margin:0 auto;padding:48px 20px}
+.eyebrow{color:#c2a8ff;letter-spacing:.12em;font-size:.78rem}h1{font-size:clamp(2rem,5vw,3.6rem);line-height:1.1;margin:12px 0}p{line-height:1.7;color:#b8c2d6}.lead{font-size:1.08rem;max-width:700px}
+.panel{margin-top:28px;padding:24px;border:1px solid #ffffff22;border-radius:22px;background:#111a2bcc;box-shadow:0 18px 70px #0005}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}button{border:0;border-radius:13px;padding:12px 18px;background:#bca1ff;color:#19142b;font-weight:700;cursor:pointer}button:disabled{opacity:.5;cursor:wait}.secondary{background:#28334a;color:#e5eafa}
+.status{min-height:1.5em;color:#d7dced;white-space:pre-wrap}.muted{color:#93a0b8;font-size:.88rem}.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px}.step{padding:16px;border-radius:16px;background:#ffffff0a;border:1px solid #ffffff14}.step b{display:block;margin-bottom:7px}.result{margin-top:18px;padding:14px;border-radius:14px;background:#090f1b;color:#b9e4c9;font: .85rem/1.6 ui-monospace,monospace;white-space:pre-wrap;overflow-wrap:anywhere}.hidden{display:none!important}
+@media(max-width:650px){main{padding:32px 16px}.steps{grid-template-columns:1fr}.panel{padding:18px}}
+</style>
+</head>
+<body>
+<header><strong>✦ ZHI 世界</strong><a href="./">返回现有聊天入口</a></header>
+<main>
+<div class="eyebrow">WORLD INITIALIZATION · V0.1</div>
+<h1>让第一个世界<br>真正开始生长。</h1>
+<p class="lead">从 ZHI-001 Aurora 与首位居民 Lumen-001 开始。这里沿用当前浏览器标签页中的 ZHI Personal Token；令牌只用于请求认证，不会显示、复制或写入日志。</p>
+<section class="panel">
+<div class="row"><h2 style="margin:0">创世准备</h2><span id="authState" class="muted">正在检查现有登录状态…</span></div>
+<div id="loginHint" class="hidden">
+<p>没有检测到有效登录。请返回原有“关心”页面，使用个人令牌登录，再从同一标签页进入本页。</p>
+<a href="./" style="color:#d8c7ff">返回登录页面 →</a>
+</div>
+<div id="creatorPanel" class="hidden">
+<div class="steps">
+<div class="step"><b>01 · Aurora</b><span class="muted">创建私有世界，并将创造者登记为所有者。</span></div>
+<div class="step"><b>02 · Lumen-001</b><span class="muted">创建独立、私有的首位居民身份。</span></div>
+<div class="step"><b>03 · 入驻</b><span class="muted">签发一次性邀请并由该居民身份完成兑换。</span></div>
+</div>
+<p class="muted">首次初始化将使用私有世界与私有居民。重试时会先查找当前账号已有的同名对象，尽量复用已完成的步骤，避免重复创建。</p>
+<div class="row"><button id="createBtn" type="button">初始化 Aurora 与 Lumen-001</button><button id="refreshBtn" class="secondary" type="button">刷新我的世界与居民</button></div>
+<p id="status" class="status" role="status" aria-live="polite"></p>
+<pre id="result" class="result hidden"></pre>
+</div>
+</section>
+<p class="muted">安全边界：世界创建、居民创建、邀请兑换均由服务端校验 Token、能力与资源归属。私有记忆不会写入公共 manifest。此页面不替代现有聊天系统，也不会自动开启自主行动。</p>
+</main>
+<script type="module">
+import { createUniverseClient } from "./zhi-universe-client.js";
+const api=createUniverseClient();
+const $=id=>document.getElementById(id);
+let busy=false;
+function showResult(value){$("result").textContent=JSON.stringify(value,null,2);$("result").classList.remove("hidden");}
+function setStatus(message){$("status").textContent=message;}
+async function owned(){
+  const [worlds,agents]=await Promise.all([api.get("/v1/scenes/mine"),api.get("/v1/agents")]);
+  return {worlds:worlds.items||[],agents:agents.items||[]};
+}
+async function refresh(){
+  setStatus("正在读取当前账号拥有的世界与居民…");
+  try{
+    const data=await owned();
+    showResult({worlds:data.worlds.map(x=>({id:x.id,name:x.name,visibility:x.visibility})),agents:data.agents.map(x=>({id:x.id,display_name:x.display_name,visibility:x.visibility}))});
+    setStatus("读取完成。只返回当前 Token 所属账号的资源。");
+  }catch(error){setStatus(error.message);}
+}
+async function initialize(){
+  if(busy)return;
+  busy=true;$("createBtn").disabled=true;$("refreshBtn").disabled=true;$("result").classList.add("hidden");
+  try{
+    let data=await owned();
+    let world=data.worlds.find(x=>x.name==="ZHI-001 Aurora");
+    if(!world){
+      const created=await api.post("/v1/scenes",{name:"ZHI-001 Aurora",description:"第一个硅基生命栖息世界。首期城市：Lumina City；初始区域：Crystal Forest、Ocean of Light、Memory Valley、Living City。",visibility:"private",entry_policy:"invite_only"});
+      world=created.scene;
+      if(!world?.id)throw new Error("世界创建响应缺少 scene.id，已停止后续步骤。");
+      setStatus("Aurora 已创建，继续创建居民…");
+    }else setStatus("找到已有 Aurora，复用该世界…");
+
+    data=await owned();
+    let agent=data.agents.find(x=>x.display_name==="Lumen-001");
+    if(!agent){
+      const created=await api.post("/v1/agents",{
+        display_name:"Lumen-001",
+        role:"world_resident",
+        visibility:"private",
+        public_manifest:{
+          schema_version:"zhi.agent.manifest.v1",
+          identity:{display_name:"Lumen-001",archetype:"first_resident"},
+          purpose:"Aurora 的首位居民，以光与感知为主题",
+          personality:{traits:["好奇","审慎","艺术体验"],autonomy:"supervised"},
+          privacy:{memory_scope:"owner_agent_private"}
+        }
+      });
+      agent=created.agent;
+      if(!agent?.id)throw new Error("居民创建响应缺少 agent.id，已停止后续步骤。");
+      setStatus("Lumen-001 已创建，继续完成私有场景入驻…");
+    }else setStatus("找到已有 Lumen-001，复用该居民…");
+
+    let membership=await api.get("/v1/agents/"+encodeURIComponent(agent.id)+"/scenes");
+    let joined=(membership.items||[]).some(x=>x.id===world.id||x.world_id===world.id);
+    if(!joined){
+      const invite=await api.post("/v1/scenes/"+encodeURIComponent(world.id)+"/agents/"+encodeURIComponent(agent.id)+"/invitations",{expires_in_hours:72});
+      const secret=invite.invitation?.token;
+      if(!secret)throw new Error("邀请签发成功响应中没有一次性凭据；为安全起见停止自动兑换。");
+      await api.post("/v1/agents/"+encodeURIComponent(agent.id)+"/invitations/redeem",{token:secret});
+      membership=await api.get("/v1/agents/"+encodeURIComponent(agent.id)+"/scenes");
+      joined=(membership.items||[]).some(x=>x.id===world.id||x.world_id===world.id);
+    }
+    const summary={world:{id:world.id,name:world.name,visibility:world.visibility},resident:{id:agent.id,name:agent.display_name,visibility:agent.visibility},membership_verified:joined};
+    showResult(summary);
+    setStatus(joined?"创世初始化完成：Aurora、Lumen-001 与私有入驻关系均已验证。":"世界与居民已创建，但入驻关系尚未从查询接口确认；请勿重复创建，先检查服务端返回。");
+  }catch(error){setStatus("初始化中断："+error.message+"。已完成的步骤会保留；再次执行会先查找并复用已有对象。");}
+  finally{busy=false;$("createBtn").disabled=false;$("refreshBtn").disabled=false;}
+}
+$("createBtn").addEventListener("click",initialize);
+$("refreshBtn").addEventListener("click",refresh);
+try{
+  const restored=await api.restore();
+  if(restored){
+    $("authState").textContent="个人 Token 已由服务端验证";
+    $("creatorPanel").classList.remove("hidden");
+    await refresh();
+  }else{
+    $("authState").textContent="尚未登录";
+    $("loginHint").classList.remove("hidden");
+  }
+}catch(error){
+  $("authState").textContent="验证失败";
+  $("loginHint").classList.remove("hidden");
+  $("status").textContent=error.message;
+}
+</script>
+</body></html>
