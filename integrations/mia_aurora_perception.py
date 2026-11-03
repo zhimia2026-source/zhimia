@@ -58,9 +58,9 @@ def normalize_events(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     result.sort(key=lambda e: _time(e["occurred_at"]))
     return result
 
-def build_cognition_input(response: dict[str, Any]) -> dict[str, Any]:
+def build_cognition_input(response: dict[str, Any], expected_agent_id: str = MIA_AGENT_ID, expected_world_id: str = AURORA_WORLD_ID) -> dict[str, Any]:
     agent, world = response.get("agent") or {}, response.get("world") or {}
-    if agent.get("id") != MIA_AGENT_ID or world.get("id") != AURORA_WORLD_ID:
+    if agent.get("id") != expected_agent_id or world.get("id") != expected_world_id:
         raise AuroraPerceptionError("agent_or_world_identity_mismatch")
     feedback = response.get("environment_feedback")
     if not isinstance(feedback, dict): raise AuroraPerceptionError("missing_environment_feedback")
@@ -118,7 +118,7 @@ class AuroraPerceptionClient:
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise AuroraPerceptionError("invalid_perception_response") from exc
         if not isinstance(response, dict): raise AuroraPerceptionError("invalid_perception_response")
-        return build_cognition_input(response)
+        return build_cognition_input(response, self.config.agent_id, self.config.world_id)
 
     def fetch_prompt(self):
         return build_cognition_prompt(self.fetch())
