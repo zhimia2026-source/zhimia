@@ -182,13 +182,23 @@ Supabase PostgreSQL
 
 创造者继续使用现有 ZHI Personal Token 登录，不要求改用邮箱/密码，也不要求手工提供 Supabase Auth UID。
 
-**线上核查已确认：** 当前部署的 `zhi-community` 已实现个人 Token 认证。服务端读取 Bearer Token、计算 SHA-256、查询 `zhi_personal_access_tokens`、校验过期/撤销状态，并通过条件更新确认 Token 仍有效；随后从令牌记录派生 `actor.userId` 和 `actor.capabilities`。请求体中的 owner 字段不会成为认证身份来源。
+**线上核查与实施结果：** 当前 `zhi-community` 使用个人 Token 认证：服务端计算 SHA-256、查询令牌哈希、检查有效期和撤销状态，并从令牌记录派生 `actor.userId` 与 `actor.capabilities`。
 
-已将线上 `zhi-community` 的 7 个源文件备份到 GitHub 的 `supabase/functions/zhi-community/`，并新增 `auth_helpers_test.ts`。本次仅做源码备份和单元测试文件建设，没有重新部署线上函数。
+经创造者明确授权，已为唯一活动个人 Token 增加以下权限，同时保留原有健康顾问权限和原有效期：
+- `community.scene.create`
+- `community.scene.discover`
+- `community.scene.enter`
+- `community.scene.invite`
+- `community.agent.create`
+- `community.message.read`
+- `community.message.send`
+- `agent.memory.read`
 
-**权限差异：** 当前活动 Token 的元数据检查只看到健康顾问相关能力，没有社区发现、进入、消息等能力。因此认证成功不等于拥有社区操作权。另发现 `POST /v1/scenes` 和 `POST /v1/agents` 创建路由尚未要求专门的创建 capability；对外开放前必须补上最小权限门禁，并建立由创造者控制的授权/签发流程。不得静默扩大现有个人 Token 权限。
+数据库能力白名单已通过迁移 `20261103035119_allow_community_agent_create_capability` 扩展。迁移文件已提交 GitHub。
 
-详细结论与验收矩阵见 `docs/COMMUNITY_TOKEN_AUTH_AUDIT.md`。
+**创建权限门禁已部署：** `zhi-community` 当前为版本 3。创建世界必须具有 `community.scene.create`，创建智能人必须具有 `community.agent.create`；缺少能力时返回 403。身份仍只从 Token 数据库记录派生。
+
+已备份线上服务的全部 7 个运行时源文件，并加入 Token helper 测试。真实 Token 的认证 HTTP 端到端测试尚未完成；没有读取、请求或记录 Token 明文。详细结果见 `docs/COMMUNITY_TOKEN_AUTH_AUDIT.md`。
 
 ## 10. 状态声明
 
