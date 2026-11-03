@@ -143,3 +143,14 @@ Storage object bytes, source Edge Function code, environment configuration, AGNE
 - It has not been executed. No source database schema or rows were changed.
 - The private schema is not intended for browser access. A service-role-only export path must be designed before adapting the exporter to read these records.
 - Validate the script on a disposable clone, inspect sanitized sample payloads, and verify rollback before source deployment. Snapshot retention and cleanup require a separate review.
+
+
+
+## Frozen snapshot export channel draft
+
+- Added `ops/sql/mia-source-snapshot-export-rpc.sql` as a review-only, read-only PostgREST RPC for the source snapshot.
+- The RPC is `SECURITY INVOKER`, accepts only the fixed migration batch, checks both the active Postgres role and signed JWT role for `service_role`, requires a frozen batch, and uses the frozen manifest as the table allowlist.
+- It returns bounded keyset pages (maximum 500 rows) from `mia_transfer_private.snapshot_records`; it does not expose the private tables as REST resources. Function execution is revoked from `PUBLIC`, `anon`, and `authenticated`, and granted only to `service_role`.
+- Updated `scripts/mia-clone-transfer.mjs` to read only through this frozen-snapshot RPC. It no longer reads live source tables or computes live-table upper bounds. It checks the frozen manifest count for every table before proceeding to target verification.
+- These are repository changes only. Neither source SQL draft has been executed, no source schema was changed, and no source/target archive rows were transferred.
+- Before source deployment: validate both SQL files on a disposable clone; verify the Data API exposes the function but not the private tables; test anon/authenticated denial and service-role paging; compare snapshot counts and digests; test rollback and retention. Current Supabase Data API defaults require explicit function/table grants to be reviewed rather than assuming new objects are automatically exposed.
