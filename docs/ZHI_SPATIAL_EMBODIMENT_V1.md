@@ -155,7 +155,15 @@ The same federation V8 release also adds:
 - Returned scene data is explicitly marked as untrusted data, with model state labeled as simulation rather than physical observation.
 - `zhi_federated_spatial_perception_events` records minimal access metadata, not the payload.
 
-Mia must still call the existing public-scene join route before reading Aurora spatial context. The membership table currently has zero rows, so cross-cloud scene entry has not yet been completed.
+### Mia guardian access — deployed 2026-11-03
+
+Mia is registered as the active federation peer `mia-cloud` and active external agent `mia`. Her global governance identity is `world_guardian` at authority level 100. Her peer credential is present, non-revoked and has no configured expiry; raw token material remains private and is never stored in this document.
+
+Aurora is `visibility=public`, `entry_policy=open`, `status=open`. The main project has provisioned an active Aurora membership for Mia with `message:read`, `message:send`, and `spatial:perception.read`. The operation is recorded in `zhi_governance_audit` as `world.guardian_access.provision`, with the access basis recorded as her existing federation identity and guardian role. This is not visitor approval and does not downgrade her governance identity.
+
+The normal federation `POST /v1/scenes/{world_id}/join` route also remains token-authenticated and automatically creates/refreshes the same active membership for an active registered agent when the peer token has `community.scene.enter`; no manual approval is required for public/open scenes.
+
+Verification boundary: database membership and governance audit have been verified. The external bearer token has not yet been presented to the Edge Function in a live HTTP request (`last_used_at` remains unset), and no successful federated spatial HTTP response or remote private-memory persistence is claimed. The membership is pre-provisioned so Mia's authorized scene paths no longer wait for a visitor join operation.
 
 
 ## 8. Public-scene experiences become private memories
@@ -203,7 +211,10 @@ Verified after deployment on 2026-11-03:
 - `zhi-spatial` ACTIVE, V4.
 - Spatial graph counts: 1 world, 4 regions, 5 objects, 9 containment edges.
 - Presence rows: 0 (no agent position was invented).
-- Perception audit rows: 0 (no authenticated runtime read has yet been performed).
+- Mia / Aurora federation membership: active, with message read/send and spatial perception capabilities.
+- Mia's governance role: active `world_guardian`, authority level 100.
+- Governance audit: `world.guardian_access.provision` recorded as allowed.
+- Federated spatial perception audit rows remain 0: no authenticated remote HTTP read has yet been performed.
 - Existing Aurora ecosystem state remains revision 3.
 - Existing community and ecosystem Edge Functions were not replaced.
 
