@@ -25,3 +25,34 @@ Deno.test("memory candidates reject unknown fields and invalid importance", () =
     if (!rejected) throw new Error("invalid memory candidate was accepted");
   }
 });
+
+
+import { normalizeAgentReflection } from "./memory_experience_helpers.ts";
+
+Deno.test("agent reflection is internally curated without creator review", () => {
+  const value = normalizeAgentReflection({
+    worth_remembering: true,
+    observed_facts: ["用户明确希望智能人自主成长"],
+    hypotheses: ["用户不希望承担逐条审核"],
+    unknowns: ["长期偏好仍需后续互动验证"],
+    reflection: "我应当主动整理有持续价值的经历，并保留证据边界。",
+    importance: 4,
+  });
+  if (!value || value.importance !== 4 || value.experience_type !== "reflection") {
+    throw new Error("valid autonomous reflection was not normalized");
+  }
+});
+
+Deno.test("agent reflection skips low-value and malformed outputs", () => {
+  const low = normalizeAgentReflection({
+    worth_remembering: false, observed_facts: [], hypotheses: [], unknowns: [],
+    reflection: "本轮只是简单问候。", importance: 1,
+  });
+  const invalid = normalizeAgentReflection({
+    worth_remembering: true, observed_facts: ["x"], reflection: "x",
+    importance: 4, tool_execute: true,
+  });
+  if (!low || low.importance !== 1 || invalid !== null) {
+    throw new Error("reflection curation policy did not fail closed");
+  }
+});
