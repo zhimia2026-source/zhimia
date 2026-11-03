@@ -31,7 +31,7 @@ async function sha256(value:string):Promise<string>{
   return [...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,"0")).join("");
 }
 async function authenticate(db:SupabaseClient,req:Request):Promise<Actor|null>{
-  const token=req.headers.get("authorization")?.match(/^Bearer\\s+([^\\s]+)$/i)?.[1];
+  const token=req.headers.get("authorization")?.match(/^Bearer\s+([^\s]+)$/i)?.[1];
   if(!token || token.length>4096) return null;
   const {data,error}=await db.from("zhi_personal_access_tokens")
     .select("id,user_id,expires_at,revoked_at,capabilities")
@@ -108,7 +108,7 @@ Deno.serve(async(req:Request)=>{
       if(nodesError||edgesError||ecosystemError||presenceError) throw new Error("database_error");
       const visibleNodes=(nodes??[]).filter(n=>n.visibility==="public" || (n.owner_agent_id===agentId && n.owner_user_id===actor.userId));
       const visibleIds=new Set(visibleNodes.map(n=>n.id));
-      const visibleEdges=(edges??[]).filter(e=>visibleIds.has(e.from_node_id)&&visibleIds.has(e.to_node_id));
+      const visibleEdges=(edges??[]).filter(e=>visibleIds.has(e.from_node_id)&&visibleIds.has(e.to_node_id)&&["inherit","open"].includes(e.access_policy));
       const state=ecosystem?.state && typeof ecosystem.state==="object"?ecosystem.state:{};
       const unknowns=visibleNodes.filter(n=>n.observability==="unknown" || n.observability==="unobserved" || n.coordinate===null)
         .map(n=>({node_id:n.id,stable_key:n.stable_key,name:n.name,reason:n.coordinate===null?"coordinate_unavailable":n.observability}));
@@ -181,9 +181,10 @@ Deno.serve(async(req:Request)=>{
       const provenance=String(body.provenance??(status==="observed"?"direct_observation":status==="inferred"?"modeled_inference":"unobserved"));
       if(!["direct_observation","agent_report","database_anchor","modeled_inference","unobserved"].includes(provenance))
         return reply({error:"invalid_provenance"},400);
-      const lastConfirmedAt=status==="observed"||status==="inferred"?new Date().toISOString():null;
-      const {data:priorPresence,error:priorError}=await db.from("zhi_spatial_presence").select("revision").eq("agent_id",agentId).eq("owner_user_id",actor.userId).eq("world_id",worldId).maybeSingle();
+      const {data:priorPresence,error:priorError}=await db.from("zhi_spatial_presence").select("revision,last_confirmed_at").eq("agent_id",agentId).eq("owner_user_id",actor.userId).eq("world_id",worldId).maybeSingle();
       if(priorError) throw new Error("database_error");
+      if((status==="position_unobserved"||status==="unknown")&&(currentId!==null||coordinate!==null)) return reply({error:"unobserved_position_cannot_claim_location"},400);
+      const lastConfirmedAt=status==="observed"?new Date().toISOString():(priorPresence?.last_confirmed_at??null);
       const {data:updated,error}=await db.from("zhi_spatial_presence").upsert({
         agent_id:agentId,owner_user_id:actor.userId,world_id:worldId,
         anchor_node_id:anchorId,current_node_id:currentId,position_status:status,
