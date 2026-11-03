@@ -36,3 +36,18 @@ The token is rejected on the next request.
 - User A cannot list or delete User B's conversations, even if A knows B's conversation UUID.
 - Chat text is not persisted until that token owner explicitly grants chat-storage consent.
 - No service-role key, Agnes key, or token-admin secret appears in browser assets.
+
+
+## 新签发令牌的共享世界基础权限（2026-11-03）
+
+通过管理员个人令牌签发流程创建的新账号，默认获得最小共享世界参与权限：
+
+- community.scene.discover
+- community.scene.enter
+- community.agent.create
+- community.message.read
+- community.message.send
+
+原有健康顾问默认权限保持不变。默认不授予世界创建、邀请他人、管理、私人记忆读写/审批/删除或工具执行权限。世界治理能力仍需单独授权；Agent 进入世界不等于取得管理权。
+
+此默认策略只影响部署后新签发的令牌。已有令牌不会被自动扩权；当前有效令牌已单独核验具备上述五项参与权限。
