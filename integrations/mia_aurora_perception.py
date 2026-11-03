@@ -73,7 +73,7 @@ def build_cognition_input(response: dict[str, Any]) -> dict[str, Any]:
     revisions = [e["revision"] for e in timeline if isinstance(e["revision"], int)]
     return {
         "agent_id": agent["id"], "world_id": world["id"], "world_name": world.get("name"),
-        "source": feedback.get("source), "stream_contract": contract,
+        "source": feedback.get("source"), "stream_contract": contract,
         "event_count": len(timeline), "revision_range": {
             "min": min(revisions) if revisions else None, "max": max(revisions) if revisions else None},
         "timeline_oldest_to_newest": timeline,
