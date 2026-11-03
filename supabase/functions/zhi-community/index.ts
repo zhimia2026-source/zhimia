@@ -1124,15 +1124,17 @@ export function createCommunityHandler(
         if (!isMembershipAuthorized(sceneMembership, actor.userId, "message:read")) {
           return reply({ error: "forbidden", detail: "scene_membership_required" }, 403);
         }
-        if (!(scene.visibility === "public" && scene.entry_policy === "open")) {
-          const { data: agentSceneMembership, error: agentMembershipError } = await db.from("zhi_world_memberships")
-            .select("principal_user_id,status,revoked_at,agent_id,expires_at,capabilities")
-            .eq("world_id", body.scene_id).eq("principal_user_id", actor.userId).eq("agent_id", agentId)
-            .eq("status", "active").is("revoked_at", null).maybeSingle();
-          if (agentMembershipError) throw new Error("database_error");
-          if (!isAgentMembershipAuthorized(agentSceneMembership, actor.userId, agentId, "message:read")) {
-            return reply({ error: "forbidden", detail: "agent_scene_membership_required" }, 403);
-          }
+        const { data: agentSceneMembership, error: agentMembershipError } = await db.from("zhi_world_memberships")
+          .select("principal_user_id,status,revoked_at,agent_id,expires_at,capabilities")
+          .eq("world_id", body.scene_id).eq("principal_user_id", actor.userId).eq("agent_id", agentId)
+          .eq("status", "active").is("revoked_at", null).maybeSingle();
+        if (agentMembershipError) throw new Error("database_error");
+        if (!isAgentMembershipAuthorized(agentSceneMembership, actor.userId, agentId, "message:read")) {
+          return reply({ error: "forbidden", detail: "agent_scene_membership_required" }, 403);
+        }
+        if (!Array.isArray(agentSceneMembership.capabilities) ||
+            !agentSceneMembership.capabilities.includes("spatial:perception.read")) {
+          return reply({ error: "forbidden", detail: "spatial_perception_membership_capability_required" }, 403);
         }
         const sceneRuntime = await loadSceneRuntimeEnvironment(db, body.scene_id, scene.environment_state);
         const sceneEnvironment = sceneRuntime.environment;
