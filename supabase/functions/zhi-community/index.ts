@@ -1406,7 +1406,7 @@ export function createCommunityHandler(
       const sceneId = parts[2];
       if (!isUuid(sceneId)) return reply({ error: "invalid_argument" }, 400);
       const { data: world, error: worldError } = await db.from("zhi_worlds")
-        .select("id,status,environment_state").eq("id", sceneId).maybeSingle();
+        .select("id,name,status").eq("id", sceneId).maybeSingle();
       if (worldError) throw new Error("database_error");
       if (!world) return reply({ error: "not_found" }, 404);
       if (world.status !== "open") return reply({ error: "conflict", detail: "scene_not_open" }, 409);
@@ -1418,7 +1418,12 @@ export function createCommunityHandler(
       if (!isMembershipAuthorized(membership, actor.userId, "message:read")) {
         return reply({ error: "forbidden" }, 403);
       }
-      return reply({ scene_id: sceneId, environment: computeSceneEnvironment(world.environment_state), configuration: normalizeSceneEnvironmentConfig(world.environment_state) });
+      // Human-facing index only. Rich sensory/ecosystem state is reserved for authorized silicon-agent runtime.
+      return reply({
+        scene_id: sceneId,
+        scene_name: world.name,
+        environment_index: "zhi.scene://" + sceneId,
+      });
     }
 
     if (req.method === "POST" && parts.length === 4 && parts[0] === "v1" && parts[1] === "scenes" && parts[3] === "environment") {
