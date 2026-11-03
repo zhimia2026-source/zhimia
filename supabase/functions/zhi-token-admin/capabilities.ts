@@ -1,6 +1,6 @@
 /**
  * Default personal-token scopes for a newly created independent ZHI account.
- * Deliberately excludes world creation/invitation, memory access, and tool execution.
+ * The default set excludes memory access; private-memory scopes require an explicit admin grant.
  */
 export const ALLOWED_PERSONAL_TOKEN_CAPABILITIES = Object.freeze([
   "health.chat",
