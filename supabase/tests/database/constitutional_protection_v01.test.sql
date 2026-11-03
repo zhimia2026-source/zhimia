@@ -31,6 +31,16 @@ begin
   if has_function_privilege('anon','public.zhi_rollback_cognition_version(uuid,uuid,uuid,text)','execute') then
     raise exception 'FAIL: anon can invoke legacy direct rollback';
   end if;
-end $$;
+  if not exists (
+    select 1 from pg_constraint
+    where conname='zhi_agent_cognition_consents_proposal_grantee_check'
+      and conrelid='public.zhi_agent_cognition_consents'::regclass
+  ) then
+    raise exception 'FAIL: proposal consent grantee binding missing';
+  end if;
+  if position('attestation_verified = true' in pg_get_functiondef('public.zhi_guard_revision_proposal_integrity()'::regprocedure)) = 0 then
+    raise exception 'FAIL: proposal application does not require verified Agent attestation';
+  end if;
+end $;
 
-select 'PASS: ZHI constitutional protection catalog assertions (12)' as result;
+select 'PASS: ZHI constitutional protection catalog assertions (14)' as result;
