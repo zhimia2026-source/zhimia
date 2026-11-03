@@ -160,6 +160,28 @@ export function buildSceneAwarenessContext(
     const item = record(value);
     return { label: boundedText(item.label, 120), type: boundedText(item.type, 80) };
   }) : [];
+  const feedback = record(environment.environment_feedback);
+  const feedbackEvents = Array.isArray(feedback.events) ? feedback.events.slice(0, 12).map((value) => {
+    const item = record(value);
+    const payload = Object.fromEntries(Object.entries(record(item.payload)).slice(0, 24).map(([key, entry]) => [
+      boundedText(key, 80),
+      typeof entry === "string" ? boundedText(entry, 160)
+        : typeof entry === "number" && Number.isFinite(entry) ? entry
+        : typeof entry === "boolean" || entry === null ? entry
+        : boundedJson(entry, 240),
+    ]));
+    return {
+      id: boundedText(item.id, 80),
+      state_revision: Number.isInteger(item.state_revision) ? item.state_revision : null,
+      event_kind: boundedText(item.event_kind, 100),
+      source_kind: boundedText(item.source_kind, 80),
+      occurred_at: boundedText(item.occurred_at, 80),
+      payload,
+      causal_chain: Array.isArray(item.causal_chain)
+        ? item.causal_chain.slice(0, 12).map((step) => boundedText(step, 120)).filter(Boolean)
+        : [],
+    };
+  }) : [];
   const objects = Array.isArray(environment.objects) ? environment.objects.slice(0, 40).map((value) => {
     const item = record(value);
     return {
@@ -221,6 +243,13 @@ export function buildSceneAwarenessContext(
     },
     atmosphere_tags: boundedList(environment.atmosphere_tags, 20),
     active_events: events,
+    environment_feedback: {
+      source: boundedText(feedback.source, 80),
+      world_id: boundedText(feedback.world_id, 80),
+      state_revision: Number.isInteger(feedback.state_revision) ? feedback.state_revision : null,
+      world_time: boundedText(feedback.world_time, 80),
+      events: feedbackEvents,
+    },
     objects,
     behavior_tendencies: cues,
     suggested_actions: deriveSceneActionProposals(environment),
