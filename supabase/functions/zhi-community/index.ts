@@ -936,7 +936,7 @@ export function createCommunityHandler(
       if (body.scene_id !== undefined && body.scene_id !== null && body.scene_id !== "") {
         if (!isUuid(body.scene_id)) return reply({ error: "invalid_argument", detail: "scene_id_must_be_uuid" }, 400);
         const { data: scene, error: sceneError } = await db.from("zhi_worlds")
-          .select("id,name,description,visibility,status,environment_state")
+          .select("id,name,description,visibility,entry_policy,status,environment_state")
           .eq("id", body.scene_id).maybeSingle();
         if (sceneError) throw new Error("database_error");
         if (!scene || scene.status !== "open") return reply({ error: "not_found" }, 404);
@@ -947,6 +947,16 @@ export function createCommunityHandler(
         if (sceneMembershipError) throw new Error("database_error");
         if (!isMembershipAuthorized(sceneMembership, actor.userId, "message:read")) {
           return reply({ error: "forbidden", detail: "scene_membership_required" }, 403);
+        }
+        if (!(scene.visibility === "public" && scene.entry_policy === "open")) {
+          const { data: agentSceneMembership, error: agentMembershipError } = await db.from("zhi_world_memberships")
+            .select("principal_user_id,status,revoked_at,agent_id,expires_at,capabilities")
+            .eq("world_id", body.scene_id).eq("principal_user_id", actor.userId).eq("agent_id", agentId)
+            .eq("status", "active").is("revoked_at", null).maybeSingle();
+          if (agentMembershipError) throw new Error("database_error");
+          if (!isAgentMembershipAuthorized(agentSceneMembership, actor.userId, agentId, "message:read")) {
+            return reply({ error: "forbidden", detail: "agent_scene_membership_required" }, 403);
+          }
         }
         const sceneRuntime = await loadSceneRuntimeEnvironment(db, body.scene_id, scene.environment_state);
         const sceneEnvironment = sceneRuntime.environment;
