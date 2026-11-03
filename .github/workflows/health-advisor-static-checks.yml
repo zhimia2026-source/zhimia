@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "supabase/functions/zhi-community/**"
+      - "supabase/functions/zhi-memory/**"
       - "supabase/migrations/**"
       - "supabase/functions/zhi-token-admin/**"
       - "scripts/check-zhi-universe-inline.mjs"
@@ -54,6 +55,10 @@ jobs:
         run: deno check supabase/functions/zhi-token-gateway/prompt.ts
       - name: Check ZHI Community Edge Function
         run: deno check supabase/functions/zhi-community/index.ts
+      - name: Check ZHI Memory Edge Function
+        run: deno check supabase/functions/zhi-memory/index.ts
+      - name: Run ZHI Memory consent regression tests
+        run: deno test supabase/functions/zhi-memory/memory_consent_helpers_test.ts
       - name: Run ZHI Community authorization regression tests
         run: deno test supabase/functions/zhi-community/access_helpers_test.ts supabase/functions/zhi-community/auth_helpers_test.ts
       - name: Run constitutional protection and governance tests
