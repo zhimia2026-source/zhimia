@@ -49,7 +49,7 @@ Deno.test("risk intervention fails closed without persisted audit and review dea
 
 Deno.test("major decisions can only produce proposals", () => {
   const auth = { ...baseAuth, category: "major_decisions" as const, action: "world.policy.amend",
-    decision_mode: "proposal_only" as const };
+    decision_mode: "proposal_only" as const, target_id: "charter" };
   const result = decideGovernanceAuthorization(auth, {
     actor_agent_id: "mia-agent", world_id: "aurora-001", category: "major_decisions",
     action: "world.policy.amend", target_id: "charter",
