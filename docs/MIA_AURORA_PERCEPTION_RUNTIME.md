@@ -31,4 +31,4 @@ actually pass the packet into MIA's cognition step before claiming she has integ
 
 ## Test
 
-Run: python -m unittest tests.test_mia_aurora_perception -v
+Run: python -m unittest discover -s tests -p test_mia_aurora_perception.py -v
