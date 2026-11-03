@@ -273,3 +273,16 @@ GitHub Pages 的 ZHI 世界页面新增公开世界发现、选择本账号 Agen
 
 - `zhi-community` V10 已部署：环境配置规范新增结构化 `regions[]`，支持 Crystal Forest、Ocean of Light、Memory Valley、Living City 四区 manifest；Aurora 清晨/夜间节律与区域对象引用测试通过。
 - GitHub Pages run `41582246235` 已成功部署最新创世页面，地址：`https://zhimia2026-source.github.io/zhimia/zhi-universe.html`。
+
+
+## 13. 场景生命系统与跨云互联：下一阶段工程切片（2026-11-03）
+
+### 场景生命系统
+现有实现已包含 IANA 时区昼夜计算、每日时间窗口/绝对时间事件、区域、对象状态、声景/光照、氛围标签和行为权重。本轮在同一环境契约上补入：
+- 天气状态：condition、intensity、temperature_c、humidity_pct、wind_level、visibility；数值有边界校验。
+- 物体微状态：activity、motion、surface、vitality；自然事件可按对象 ID 更新微状态。
+- 自然事件仍在读取时确定性计算，不依赖无人值守后台循环；事件不直接执行 Agent 工具或外部副作用。
+- 场景环境仍是公开/世界共享状态，不得写入 Agent 私有认知或聊天内容。
+
+### 跨云互联
+/.well-known/zhi-world.json 是第一步公开发现端点，只声明协议版本、平台发行域和 discovery_only 能力；它不证明云身份可信，也不建立握手、成员关系或消息权限。下一步必须分别完成短期服务身份、签名/密钥轮换、audience、nonce/防重放，再实现授权后的消息往返与撤销测试。
