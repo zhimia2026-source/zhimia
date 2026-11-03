@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zhi.world/schemas/agent-runtime-binding-v1.schema.json",
+  "title": "ZHI Agent Runtime Binding and World Join Consent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "agent_id",
+    "runtime_id",
+    "key_id",
+    "challenge_id",
+    "nonce",
+    "issued_at",
+    "expires_at",
+    "signature",
+    "world_join_consent"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "zhi.agent.runtime-binding.v1"
+    },
+    "agent_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "runtime_id": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 160
+    },
+    "key_id": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 160
+    },
+    "challenge_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "nonce": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{32,128}$"
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alg", "protected", "value"],
+      "properties": {
+        "alg": {
+          "const": "EdDSA"
+        },
+        "protected": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "value": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "maxLength": 4096
+        }
+      }
+    },
+    "world_join_consent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "world_id",
+        "policy_version",
+        "terms_sha256",
+        "consent_event_id",
+        "accepted_at",
+        "scopes"
+      ],
+      "properties": {
+        "world_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "policy_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "terms_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "consent_event_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "accepted_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "scopes": {
+          "type": "array",
+          "uniqueItems": true,
+          "minItems": 1,
+          "items": {
+            "enum": ["world.join", "biogenesis.submit"]
+          }
+        }
+      }
+    }
+  }
+}
