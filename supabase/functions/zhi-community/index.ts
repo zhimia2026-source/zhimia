@@ -641,6 +641,21 @@ export function createCommunityHandler(
       return reply({ items: data ?? [] });
     }
 
+    if (req.method === "GET" && parts.length === 3 && parts[0] === "v1" && parts[1] === "scenes") {
+      if (!hasCapability(actor, "community.scene.discover")) {
+        return reply({ error: "forbidden", detail: "capability_required" }, 403);
+      }
+      const worldId = parts[2];
+      if (!isUuid(worldId)) return reply({ error: "invalid_argument", detail: "world_id_must_be_uuid" }, 400);
+      const { data: world, error } = await db.from("zhi_worlds")
+        .select("id,name,description,visibility,entry_policy,status,rules_version,environment_state,created_at")
+        .eq("id", worldId).eq("visibility", "public").eq("entry_policy", "open")
+        .eq("status", "open").maybeSingle();
+      if (error) throw new Error("database_error");
+      if (!world) return reply({ error: "not_found" }, 404);
+      return reply({ world });
+    }
+
     if (req.method === "GET" && path === "/v1/scenes/mine") {
       const { data: memberships, error: membershipError } = await db.from("zhi_world_memberships")
         .select("world_id,membership_role,capabilities,expires_at")
