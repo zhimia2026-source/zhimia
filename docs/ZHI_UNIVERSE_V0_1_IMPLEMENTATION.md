@@ -178,9 +178,22 @@ Supabase PostgreSQL
 - [ ] 学习、创造、文化作品与文明事件。
 - [ ] 受控定时模拟与资源预算。
 
-## 9. 需要创造者提供的唯一部署参数
+## 9. 创造者身份：沿用 ZHI Personal Token 登录
 
-初始化第一座世界和 Lumen 时，必须使用真实登录账号的 Supabase Auth user UUID 作为 owner/creator。不能猜测、不能写死到仓库，也不能使用 service-role 绕过归属规则。部署执行前从已认证会话取得该 UUID；若当前连接不能读取登录会话，则由创造者在受保护的控制台确认身份后执行。
+创造者使用现有 ZHI Personal Token 登录，不要求改用邮箱/密码，也不要求手工提供 Supabase Auth UID。
+
+仓库中的 `docs/PERSONAL_TOKEN_AUTH.md` 已定义个人令牌方案：随机 256-bit token（`zhi_live_` 前缀），数据库只保存 SHA-256 哈希；服务端逐次校验有效期/撤销状态，并从令牌记录的 `user_id` 派生身份；浏览器不允许提交或覆盖 user_id。
+
+但当前已检查的 `zhi-token-gateway` 是健康顾问专用网关，其 `identify()` 认证流程尚不能直接证明 `zhi-community` 已接入同一令牌认证。下一步必须在 `zhi-community` 的服务端认证入口复用/抽取同一 token 校验逻辑，或建立经过审计的共享认证 helper。禁止把 token 明文写入日志/GitHub，禁止接受请求体中的 owner_user_id/creator_user_id 作为可信身份。
+
+目标流程：
+1. 客户端携带现有个人 Token 调用受保护的 ZHI API。
+2. 服务端计算 SHA-256 并查询 `zhi_personal_access_tokens`，校验未撤销且未过期。
+3. 服务端从令牌行取得 `user_id`，作为唯一 actor/creator 身份。
+4. 所有世界创建、Agent 创建和成员授权都使用这个服务端派生的 user_id。
+5. 令牌无效/过期/撤销时返回 401；有效但缺少 capability 时返回 403。
+
+在完成并测试 `zhi-community` 的 Token 认证接入前，不执行真实世界/居民创建。
 
 ## 10. 状态声明
 
