@@ -47,7 +47,7 @@ Supabase：项目 `lvxmygrgqtmzqgailmyl`，区域 `ap-southeast-1`，状态为 A
 - `zhi-memory`：私有微体验创建、读取、审核和删除 API。
 - 其他现有函数（健康顾问、令牌网关、Care）保持独立，不因 Universe 建设而覆盖。
 
-重要限制：当前数据库对象存在且 RLS 已启用，不等于每条 API 路径都已完成安全验收。对关键表的 `pg_policies` 查询没有返回策略记录；服务端 Edge Function 使用受保护的服务端凭据并自行校验所有者/能力。上线前必须对函数路由、服务端校验、Data API 暴露面和跨用户拒绝行为进行专项验证，不能仅凭 RLS enabled 标记宣称安全。
+重要限制与核查结果：Supabase Security Advisor 对 18 张表报告 RLS enabled but no policy。对核心世界/Agent/记忆表抽查 `information_schema.role_table_grants`，只发现 `service_role` 与 `postgres` 权限，未发现 `anon` 或 `authenticated` 直接表权限；这与服务端专用访问设计一致，RLS 无策略在此模式下属于默认拒绝，而不是自动的数据泄露证据。`zhi-community` 与 `zhi-memory` 使用服务端凭据，并在函数内执行 token、owner、capability 和 membership 检查。仍须在发布前验证 Data API 暴露设置、所有函数路由和跨用户拒绝行为。Security Advisor 另提示 Auth 泄露密码保护未启用，建议在 Dashboard 开启。Performance Advisor 报告 22 个未覆盖索引的外键；当前相关业务表数据量很低，先按实际查询计划评估，不批量盲目建索引。
 
 ## 3. 目标架构
 
