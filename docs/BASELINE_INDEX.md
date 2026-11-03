@@ -37,3 +37,5 @@
 - 目前标准接口和跨云互联文件属于设计基线；在实际实现和验证前，不得描述为已部署能力。
 
 14. [生态事件来源类型修复迁移](../supabase/migrations/20261103074050_extend_ecosystem_event_source_kinds.sql) — 对齐事件生产端、事件表约束与原子提交 RPC 的合法来源类型。
+
+15. [生态引擎线上 E2E 验收脚本](../scripts/verify-zhi-ecosystem-e2e.sh) — 本地安全调用 Edge Function，检查真实状态提交与相同目标时间幂等重试。
