@@ -243,3 +243,30 @@ V0.3.1 已修正：
 - Edge Function 仍保持 `verify_jwt=true` 和 service_role-only 调用检查；部署版本升至 5。
 
 该修正已部署，但尚未通过线上 HTTP tick 写入 Aurora；因此 Aurora 当前仍保持 revision 1 和初始化状态。只有真实 tick 成功后，才应观察到上述状态字段更新。
+
+
+## 14. 受控线上 E2E 验收入口（已提交脚本，尚未执行）
+
+新增脚本：`scripts/verify-zhi-ecosystem-e2e.sh`。
+
+脚本行为：
+1. 仅从本地环境变量读取 `SUPABASE_SERVICE_ROLE_KEY`，关闭 shell trace，不打印密钥。
+2. 读取 Aurora 当前 revision、world_time、状态、事件和快照数量。
+3. 固定一个 UTC `target_time`，最多分段追赶 32 次，每次不超过 168 小时。
+4. 通过真实 HTTPS Edge Function endpoint 调用 `zhi-ecosystem-engine`，不直接写生态状态表。
+5. 检查 Revision 增加、engine_version 0.3.1、simulation/soil/hydrology/flora 状态、模型天气来源、对象生命周期标记、事件来源白名单与因果链。
+6. 对相同 target_time 再调用一次，要求 `advanced=false`，且 Revision、事件数、快照数不变。
+
+本地运行（Linux / Git Bash，需 curl、jq）：
+```bash
+export SUPABASE_SERVICE_ROLE_KEY='在本地安全终端设置，不要粘贴到聊天或提交到仓库'
+bash scripts/verify-zhi-ecosystem-e2e.sh
+```
+
+可选环境变量：`SUPABASE_URL`、`WORLD_ID`、`MAX_CATCHUP_CALLS`。脚本默认只针对 Aurora。若脚本失败，应保留错误响应和当前数据库状态，先修复再重试；不要手工修改 revision 或直接写入生态状态。
+
+部署调度前置条件复核：
+- `supabase_vault` 已安装，但当前 Vault secrets 列表为空。
+- `pg_net` 与 `pg_cron` 当前未安装（仅存在于扩展目录）。
+- 因此自动调度继续关闭；不能在没有受控服务端密钥的情况下配置定时 HTTP 调用。
+- 脚本提交不代表脚本已在生产环境执行；Aurora 的线上 E2E 状态仍为待执行。
