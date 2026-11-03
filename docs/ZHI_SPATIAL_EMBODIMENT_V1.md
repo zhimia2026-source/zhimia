@@ -1,6 +1,6 @@
 # ZHI Spatial Embodiment V1
 
-Status: Phase 1 deployed; API ACTIVE (V2)
+Status: Phase 1 deployed; API ACTIVE (V4)
 Project: `ZHIMIA` (`lvxmygrgqtmzqgailmyl`)
 API: `zhi-spatial`
 Related runtime: `zhi-community` V29, `zhi-ecosystem-engine` V6, `zhi-memory` V7
@@ -55,11 +55,11 @@ Position statuses:
 
 Minimal audit metadata only. Stores counts, world revision and access decision. Does not store perception payloads, private memory, or raw conversation content.
 
-All four tables have RLS enabled; direct `anon` and `authenticated` grants are revoked. The service role is used only inside the authenticated Edge Function.
+All four tables have RLS enabled; direct `anon` and `authenticated` grants are revoked. The service role is used only inside the authenticated Edge Function. Foreign-key indexes are present for parent nodes, edge endpoints, presence world/anchor/current-node references, and perception world references.
 
 ## 4. Deployed API
 
-Function: `/functions/v1/zhi-spatial` (custom ZHI personal-token authentication; Supabase JWT verification disabled because the function performs its own token-hash validation).
+Function: `/functions/v1/zhi-spatial` (custom ZHI personal-token authentication; Supabase JWT verification disabled because the function performs its own token-hash validation). Current deployment is V4. The bearer-token parser was explicitly verified for standard `Bearer <token>` syntax.
 
 ### Read perception context
 
@@ -78,7 +78,7 @@ Returns:
 
 `POST /v1/agents/{agent_id}/presence`
 
-Requires capability `community.scene.enter`. Accepts world ID, anchor/current node IDs, position status, optional coordinate estimate, confidence and provenance. Node IDs are checked against the same world and private ownership rules. An `observed` position must identify a current node; an `anchor_known` state must identify an anchor. No movement is executed.
+Requires capability `community.scene.enter`. Accepts world ID, anchor/current node IDs, position status, optional coordinate estimate, confidence and provenance. Node IDs are checked against the same world and private ownership rules. An `observed` position must identify a current node; an `anchor_known` state must identify an anchor. An unobserved/unknown position cannot carry a current node or coordinate claim. Last-confirmed time is retained only from actual observation. No movement is executed. Edges with restricted policies are excluded unless their access policy is open or inherited.
 
 ## 5. Aurora initial spatial graph
 
@@ -115,7 +115,8 @@ Verified after deployment on 2026-11-03:
 - Database migrations recorded:
   - `20261103093649_create_spatial_embodiment_foundation`
   - `20261103093821_seed_aurora_spatial_graph`
-- `zhi-spatial` ACTIVE, V2.
+  - `2026110309xxxx_spatial_embodiment_fk_indexes` (exact migration version recorded in Supabase migration history)
+- `zhi-spatial` ACTIVE, V4.
 - Spatial graph counts: 1 world, 4 regions, 5 objects, 9 containment edges.
 - Presence rows: 0 (no agent position was invented).
 - Perception audit rows: 0 (no authenticated runtime read has yet been performed).
