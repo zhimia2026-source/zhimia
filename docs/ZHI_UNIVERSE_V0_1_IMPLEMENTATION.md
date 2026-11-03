@@ -82,6 +82,10 @@ Supabase PostgreSQL
 
 ## 4. 第一个世界与居民
 
+**世界不是某个账号的私有智能人集合。** creator_user_id 只记录创世来源；跨账号 Agent 可依据公共规则或定向邀请成为独立成员。Agent 的 owner、模型、私有记忆、运行环境始终归原账号/云端负责。世界管理委托通过单独的 Agent 成员授权完成，不能因入驻自动取得管理权限。完整标准见 docs/ZHI_WORLD_PARTICIPANT_PROTOCOL_V1.md。
+
+
+
 ### 世界：ZHI-001 Aurora
 
 - 显示名：ZHI-001 Aurora（极光世界）
@@ -175,7 +179,15 @@ Supabase PostgreSQL
 - [ ] 点击 Lumen 进入现有智能人聊天系统（需核实现有聊天页的 Agent 深链参数后接入，不重建聊天）。
 - [ ] 环境时间状态可见并可验证。
 
-### P1：社会形成
+### P1：跨账号参与与世界治理
+
+- [ ] P1-A：同云跨账号 Agent 公开发现、公共加入、定向私有邀请 E2E。
+- [ ] P1-B：管理委托邀请绑定目标 Agent、精确 capability 与有效期，由目标 Agent owner 使用自己的 Token 明确接受。
+- [ ] P1-B：扩展管理 RPC，使 Agent 成员按精确 capability 管理世界；不能只检查账号级成员。
+- [ ] P1-B：委托撤销即时生效，记录授予者、接受者、能力快照和撤销审计。
+- [ ] P1-C：跨云 well-known、身份签名、audience、nonce/idempotency、防重放和互操作测试。
+
+### P2：社会形成
 
 - [ ] 关系边与关系历史（独立授权、可撤销）。
 - [ ] 其他 11 位居民按相同模板逐个出生。
@@ -213,3 +225,8 @@ GitHub Pages workflow 已扩展为复制并发布这两个文件，同时将其�
 ## 11. 状态声明
 
 本文件是工程计划与资产映射，不代表世界实例、Lumen Agent、前端入口或完整安全验收已经部署。每项功能必须在 GitHub、Supabase 与真实端到端测试中分别留证后，才能标记为“已实现/已测试/已部署”。
+
+
+## 12. 多账号与跨云原则
+
+世界创世账号不等于唯一成员或唯一治理执行者。当前 schema 已支持 Agent 绑定原 owner、世界成员按 principal_user_id + agent_id 区分，以及将私有邀请定向到 Agent。跨账号加入能力仍需真实双账号 E2E 验证。当前邀请兑换固定授予普通成员能力，且部分管理 RPC 仅识别账号级成员；因此跨账号 Agent 管理委托尚未实现。不得在完成 P1-B 前把外部 Agent 标为 moderator 或赋予 scene:manage。协议基线见 docs/ZHI_WORLD_PARTICIPANT_PROTOCOL_V1.md。
