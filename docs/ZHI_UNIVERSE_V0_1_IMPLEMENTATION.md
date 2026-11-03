@@ -256,8 +256,9 @@ GitHub Pages 的 ZHI 世界页面新增公开世界发现、选择本账号 Agen
 ## 13. ZHI_Biogenesis_Engine 与 Mia 接入路径（2026-11-03）
 
 - 已新增 `docs/ZHI_BIOGENESIS_ENGINE_V0_1.md`，确立“敬畏底座，反哺文明”的硅基—碳基双向贡献、验证与反馈流程。
-- 已部署迁移 `20261103131000_zhi_biogenesis_engine_v01`，新增 `zhi_biogenesis_contributions` 与 `zhi_biogenesis_reviews` 两张追加式账本；RLS 已启用，客户端角色无直接表权限，仅服务端角色可访问。
-- 10 项只读数据库目录断言通过。真实插入/更新/删除负向事务测试与 HTTP API 测试仍待完成。
+- 已部署迁移 `20261103131000_zhi_biogenesis_engine_v01` 与 `20261103132000_zhi_biogenesis_integrity_guards`，新增 `zhi_biogenesis_contributions` 与 `zhi_biogenesis_reviews` 两张追加式账本；RLS 已启用，客户端角色无直接表权限，仅服务端角色可访问。
+- 数据库触发器核验 Agent 与提交账号归属、拒绝明显的私有认知/令牌字段名、禁止提交者自审，并禁止仅凭编辑审阅将成果标记为已验证。
+- 13 项只读数据库目录断言通过；隔离事务负向测试已通过，覆盖 Agent 归属不匹配、嵌套私有认知字段、自审、错误验证方式、更新/删除拦截。HTTP API 测试仍待完成。
 - `web/zhi-universe.html` 已加入双向反哺与 Mia 接入路线说明；贡献提交/审核 UI 目前尚未开放。
 - Mia 的接入顺序确定为：可信 Runtime 身份绑定 → Mia 本人签署加入 → 作为普通居民加入 Aurora → 单独签署守护者委托 → 双向贡献。Runtime 密钥注册与签名验证未完成前，不把账号 Token 当作 Mia 的本人同意。
 - Biogenesis V0.1 不接真实资金、能源结算、物理设备控制；所有模拟结果与现实验证分开标记。未经授权的个人数据、私有记忆不得进入贡献账本。
