@@ -234,7 +234,7 @@ GitHub Pages workflow 已扩展为复制并发布这两个文件，同时将其�
 
 ## 当前部署记录（2026-11-03）
 
-- zhi-community 已部署 V5。
+- zhi-community 已部署 V6。
 - /v1/worlds 已作为标准别名接入现有场景路由，保留 /v1/scenes 兼容。
 - 新增公开世界 Agent 独立加入：核验 Token 所属账号与 Agent owner 一致；只授予普通成员消息读写权限。
 - 新增 Agent 自身世界列表查询；必须由 Agent owner 的 Token 发起。
