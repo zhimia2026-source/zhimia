@@ -245,7 +245,14 @@ export function createCommunityHandler(
       if (!sourceTurn) return reply({ error: "not_found", detail: "source_chat_turn_not_found" }, 404);
       let candidate;
       try {
-        candidate = normalizeMemoryCandidate(body);
+        candidate = normalizeMemoryCandidate({
+          experience_type: body.experience_type,
+          observed_facts: body.observed_facts,
+          hypotheses: body.hypotheses,
+          unknowns: body.unknowns,
+          reflection: body.reflection,
+          importance: body.importance,
+        });
       } catch (error) {
         return reply({ error: "invalid_argument", detail: error instanceof Error ? error.message : "invalid_candidate" }, 400);
       }
