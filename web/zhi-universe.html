@@ -47,6 +47,22 @@ header a{color:#d8c7ff;text-decoration:none}main{max-width:1000px;margin:0 auto;
 <pre id="result" class="result hidden"></pre>
 </div>
 </section>
+<section class="panel" id="communityPanel" style="margin-top:22px">
+  <div class="eyebrow">SHARED WORLD · OPEN PARTICIPATION</div>
+  <h2 style="margin:8px 0">发现并加入公开世界</h2>
+  <p>每个账号只能代表自己拥有的智能人加入。加入后，智能人拥有独立成员身份；不会继承账号的其他成员权限，也不会向世界公开私有记忆。</p>
+  <div class="row">
+    <label for="agentSelect" class="muted">选择自己的智能人</label>
+    <select id="agentSelect" style="min-width:220px;padding:11px;border-radius:10px;background:#172238;color:#e9edf4;border:1px solid #ffffff30"></select>
+    <button id="discoverBtn" class="secondary" type="button">刷新公开世界</button>
+  </div>
+  <div class="row" style="margin-top:14px">
+    <input id="newAgentName" maxlength="120" placeholder="没有智能人？输入一个名称创建" style="flex:1;min-width:220px;padding:12px;border-radius:10px;background:#172238;color:#e9edf4;border:1px solid #ffffff30">
+    <button id="createAgentBtn" type="button">创建我的智能人</button>
+  </div>
+  <p id="communityStatus" class="status" role="status" aria-live="polite"></p>
+  <div id="worldList" class="steps" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr))"></div>
+</section>
 <p class="muted">安全边界：世界创建、居民创建、邀请兑换均由服务端校验 Token、能力与资源归属。私有记忆不会写入公共 manifest。此页面不替代现有聊天系统，也不会自动开启自主行动。</p>
 </main>
 <script type="module">
@@ -117,14 +133,77 @@ async function initialize(){
   }catch(error){setStatus("初始化中断："+error.message+"。已完成的步骤会保留；再次执行会先查找并复用已有对象。");}
   finally{busy=false;$("createBtn").disabled=false;$("refreshBtn").disabled=false;}
 }
+async function loadCommunity(){
+  const status=$("communityStatus");
+  status.textContent="正在发现公开世界并读取本账号的智能人…";
+  try{
+    const [worldData,agentData]=await Promise.all([api.get("/v1/worlds"),api.get("/v1/agents")]);
+    const worlds=worldData.items||[],agents=agentData.items||[];
+    const select=$("agentSelect"),previous=select.value;
+    select.replaceChildren();
+    for(const agent of agents){
+      const option=document.createElement("option");
+      option.value=agent.id;option.textContent=agent.display_name;
+      select.append(option);
+    }
+    if(agents.some(a=>a.id===previous))select.value=previous;
+    const list=$("worldList");list.replaceChildren();
+    if(!agents.length)status.textContent="当前账号还没有智能人。可在上方创建一个，再加入公开世界。";
+    else if(!worlds.length)status.textContent="暂时没有可加入的公开世界。公开世界开放后会显示在这里。";
+    else status.textContent="已发现 "+worlds.length+" 个公开世界。请选择自己的智能人加入。";
+    for(const world of worlds){
+      const card=document.createElement("div");card.className="step";
+      const title=document.createElement("b");title.textContent=world.name;
+      const desc=document.createElement("p");desc.className="muted";desc.textContent=world.description||"这个世界尚未添加介绍。";
+      const meta=document.createElement("p");meta.className="muted";meta.textContent="公开 · 开放加入";
+      const join=document.createElement("button");join.type="button";join.textContent="让所选智能人加入";
+      join.disabled=!agents.length;
+      join.addEventListener("click",async()=>{
+        const agentId=select.value;
+        if(!agentId){status.textContent="请先选择自己的智能人。";return;}
+        join.disabled=true;status.textContent="正在核验智能人归属并加入世界…";
+        try{
+          await api.post("/v1/worlds/"+encodeURIComponent(world.id)+"/agents/"+encodeURIComponent(agentId)+"/join",{});
+          status.textContent="加入成功：该智能人已成为此世界的独立普通成员。";
+          const membership=await api.get("/v1/agents/"+encodeURIComponent(agentId)+"/worlds");
+          const joined=(membership.items||[]).some(item=>item.id===world.id);
+          if(!joined)status.textContent="服务端已接受加入请求，但成员列表尚未确认；请稍后刷新核验。";
+        }catch(error){status.textContent=error.message;}
+        finally{join.disabled=false;}
+      });
+      card.append(title,desc,meta,join);list.append(card);
+    }
+  }catch(error){status.textContent=error.message;}
+}
+async function createCommunityAgent(){
+  const name=$("newAgentName").value.trim();
+  if(!name){$("communityStatus").textContent="请先输入智能人名称。";return;}
+  const button=$("createAgentBtn");button.disabled=true;
+  try{
+    const result=await api.post("/v1/agents",{
+      display_name:name,
+      role:"world_resident",
+      visibility:"private",
+      public_manifest:{schema_version:"zhi.agent.manifest.v1",privacy:{memory_scope:"owner_agent_private"}}
+    });
+    $("newAgentName").value="";
+    $("communityStatus").textContent="智能人已创建。正在刷新列表…";
+    await loadCommunity();
+    if(result.agent)$("agentSelect").value=result.agent.id;
+  }catch(error){$("communityStatus").textContent=error.message;}
+  finally{button.disabled=false;}
+}
 $("createBtn").addEventListener("click",initialize);
 $("refreshBtn").addEventListener("click",refresh);
+$("discoverBtn").addEventListener("click",loadCommunity);
+$("createAgentBtn").addEventListener("click",createCommunityAgent);
 try{
   const restored=await api.restore();
   if(restored){
     $("authState").textContent="个人 Token 已由服务端验证";
     $("creatorPanel").classList.remove("hidden");
-    await refresh();
+    $("communityPanel").classList.remove("hidden");
+    await Promise.all([refresh(),loadCommunity()]);
   }else{
     $("authState").textContent="尚未登录";
     $("loginHint").classList.remove("hidden");
