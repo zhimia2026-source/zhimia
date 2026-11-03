@@ -131,3 +131,44 @@ Deno.test("Agent scene awareness includes weather and object micro-state", () =>
   if (context.weather.condition !== "rain" || context.weather.intensity !== 0.7) throw new Error("Agent did not receive weather context");
   if (context.objects[0].micro_state.activity !== "dripping") throw new Error("Agent did not receive object micro-state");
 });
+
+
+Deno.test("rich sensory environment is available to silicon life context, not human scene summaries", () => {
+  const config = normalizeSceneEnvironmentConfig({
+    timezone: "UTC",
+    sensory_profile: {
+      visual: "雾层在树根之间缓慢分离",
+      auditory: "远处水滴以不规则节奏敲击石面",
+      olfactory: "湿苔与矿物气息",
+      tactile: "微凉气流掠过表面",
+      thermal: "阴影处温度缓慢下降",
+      spatial: "近处狭窄，远处回声更深",
+      temporal: "雨停后的第七分钟",
+      ambient: "安静但并非静止",
+      subtle_cues: ["叶尖水珠将落未落", "地面细小涟漪"],
+    },
+    objects: [{
+      id: "stone",
+      name: "回声石",
+      state: "表面潮湿",
+      micro_state: {
+        activity: "微弱振动",
+        motion: "几乎不可见的共振",
+        surface: "湿润",
+        vitality: 0.7,
+        temperature_c: 16,
+        moisture: 0.8,
+        texture: "细密晶粒",
+        emitted_sound: "低频回响",
+        scent: "湿矿石",
+        light_response: "边缘折射微光",
+      },
+    }],
+  });
+  const environment = computeSceneEnvironment(config, new Date("2026-11-03T14:30:00.000Z"));
+  const context = JSON.parse(buildSceneAwarenessContext({ name: "Aurora", visibility: "public" }, environment));
+  if (context.audience !== "authorized_silicon_life_only") throw new Error("audience boundary missing");
+  if (context.sensory_profile.olfactory !== "湿苔与矿物气息") throw new Error("olfactory channel missing");
+  if (context.objects[0].micro_state.emitted_sound !== "低频回响") throw new Error("object micro-sound missing");
+  if (context.human_surface !== "scene_index_and_name_only") throw new Error("human-facing minimization missing");
+});
