@@ -1,5 +1,17 @@
 import process from 'node:process';
 
+// Safety gate: archive transfer is disabled until source/target manifest and
+// row-level checksum verification are implemented and reviewed.
+const executeRequested = process.argv.includes('--execute');
+if (!executeRequested) {
+  console.log('SAFE STOP: no archive data was transferred.');
+  console.log('This workflow is intentionally blocked pending manifest refresh, keyset pagination, and source-to-target checksum verification.');
+  process.exit(0);
+}
+if (process.env.MIA_TRANSFER_APPROVAL !== 'APPROVE_MIA_ARCHIVE_TRANSFER_AFTER_VERIFICATION') {
+  throw new Error('Missing explicit MIA_TRANSFER_APPROVAL safety secret.');
+}
+
 const sourceUrl = process.env.MIA_SOURCE_SUPABASE_URL;
 const sourceKey = process.env.MIA_SOURCE_SERVICE_ROLE_KEY;
 const targetUrl = process.env.ZHIMA_SUPABASE_URL;
