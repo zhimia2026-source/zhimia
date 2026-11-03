@@ -78,3 +78,41 @@ Deno.test("scene environment rejects private cognition fields", () => {
   }
   if (!rejected) throw new Error("private cognition field must be rejected");
 });
+
+
+Deno.test("weather and object micro-states evolve through a natural event", () => {
+  const config = normalizeSceneEnvironmentConfig({
+    ...auroraSeed,
+    weather: { condition: "clear", intensity: 0, temperature_c: 24, humidity_pct: 65, wind_level: "light", visibility: "clear" },
+    objects: [
+      { id: "canopy", name: "林间树冠", state: "舒展", micro_state: { activity: "swaying", motion: "gentle", surface: "dry", vitality: 0.8 } },
+    ],
+    events: [{
+      id: "forest_rain",
+      type: "natural_event",
+      label: "林间骤雨",
+      daily_window: { start: "14:00", end: "15:00" },
+      state_delta: {
+        lighting: "clouded",
+        soundscape: "forest_rain",
+        weather: { condition: "rain", intensity: 0.8, humidity_pct: 98, wind_level: "gusty", visibility: "misty" },
+        object_states: { canopy: "雨滴沿叶脉滑落" },
+        object_micro_states: { canopy: { activity: "dripping", motion: "shivering", surface: "wet", vitality: 0.9 } },
+        atmosphere_tags: ["rainfall", "shelter_seeking"],
+      },
+      behavior_weights: { seek_shelter: 0.85 },
+    }],
+  });
+  const state = computeSceneEnvironment(config, new Date("2026-11-03T14:30:00.000Z"));
+  if (state.weather.condition !== "rain" || state.weather.intensity !== 0.8) throw new Error("weather event not applied");
+  if (state.objects[0].micro_state.activity !== "dripping" || state.objects[0].micro_state.surface !== "wet") {
+    throw new Error("object micro-state did not evolve");
+  }
+  if (state.behavior_weights.seek_shelter !== 0.85) throw new Error("natural event behavior weight missing");
+});
+
+Deno.test("weather values outside the declared physical bounds are rejected to defaults", () => {
+  const config = normalizeSceneEnvironmentConfig({ ...auroraSeed, weather: { condition: "storm", intensity: 9, humidity_pct: 150 } });
+  const state = computeSceneEnvironment(config, new Date("2026-11-03T12:00:00.000Z"));
+  if (state.weather.intensity !== 0 || state.weather.humidity_pct !== null) throw new Error("weather bounds were not enforced");
+});
