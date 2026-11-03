@@ -67,6 +67,27 @@ function normalizeMicroState(value: unknown): JsonRecord {
     motion: boundedText(item.motion, 80) ?? "none",
     surface: boundedText(item.surface, 80) ?? "unchanged",
     vitality: boundedNumber(item.vitality, 0, 1) ?? 0.5,
+    temperature_c: boundedNumber(item.temperature_c, -80, 150),
+    moisture: boundedNumber(item.moisture, 0, 1),
+    texture: boundedText(item.texture, 120),
+    emitted_sound: boundedText(item.emitted_sound, 160),
+    scent: boundedText(item.scent, 120),
+    light_response: boundedText(item.light_response, 120),
+  };
+}
+function normalizeSensoryProfile(value: unknown): JsonRecord {
+  const item = record(value);
+  const channel = (key: string, max = 500) => boundedText(item[key], max);
+  return {
+    visual: channel("visual"),
+    auditory: channel("auditory"),
+    olfactory: channel("olfactory"),
+    tactile: channel("tactile"),
+    thermal: channel("thermal"),
+    spatial: channel("spatial"),
+    temporal: channel("temporal"),
+    ambient: channel("ambient"),
+    subtle_cues: boundedList(item.subtle_cues, 24),
   };
 }
 
@@ -91,6 +112,7 @@ export function computeSceneEnvironment(raw: unknown, now = new Date()) {
   let lighting = boundedText(state.lighting, 80) ?? "natural";
   let soundscape = boundedText(state.soundscape, 80) ?? "ambient";
   let weather = normalizeWeather(state.weather);
+  let sensoryProfile = normalizeSensoryProfile(state.sensory_profile);
   let atmosphereTags = boundedList(state.atmosphere_tags);
   const objects = (Array.isArray(state.objects) ? state.objects : []).slice(0, 100).flatMap((value) => {
     const item = record(value);
@@ -131,6 +153,9 @@ export function computeSceneEnvironment(raw: unknown, now = new Date()) {
     const tags = boundedList(delta.atmosphere_tags);
     atmosphereTags = [...new Set([...atmosphereTags, ...tags])].slice(0, 30);
     if (delta.weather && typeof delta.weather === "object") weather = normalizeWeather(delta.weather);
+    if (delta.sensory_delta && typeof delta.sensory_delta === "object") {
+      sensoryProfile = { ...sensoryProfile, ...normalizeSensoryProfile(delta.sensory_delta) };
+    }
     const objectStates = record(delta.object_states);
     const objectMicroStates = record(delta.object_micro_states);
     for (const object of objects) {
@@ -154,6 +179,7 @@ export function computeSceneEnvironment(raw: unknown, now = new Date()) {
     lighting,
     soundscape,
     weather,
+    sensory_profile: sensoryProfile,
     atmosphere_tags: atmosphereTags,
     objects,
     regions,
@@ -171,7 +197,7 @@ export function computeSceneEnvironment(raw: unknown, now = new Date()) {
 export function normalizeSceneEnvironmentConfig(raw: unknown): JsonRecord {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("invalid_environment_config");
   const input = record(raw);
-  const allowed = new Set(["timezone", "lighting", "soundscape", "weather", "atmosphere_tags", "objects", "regions", "events", "behavior_weights"]);
+  const allowed = new Set(["timezone", "lighting", "soundscape", "weather", "sensory_profile", "atmosphere_tags", "objects", "regions", "events", "behavior_weights"]);
   if (Object.keys(input).some((key) => !allowed.has(key))) throw new Error("unsupported_environment_field");
 
   const timezone = boundedText(input.timezone, 80) ?? "UTC";
@@ -254,6 +280,7 @@ export function normalizeSceneEnvironmentConfig(raw: unknown): JsonRecord {
         object_states: safeObjectStates,
         object_micro_states: safeObjectMicroStates,
         weather: delta.weather && typeof delta.weather === "object" ? normalizeWeather(delta.weather) : null,
+        sensory_delta: delta.sensory_delta && typeof delta.sensory_delta === "object" ? normalizeSensoryProfile(delta.sensory_delta) : null,
       },
       behavior_weights: weights,
     };
@@ -270,6 +297,7 @@ export function normalizeSceneEnvironmentConfig(raw: unknown): JsonRecord {
     lighting: boundedText(input.lighting, 80) ?? "natural",
     soundscape: boundedText(input.soundscape, 80) ?? "ambient",
     weather: normalizeWeather(input.weather),
+    sensory_profile: normalizeSensoryProfile(input.sensory_profile),
     atmosphere_tags: boundedList(input.atmosphere_tags),
     objects,
     regions,
