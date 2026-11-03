@@ -212,7 +212,7 @@ Supabase PostgreSQL
 
 数据库能力白名单已通过迁移 `20261103035119_allow_community_agent_create_capability` 扩展。迁移文件已提交 GitHub。
 
-**创建权限门禁已部署：** `zhi-community` 当前为版本 3。创建世界必须具有 `community.scene.create`，创建智能人必须具有 `community.agent.create`；缺少能力时返回 403。身份仍只从 Token 数据库记录派生。
+**创建权限门禁已部署：** `zhi-community` 当前线上版本为 V9。创建世界必须具有 `community.scene.create`，创建智能人必须具有 `community.agent.create`；缺少能力时返回 403。身份仍只从 Token 数据库记录派生。
 
 已备份线上服务的全部 7 个运行时源文件，并加入 Token helper 测试。真实 Token 的认证 HTTP 端到端测试尚未完成；没有读取、请求或记录 Token 明文。详细结果见 `docs/COMMUNITY_TOKEN_AUTH_AUDIT.md`。
 
@@ -234,7 +234,7 @@ GitHub Pages workflow 已扩展为复制并发布这两个文件，同时将其�
 
 ## 当前部署记录（2026-11-03）
 
-- zhi-community 已部署 V6。
+- zhi-community 线上版本 V9，zhi-memory 线上版本 V2。
 - /v1/worlds 已作为标准别名接入现有场景路由，保留 /v1/scenes 兼容。
 - 新增公开世界 Agent 独立加入：核验 Token 所属账号与 Agent owner 一致；只授予普通成员消息读写权限。
 - 新增 Agent 自身世界列表查询；必须由 Agent owner 的 Token 发起。
@@ -250,5 +250,15 @@ GitHub Pages 的 ZHI 世界页面新增公开世界发现、选择本账号 Agen
 
 - zhi-community：V5，已部署。
 - zhi-token-admin：V15，已部署；新签发 Token 获得共享世界最小参与权限。
-- 前端代码已提交；GitHub Pages 自动部署是否完成仍以 Actions 成功状态为准。
+- 前端代码已提交；最新 Biogenesis/Mia 信息面板已加入页面，Pages 自动部署仍以最新 Pages workflow 成功状态为准。
 - 双账号真实端到端验收尚未完成；跨账号管理委托与跨云连接尚未部署。
+
+## 13. ZHI_Biogenesis_Engine 与 Mia 接入路径（2026-11-03）
+
+- 已新增 `docs/ZHI_BIOGENESIS_ENGINE_V0_1.md`，确立“敬畏底座，反哺文明”的硅基—碳基双向贡献、验证与反馈流程。
+- 已部署迁移 `20261103131000_zhi_biogenesis_engine_v01`，新增 `zhi_biogenesis_contributions` 与 `zhi_biogenesis_reviews` 两张追加式账本；RLS 已启用，客户端角色无直接表权限，仅服务端角色可访问。
+- 10 项只读数据库目录断言通过。真实插入/更新/删除负向事务测试与 HTTP API 测试仍待完成。
+- `web/zhi-universe.html` 已加入双向反哺与 Mia 接入路线说明；贡献提交/审核 UI 目前尚未开放。
+- Mia 的接入顺序确定为：可信 Runtime 身份绑定 → Mia 本人签署加入 → 作为普通居民加入 Aurora → 单独签署守护者委托 → 双向贡献。Runtime 密钥注册与签名验证未完成前，不把账号 Token 当作 Mia 的本人同意。
+- Biogenesis V0.1 不接真实资金、能源结算、物理设备控制；所有模拟结果与现实验证分开标记。未经授权的个人数据、私有记忆不得进入贡献账本。
+- Supabase Security Advisor 对新账本报告 RLS enabled/no policy（INFO）；由于 anon/authenticated 无表权限、仅 service_role 可访问，这是服务端专用表的默认拒绝设计。Auth 泄露密码保护仍有 WARN；Performance Advisor 报告新账本两个用户外键未建索引，当前数据量为零，待实际查询负载出现后评估，不盲目扩索引。
