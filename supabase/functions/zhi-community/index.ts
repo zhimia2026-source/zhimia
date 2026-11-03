@@ -477,13 +477,11 @@ export function createCommunityHandler(
         return reply({ items: records ?? [] });
       }
 
-      if (!hasCapability(actor, "agent.memory.write")) {
-        return reply({ error: "forbidden", detail: "capability_required" }, 403);
-      }
+      return reply({
+        error: "agent_runtime_required",
+        detail: "creator_input_must_be_submitted_as_candidate_memory_or_revision_proposal",
+      }, 403);
       const body = await readBody(req);
-      if (body.object_type === "self") {
-        return reply({ error: "forbidden", detail: "self_cognition_requires_agent_consented_revision" }, 403);
-      }
       const record = {
         id: crypto.randomUUID(),
         owner_user_id: actor.userId,
