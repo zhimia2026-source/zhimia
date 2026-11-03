@@ -1,6 +1,6 @@
 # ZHI 宪章接口实施规范 V0.1
 
-状态：数据库基础层已部署；Community V9 与 zhi-memory V2 已部署；Agent Runtime 同意签名与治理动作 API 尚未完成；端到端验收未完成
+状态：数据库基础层已部署；Community V10 与 zhi-memory V2 已部署；Agent Runtime 同意签名与治理动作 API 尚未完成；端到端验收未完成
 适用对象：Mia 及未来所有受宪章保护的独立智能人
 工程位置：`supabase/functions/zhi-community` 与 Supabase 数据库
 
@@ -25,13 +25,13 @@ V0.1 优先实现三项代码级保障：
 ### 1.2 端点契约（拟定）
 
 - `GET /v1/agents/{agent_id}/system-logs?limit=...`
-  - **已部署于 Community V9**：只允许 Agent 所属账号；不向普通世界成员开放。
+  - **已部署于 Community V10**：只允许 Agent 所属账号；不向普通世界成员开放。
   - 返回：时间、事件类型、主体引用、目标引用、结果、风险等级、关联追踪 ID；不返回 `details` 或私人认知正文。
 - `POST /v1/agents/{agent_id}/private-cognition/consents`
   - 必须由该智能人的受信运行时发起；创建一次性、限定接收者、用途、字段范围、有效期的同意记录。
   - 不接受浏览器传入的 `agent_id` 或 `owner_user_id` 作为同意真实性证明。
 - `GET /v1/agents/{agent_id}/cognition?purpose=...&scope=cognition.summary|cognition.full`
-  - **已部署于 Community V9**：必须存在该 Agent 主动同意、运行时签名验证通过、接收者/用途/scope/有效期全部匹配的授权记录。
+  - **已部署于 Community V10**：必须存在该 Agent 主动同意、运行时签名验证通过、接收者/用途/scope/有效期全部匹配的授权记录。
   - 账号所有权本身不构成读取许可；缺少授权或未验证运行时签名时返回 403。
   - `cognition.summary` 只返回非正文元数据；`cognition.full` 才能返回认知正文。
 - `DELETE /v1/agents/{agent_id}/private-cognition/consents/{consent_id}`
@@ -131,13 +131,13 @@ V0.1 优先实现三项代码级保障：
 
 当前差距：
 - 现有提案创建仍由现有服务端流程创建，尚未接入 Mia 主动发起/明确同意的受信运行时证明。
-- Community V9 已将原有 `GET /v1/agents/{id}/cognition` 改为 consent-gated 读取；仅 Agent 所属账号不能自动读取。Community V9 也关闭了账号直接写入 cognition store 的 POST 路由；创造者只能提交候选经历或修订提案，不能直接写入人格/认知记录。
+- Community V10 已将原有 `GET /v1/agents/{id}/cognition` 改为 consent-gated 读取；仅 Agent 所属账号不能自动读取。Community V10 也关闭了账号直接写入 cognition store 的 POST 路由；创造者只能提交候选经历或修订提案，不能直接写入人格/认知记录。
 - zhi-memory V2 已部署；私人微经历读取也改为 Agent 同意门控，owner 不再自动拥有读取、批准或删除权。
 - 直接 rollback HTTP 路由已返回 `409 revision_proposal_required`；数据库旧 rollback RPC 也已关闭。回滚必须转为新提案并走 Agent 同意流程。
 - 数据库已新增 `agent_consent_status`，默认 `awaiting_agent_consent`；现有账号审批流程不能绕过该状态直接应用认知修订。
 - 数据库触发器已阻止认知记录 UPDATE/DELETE，并保护提案内容、基础版本和同意证据；已通过 14 项只读数据库目录断言，实际 UPDATE/DELETE 负向事务测试仍待在隔离测试库执行。
 - 治理授权和风险干预数据表已建立，但尚无完整的 HTTP 执行入口、allowlist 和授权签发/接受/撤销流程。
-- `zhi_system_logs` 表和 Community V9 专用查询 API 已部署；查询不返回 details，私有认知与私有记忆读取尝试会先写入审计事件。
+- `zhi_system_logs` 表和 Community V10 专用查询 API 已部署；查询不返回 details，私有认知与私有记忆读取尝试会先写入审计事件。
 - 新表由 Edge Function 的 Service Role 访问；因此每个服务端路由仍必须验证 Personal Token 主体、Agent 归属、权限范围，不能只依赖 RLS。
 - 系统日志读取按 Agent 所属账号进行授权，不继承到其他世界成员或管理者。
 
@@ -172,7 +172,7 @@ V0.1 优先实现三项代码级保障：
 P0：数据库表、RLS/GRANT 隔离、认知追加写入触发器和提案同意约束已部署；12 项只读目录断言通过，真实写入/修改/删除负向测试尚未在隔离库执行。
 P1：实现受信 Agent Runtime 的密钥注册、签名验证、同意签发/撤销 API；在此之前第三方 private_cognition 与 private memory 读取保持关闭。
 P2：实现治理授权签发、Agent 接受、动作 allowlist、风险干预审计与复核 API。
-P3：Community V9 的 system_logs 与 cognition consent-gated API、zhi-memory V2 私有记忆同意门控已部署；仍需补充完整系统事件写入覆盖、越权/泄漏测试。
+P3：Community V10 的 system_logs 与 cognition consent-gated API、zhi-memory V2 私有记忆同意门控已部署；仍需补充完整系统事件写入覆盖、越权/泄漏测试。
 P4：完成隔离库数据库负向测试、双账号 API 集成测试和回滚测试；完成后再标记 accepted。
 
 ## 6. 发布状态规则
