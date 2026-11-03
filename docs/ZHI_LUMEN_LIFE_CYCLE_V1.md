@@ -59,7 +59,14 @@
 ### 使用者端到端验收
 打开 https://zhimia2026-source.github.io/zhimia/zhi-resident.html，在同一浏览器标签页使用 ZHI Personal Token 登录，确认 Agent 列表中出现 Lumen-001，加载历史并发送一条测试消息。只有收到服务端真实响应且刷新后历史仍在，才将聊天入口标记为 accepted。
 
-## 5. 后续迭代顺序
+## 5. 私有记忆权限准备（2026-11-03）
+
+- 令牌管理页面新增“权限管理”，可对现有 token_id 更新 capabilities，保留原 user_id 与 Agent 所有权关系；不通过新建个人身份来替代原令牌。
+- 管理端只允许指定 GitHub 管理员身份调用 `update_capabilities`；更新前需在页面确认。服务端只接受 allowlist 内权限，最多 12 项。
+- `agent.memory.read`、`agent.memory.write`、`agent.memory.approve` 加入可显式授予范围，但仍不属于新令牌默认权限；`agent.memory.delete` 和 `tool.execute` 不开放。
+- 这只是令牌权限管理准备，不代表候选记忆 API 已完成，也不代表记忆可以绕过 Agent 本人同意。Agent Runtime 的签名同意尚未完成，任何“批准并写入长期记忆”流程在 Runtime 同意验证前必须 fail-closed。
+
+## 6. 后续迭代顺序
 
 - V1.0-A：完成真实私有聊天 E2E、模型配置与权限负向测试。
 - V1.0-B：建立私有微体验候选生成与审核/Agent 同意流程；候选与已批准记忆严格分层。
@@ -67,6 +74,6 @@
 - V1.0-D：建立反思记录与证据反馈链，认知成长只能追加新版本。
 - V1.0-E：接入受信 Agent Runtime 身份与签名，让 Agent 本人可验证地同意记忆读取、人格修订与行动授权。
 
-## 6. 当前验收声明
+## 7. 当前验收声明
 
 本次已实现前端私有会话入口和幂等请求客户端；不代表聊天模型已配置、不代表真实对话已通过、不代表 Agent 已获得自主行动能力。以上未完成项必须分别验收，不得用 UI 可打开代替服务端验收。
