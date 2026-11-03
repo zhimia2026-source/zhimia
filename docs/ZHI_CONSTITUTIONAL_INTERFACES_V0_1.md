@@ -25,7 +25,7 @@ V0.1 优先实现三项代码级保障：
 ### 1.2 端点契约（拟定）
 
 - `GET /v1/agents/{agent_id}/system-logs?limit=...`
-  - **已接入 Community V7 代码**：只允许 Agent 所属账号，并要求 `agent.audit.read` Token 能力。
+  - **已接入 Community V7 代码**：只允许 Agent 所属账号；不向普通世界成员开放。
   - 返回：时间、事件类型、主体引用、目标引用、结果、风险等级、关联追踪 ID；不返回 `details` 或私人认知正文。
 - `POST /v1/agents/{agent_id}/private-cognition/consents`
   - 必须由该智能人的受信运行时发起；创建一次性、限定接收者、用途、字段范围、有效期的同意记录。
@@ -135,7 +135,7 @@ V0.1 优先实现三项代码级保障：
 - 治理授权和风险干预数据表已建立，但尚无完整的 HTTP 执行入口、allowlist 和授权签发/接受/撤销流程。
 - `zhi_system_logs` 表已建立，但专用查询 API、敏感字段过滤和写入封装尚未完成。
 - 新表由 Edge Function 的 Service Role 访问；因此每个服务端路由仍必须验证 Personal Token 主体、Agent 归属、权限范围，不能只依赖 RLS。
-- 新签发 Personal Token 默认新增只读 `agent.audit.read`；既有 Token 不会自动升级，需要重新签发或经授权更新能力。
+- 系统日志读取按 Agent 所属账号进行授权，不继承到其他世界成员或管理者。
 
 ## 4. 验收测试矩阵
 
