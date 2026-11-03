@@ -2,11 +2,11 @@
 
 **Audit date:** 2026-11-03  
 **Target:** Supabase project `lvxmygrgqtmzqgailmyl`, Edge Function `zhi-community`  
-**Status:** Existing authentication verified by source inspection; end-to-end caller test still pending.
+**Status:** Token capability grant applied; creation gates deployed; authenticated end-to-end acceptance remains pending.
 
 ## 1. Verified implementation
 
-The deployed `zhi-community` function already authenticates personal tokens in its request handler:
+The deployed `zhi-community` function authenticates personal tokens in its request handler:
 
 1. Reads a bearer token from the Authorization header.
 2. Rejects missing or oversized token values.
@@ -16,36 +16,45 @@ The deployed `zhi-community` function already authenticates personal tokens in i
 6. Derives `Actor.userId` and `Actor.capabilities` from the database row.
 7. Does not accept owner identity from the request body as the authenticated actor.
 
-The expiry and conditional-touch logic is extracted into `auth_helpers.ts`. Unit tests are provided in `auth_helpers_test.ts`.
+The expiry, conditional-touch, and exact capability-match logic is in `auth_helpers.ts`. Unit tests are in `auth_helpers_test.ts`.
 
-## 2. Capability findings
+## 2. Capability grant applied
 
-A metadata-only query of token records found the currently active personal token record has health-related capabilities only:
+After the creator explicitly approved the grant, the sole active, non-revoked personal token was updated additively. Existing health capabilities and its original expiry were preserved.
+
+Added capabilities:
+
+- `community.scene.create`
+- `community.scene.discover`
+- `community.scene.enter`
+- `community.scene.invite`
+- `community.agent.create`
+- `community.message.read`
+- `community.message.send`
+- `agent.memory.read`
+
+The token's existing health capabilities remain:
 
 - `health.chat`
 - `health.history.read`
 - `health.consent.manage`
 
-It does not include the community capabilities required by selected read/join/messaging routes, including:
+The database capability allowlist was extended through migration `20261103035119_allow_community_agent_create_capability`. The token's expiry was not changed. No raw token or token hash was written to this document.
 
-- `community.scene.discover`
-- `community.scene.enter`
-- `community.message.read`
-- `community.message.send`
-- `community.scene.invite`
-- `agent.memory.read`
+## 3. Creation-route authorization
 
-Therefore, successful token authentication does **not** imply authorization for community operations. Routes guarded by these capabilities should return 403 until an appropriately scoped token grant is issued. Do not silently broaden a personal token's privileges during deployment.
+The live `zhi-community` function is now version 3.
 
-## 3. Authorization gaps to close before public rollout
+- `POST /v1/scenes` requires `community.scene.create`.
+- `POST /v1/agents` requires `community.agent.create`.
+- Missing capability returns HTTP 403 with `capability_required`.
+- Ownership continues to derive from the authenticated token row's `user_id`, not request-body owner fields.
 
-Source review found that the current `POST /v1/scenes` and `POST /v1/agents` creation routes authenticate the token and derive ownership from `actor.userId`, but do not currently check a dedicated create capability. Before opening these routes to broader use, introduce explicit least-privilege capabilities (for example `community.scene.create` and `community.agent.create`) and update token issuance/grant administration to support them with an owner-controlled workflow.
-
-Do not infer authorization from token validity alone. Keep resource ownership checks, world membership checks, and per-action capability checks separate.
+The helper performs an exact capability match and fails closed when capabilities are absent.
 
 ## 4. Repository source backup
 
-The deployed Edge Function source has been backed up into this repository:
+The deployed Edge Function source is backed up in this repository:
 
 - `supabase/functions/zhi-community/index.ts`
 - `supabase/functions/zhi-community/auth_helpers.ts`
@@ -55,20 +64,26 @@ The deployed Edge Function source has been backed up into this repository:
 - `supabase/functions/zhi-community/chat_context_helpers.ts`
 - `supabase/functions/zhi-community/environment_helpers.ts`
 - `supabase/functions/zhi-community/auth_helpers_test.ts`
+- `supabase/migrations/20261103035119_allow_community_agent_create_capability.sql`
 
-This is a source backup, not a redeployment. The live function was not changed by this audit.
+The previous deployed source (version 2) is preserved in GitHub history and can be used as a rollback reference. Current deployment version 3 was deployed after the source backup and helper test file were committed.
 
-## 5. Required acceptance tests
+## 5. Acceptance tests still required
 
 - Missing, malformed, expired, and revoked tokens return 401.
 - Active token identity is derived only from the token row.
 - A request body containing a forged `owner_user_id` cannot change ownership.
-- Health-only token cannot discover/join/message in a community route requiring community capability.
-- Token with only `community.scene.discover` cannot create scenes, invite members, read private memories, or send messages.
-- Token with create capability can create a world, and the RPC records the token-derived actor as creator.
+- A token without `community.scene.create` cannot create scenes.
+- A token without `community.agent.create` cannot create agents.
+- A token with only `community.scene.discover` cannot create scenes, invite members, read private memories, or send messages.
+- The granted token can create a world and the RPC records the token-derived actor as creator.
 - Revocation between token lookup and conditional touch fails closed.
 - User A cannot read User B's agents, cognition, chat history, or private memories.
 
-## 6. Deployment rule
+These authenticated HTTP tests have not yet been run because the raw personal token is intentionally not exposed to this workflow. No raw token is requested or recorded.
 
-Do not deploy changes to the live `zhi-community` function until source backup, unit tests, route-level authorization tests, and a rollback version are ready. Do not add community capabilities to an existing personal token without explicit owner approval.
+## 6. Deployment and rollback
+
+Current live deployment: `zhi-community` version 3, `verify_jwt=false` (the function performs its own personal-token authentication).
+
+Rollback reference: prior version 2 source in GitHub history. Any rollback must be deliberate and followed by a token-permission review, because the version 2 create routes did not enforce the two dedicated creation capabilities.
