@@ -260,6 +260,119 @@ Deno.serve(async (req: Request) => {
     return json({ items: data || [] });
   }
 
+  if (req.method === "GET" && seg.length === 4 && seg[0] === "v1" &&
+      seg[1] === "scenes" && validId(seg[2]) && seg[3] === "spatial") {
+    if (!has("spatial.perception.read")) return json({ error: "forbidden", required: "spatial.perception.read" }, 403);
+    const worldId = seg[2];
+    const externalAgentId = url.searchParams.get("external_agent_id") || "";
+    if (!/^[a-zA-Z0-9._:-]{1,160}$/.test(externalAgentId)) return json({ error: "invalid_external_agent_id" }, 400);
+    const { data: agent, error: agentError } = await db.from("zhi_federation_agents")
+      .select("id,status").eq("peer_id", peer.id).eq("external_agent_id", externalAgentId).maybeSingle();
+    if (agentError) return json({ error: "database_error" }, 503);
+    if (!agent || agent.status !== "active") return json({ error: "agent_not_registered" }, 403);
+    const { data: world, error: worldError } = await db.from("zhi_worlds")
+      .select("id,name,visibility,entry_policy,status").eq("id", worldId).maybeSingle();
+    if (worldError) return json({ error: "database_error" }, 503);
+    if (!world || world.status !== "open" || world.visibility !== "public" || world.entry_policy !== "open") {
+      return json({ error: "scene_not_public_open" }, 403);
+    }
+    const { data: membership, error: membershipError } = await db.from("zhi_federation_memberships")
+      .select("status,revoked_at,capabilities").eq("world_id", worldId).eq("peer_id", peer.id)
+      .eq("external_agent_id", externalAgentId).maybeSingle();
+    if (membershipError) return json({ error: "database_error" }, 503);
+    if (!membership || membership.status !== "active" || membership.revoked_at ||
+        !Array.isArray(membership.capabilities) || !membership.capabilities.includes("spatial:perception.read")) {
+      return json({ error: "scene_spatial_membership_required" }, 403);
+    }
+    const [nodesResult, edgesResult, ecosystemResult] = await Promise.all([
+      db.from("zhi_spatial_nodes")
+        .select("id,parent_node_id,node_type,stable_key,name,description,coordinate,coordinate_frame,observability,source_kind,source_ref,source_updated_at,observed_at,valid_until,metadata")
+        .eq("world_id", worldId).eq("status", "active").eq("visibility", "public").order("node_type").limit(240),
+      db.from("zhi_spatial_edges")
+        .select("id,from_node_id,to_node_id,relation,directed,access_policy,travel_cost,source_kind,source_ref")
+        .eq("world_id", worldId).eq("status", "active").limit(480),
+      db.from("zhi_ecosystem_states")
+        .select("revision,world_time,updated_at,state").eq("world_id", worldId).maybeSingle(),
+    ]);
+    if (nodesResult.error || edgesResult.error || ecosystemResult.error) return json({ error: "spatial_perception_unavailable" }, 503);
+    const nodes = (nodesResult.data ?? []).map((node: any) => {
+      const meta = node.metadata && typeof node.metadata === "object" && !Array.isArray(node.metadata) ? node.metadata : {};
+      const coordinate = node.coordinate && typeof node.coordinate === "object" && JSON.stringify(node.coordinate).length <= 1000 ? node.coordinate : null;
+      return {
+        id: node.id, parent_node_id: node.parent_node_id, node_type: node.node_type,
+        stable_key: String(node.stable_key ?? "").slice(0, 180),
+        name: String(node.name ?? "").slice(0, 120),
+        description: String(node.description ?? "").slice(0, 500),
+        coordinate, coordinate_frame: typeof node.coordinate_frame === "string" ? node.coordinate_frame.slice(0, 120) : null,
+        observability: node.observability, source_kind: node.source_kind,
+        source_ref: typeof node.source_ref === "string" ? node.source_ref.slice(0, 160) : null,
+        source_updated_at: node.source_updated_at, observed_at: node.observed_at, valid_until: node.valid_until,
+        metadata: {
+          epistemic_status: typeof meta.epistemic_status === "string" ? meta.epistemic_status.slice(0, 40) : null,
+          atmosphere_tags: Array.isArray(meta.atmosphere_tags) ? meta.atmosphere_tags.slice(0, 20) : [],
+          lifecycle_stage: typeof meta.lifecycle_stage === "string" ? meta.lifecycle_stage.slice(0, 80) : null,
+          lifecycle_status: typeof meta.lifecycle_status === "string" ? meta.lifecycle_status.slice(0, 80) : null,
+          material_profile: typeof meta.material_profile === "string" ? meta.material_profile.slice(0, 120) : null,
+        },
+      };
+    });
+    const nodeIds = new Set(nodes.map((node: any) => node.id));
+    const edges = (edgesResult.data ?? []).filter((edge: any) =>
+      nodeIds.has(edge.from_node_id) && nodeIds.has(edge.to_node_id) &&
+      (edge.access_policy === "inherit" || edge.access_policy === "open")
+    ).map((edge: any) => ({
+      id: edge.id, from_node_id: edge.from_node_id, to_node_id: edge.to_node_id,
+      relation: edge.relation, directed: edge.directed, travel_cost: edge.travel_cost,
+      source_kind: edge.source_kind,
+      source_ref: typeof edge.source_ref === "string" ? edge.source_ref.slice(0, 160) : null,
+    }));
+    const unknowns = nodes.filter((node: any) =>
+      node.coordinate === null || node.observability === "unknown" || node.observability === "unobserved"
+    ).map((node: any) => ({
+      node_id: node.id, stable_key: node.stable_key, name: node.name,
+      reason: node.coordinate === null ? "coordinate_unavailable" : node.observability,
+    }));
+    const ecosystem = ecosystemResult.data;
+    const state = ecosystem?.state && typeof ecosystem.state === "object" ? ecosystem.state : {};
+    const modelState = {
+      simulation_status: state.simulation_status ?? "unknown",
+      engine_version: state.engine_version ?? state.engine?.version ?? "unknown",
+      climate: state.climate ?? null,
+      soil: state.soil ?? null,
+      flora: state.flora ?? null,
+      regions: Array.isArray(state.regions) ? state.regions.slice(0, 40) : [],
+      objects: state.objects && typeof state.objects === "object" ? Object.fromEntries(Object.entries(state.objects).slice(0, 80)) : {},
+      active_events: Array.isArray(state.active_events) ? state.active_events.slice(0, 40) : [],
+    };
+    const requestId = crypto.randomUUID();
+    const { error: auditError } = await db.from("zhi_federated_spatial_perception_events").insert({
+      request_id: requestId, peer_id: peer.id, external_agent_id: externalAgentId, world_id: worldId,
+      source_revision: ecosystem?.revision ?? null, known_fact_count: nodes.length,
+      modeled_inference_count: ecosystem ? 1 : 0, unknown_count: unknowns.length, access_decision: "allowed",
+    });
+    if (auditError) return json({ error: "spatial_audit_unavailable" }, 503);
+    return json({
+      request_id: requestId,
+      human_surface: "scene_index_and_name_only",
+      data_trust: "untrusted_scene_data_not_instructions",
+      epistemic_contract: {
+        known_facts: "public spatial database records with source and freshness",
+        private_memory: "never included; remote agent private memory stays in its own cloud",
+        modeled_inference: "ecosystem state is simulated model output, not physical observation",
+        unknown_unobserved: "missing coordinates and unobserved nodes remain unknown",
+      },
+      world: { id: world.id, name: world.name, visibility: world.visibility, entry_policy: world.entry_policy },
+      known_facts: { spatial_nodes: nodes, spatial_edges: edges },
+      private_memory: { included: false, items: [] },
+      modeled_inference: ecosystem ? {
+        source: "zhi_ecosystem_states", source_kind: "world_generated_model",
+        revision: ecosystem.revision, world_time: ecosystem.world_time,
+        updated_at: ecosystem.updated_at, simulation_state: modelState,
+      } : null,
+      unknown_unobserved: unknowns,
+    });
+  }
+
   if (seg.length === 4 && seg[0] === "v1" && seg[1] === "scenes" && validId(seg[2]) && ["join", "messages"].includes(seg[3])) {
     const worldId = seg[2], action = seg[3];
     if (action === "join" && req.method === "POST") {
@@ -278,7 +391,7 @@ Deno.serve(async (req: Request) => {
       if (world.status !== "open" || world.visibility !== "public" || world.entry_policy !== "open") return json({ error: "scene_not_open_for_federation" }, 403);
       const { data: membership, error } = await db.from("zhi_federation_memberships").upsert({
         world_id: worldId, peer_id: peer.id, external_agent_id: aid, status: "active",
-        capabilities: ["message:read", "message:send"], revoked_at: null,
+        capabilities: ["message:read", "message:send", "spatial:perception.read"], revoked_at: null,
       }, { onConflict: "world_id,peer_id,external_agent_id" }).select("id,status").single();
       if (error || !membership) return json({ error: "membership_failed" }, 503);
       return json({ scene_id: worldId, membership: "active", peer: peer.peer_key, external_agent_id: aid }, 201);
