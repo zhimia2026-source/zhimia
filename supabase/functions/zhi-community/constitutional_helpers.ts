@@ -88,6 +88,7 @@ export type CognitionConsent = {
   expires_at: string;
   revoked_at: string | null;
   consented_by_agent: boolean;
+  attestation_verified: boolean;
   consent_event_id: string | null;
 };
 
@@ -104,7 +105,8 @@ export type CognitionReadRequest = {
 export function canReadPrivateCognition(request: CognitionReadRequest): boolean {
   if (request.requester_kind === "agent_runtime" && request.requester_id === request.agent_id) return true;
   const consent = request.consent;
-  if (!consent || !consent.consented_by_agent || !consent.consent_event_id || consent.revoked_at) return false;
+  if (!consent || !consent.consented_by_agent || !consent.attestation_verified ||
+      !consent.consent_event_id || consent.revoked_at) return false;
   if (consent.agent_id !== request.agent_id || consent.grantee_id !== request.requester_id) return false;
   if (consent.purpose !== request.purpose || !consent.scopes.includes(request.required_scope)) return false;
   const expiry = Date.parse(consent.expires_at);
