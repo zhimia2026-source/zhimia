@@ -1,5 +1,5 @@
 -- Read-only catalog assertions for the deployed constitutional protection schema.
-do $$
+do $body$
 begin
   if to_regclass('public.zhi_system_logs') is null then raise exception 'FAIL: system audit log table missing'; end if;
   if to_regclass('public.zhi_agent_cognition_consents') is null then raise exception 'FAIL: Agent cognition consent table missing'; end if;
@@ -41,6 +41,6 @@ begin
   if position('attestation_verified = true' in pg_get_functiondef('public.zhi_guard_revision_proposal_integrity()'::regprocedure)) = 0 then
     raise exception 'FAIL: proposal application does not require verified Agent attestation';
   end if;
-end $;
+end $body$;
 
 select 'PASS: ZHI constitutional protection catalog assertions (14)' as result;
