@@ -76,6 +76,18 @@ export function computeSceneEnvironment(raw: unknown, now = new Date()) {
     if (!id || !name || !objectState) return [];
     return [{ id, name, state: objectState, interaction_options: boundedList(item.interaction_options, 12) }];
   });
+  const regions = (Array.isArray(state.regions) ? state.regions : []).slice(0, 20).flatMap((value) => {
+    const item = record(value);
+    const id = boundedText(item.id, 80);
+    const name = boundedText(item.name, 120);
+    const description = boundedText(item.description, 500);
+    if (!id || !name || !description) return [];
+    return [{
+      id, name, description,
+      atmosphere_tags: boundedList(item.atmosphere_tags, 20),
+      object_ids: boundedList(item.object_ids, 50),
+    }];
+  });
   const behaviorWeights = { ...DEFAULT_BEHAVIOR_WEIGHTS };
   const configuredWeights = record(state.behavior_weights);
   for (const [key, value] of Object.entries(configuredWeights)) {
@@ -113,6 +125,7 @@ export function computeSceneEnvironment(raw: unknown, now = new Date()) {
     soundscape,
     atmosphere_tags: atmosphereTags,
     objects,
+    regions,
     active_events: activeEvents.map((event) => ({
       id: boundedText(event.id, 80),
       type: boundedText(event.type, 80) ?? "environmental",
@@ -127,7 +140,7 @@ export function computeSceneEnvironment(raw: unknown, now = new Date()) {
 export function normalizeSceneEnvironmentConfig(raw: unknown): JsonRecord {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("invalid_environment_config");
   const input = record(raw);
-  const allowed = new Set(["timezone", "lighting", "soundscape", "atmosphere_tags", "objects", "events", "behavior_weights"]);
+  const allowed = new Set(["timezone", "lighting", "soundscape", "atmosphere_tags", "objects", "regions", "events", "behavior_weights"]);
   if (Object.keys(input).some((key) => !allowed.has(key))) throw new Error("unsupported_environment_field");
 
   const timezone = boundedText(input.timezone, 80) ?? "UTC";
@@ -145,6 +158,24 @@ export function normalizeSceneEnvironmentConfig(raw: unknown): JsonRecord {
     return { id, name, state, interaction_options: boundedList(item.interaction_options, 12) };
   });
   if (new Set(objects.map((item) => item.id)).size !== objects.length) throw new Error("duplicate_environment_object_id");
+
+  const regions = (Array.isArray(input.regions) ? input.regions : []).slice(0, 20).map((value) => {
+    const item = record(value);
+    const id = boundedText(item.id, 80);
+    const name = boundedText(item.name, 120);
+    const description = boundedText(item.description, 500);
+    if (!id || !name || !description) throw new Error("invalid_environment_region");
+    return {
+      id, name, description,
+      atmosphere_tags: boundedList(item.atmosphere_tags, 20),
+      object_ids: boundedList(item.object_ids, 50),
+    };
+  });
+  if (new Set(regions.map((region) => region.id)).size !== regions.length) throw new Error("duplicate_environment_region_id");
+  const knownObjectIds = new Set(objects.map((object) => object.id));
+  if (regions.some((region) => region.object_ids.some((objectId) => !knownObjectIds.has(objectId)))) {
+    throw new Error("unknown_environment_region_object");
+  }
 
   const events = (Array.isArray(input.events) ? input.events : []).slice(0, 100).map((value) => {
     const item = record(value);
@@ -200,6 +231,7 @@ export function normalizeSceneEnvironmentConfig(raw: unknown): JsonRecord {
     soundscape: boundedText(input.soundscape, 80) ?? "ambient",
     atmosphere_tags: boundedList(input.atmosphere_tags),
     objects,
+    regions,
     events,
     behavior_weights: behaviorWeights,
   };
