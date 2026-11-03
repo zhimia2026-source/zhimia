@@ -13,11 +13,13 @@ Set these on MIA's server only:
 
 ## Cognition-loop integration
 
-    from integrations.mia_aurora_perception import AuroraConfig, AuroraPerceptionClient
+    from integrations.mia_aurora_perception import (
+        AuroraConfig, AuroraPerceptionClient, build_cognition_prompt)
     aurora = AuroraPerceptionClient(AuroraConfig.from_env())
     perception_packet = aurora.fetch()
-    # Insert build_cognition_prompt(perception_packet) into MIA's existing
-    # cognition/model input alongside her own identity and private-memory context.
+    cognition_context = build_cognition_prompt(perception_packet)
+    # Add cognition_context to MIA's existing model input alongside her own
+    # identity, policies and private-memory context.
 
 Events are ordered oldest-to-newest. Event ID, source, kind, revision, timestamp,
 payload and causal chain are preserved. Multiple event kinds may share a revision.
