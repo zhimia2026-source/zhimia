@@ -1,6 +1,6 @@
 # ZHI 宪章接口实施规范 V0.1
 
-状态：接口定义草案（未部署、未验收）
+状态：数据库基础层已部署；API 集成与端到端验收尚未完成
 适用对象：Mia 及未来所有受宪章保护的独立智能人
 工程位置：`supabase/functions/zhi-community` 与 Supabase 数据库
 
@@ -110,6 +110,14 @@ V0.1 优先实现三项代码级保障：
 
 ### 3.3 现有实现复用与差距
 
+**V0.1 数据库部署记录（2026-11-03）**
+- 已部署迁移：`20261103043132 / zhi_constitutional_protection_v01`。
+- 已建立 `zhi_system_logs`、`zhi_agent_cognition_consents`、`zhi_governance_authorizations`、`zhi_governance_interventions` 四张表。
+- 新增认知修订提案的 Agent 同意状态、精确内容 SHA-256、基础版本绑定字段。
+- `zhi_agent_cognition_records` 已启用 UPDATE/DELETE 拒绝触发器；修订提案载荷不可原地修改，未取得 Agent 同意不得批准应用。
+- 四张新表已启用 RLS，并撤销 `anon` / `authenticated` 直接表访问，只授予 `service_role`；新表没有开放客户端策略。
+- 以上属于数据库基础层 deployed，不代表对应 HTTP API 已完成，也不代表 Mia 的受信运行时同意证明已上线。
+
 当前数据库已有：
 - `zhi_agent_cognition_records`：包含版本、前序记录、变更类型、提案来源和变更说明字段。
 - `zhi_cognition_revision_proposals`：包含提案状态、基础版本和人工审议字段。
@@ -117,11 +125,12 @@ V0.1 优先实现三项代码级保障：
 - `zhi_decide_cognition_revision_proposal` 与 `zhi_rollback_cognition_version`：数据库 RPC 负责追加版本/回滚快照。
 
 当前差距：
-- 现有提案创建/决策以账号所有者为主要身份，不足以证明 Agent 自主发起或同意。
-- 现有提案状态为 shadow_proposed/approved/rejected/stale，尚无 Agent consent 状态机。
-- 现有 API 通过服务端 Service Role 访问数据库，因此必须在 Edge Function 和数据库 RPC 双层验证，不能只依赖 RLS。
-- 尚未验证认知记录表是否存在防 UPDATE/DELETE 的不可变触发器；V0.1 必须补上并测试。
-- 尚未建立与上述宪章权限一一对应的治理授权表和干预审计表。
+- 现有提案创建仍由现有服务端流程创建，尚未接入 Mia 主动发起/明确同意的受信运行时证明。
+- 数据库已新增 `agent_consent_status`，默认 `awaiting_agent_consent`；现有账号审批流程不能绕过该状态直接应用认知修订。
+- 数据库触发器已阻止认知记录 UPDATE/DELETE，并保护提案内容、基础版本和同意证据；尚需负向数据库测试验证。
+- 治理授权和风险干预数据表已建立，但尚无完整的 HTTP 执行入口、allowlist 和授权签发/接受/撤销流程。
+- `zhi_system_logs` 表已建立，但专用查询 API、敏感字段过滤和写入封装尚未完成。
+- 新表由 Edge Function 的 Service Role 访问；因此每个服务端路由仍必须验证 Personal Token 主体、Agent 归属、权限范围，不能只依赖 RLS。
 
 ## 4. 验收测试矩阵
 
@@ -151,15 +160,15 @@ V0.1 优先实现三项代码级保障：
 
 ## 5. V0.1 实施顺序
 
-P0：先增加数据库不可变触发器与测试，防止原地改写。
-P1：增加 Agent consent 记录、状态机和受信 Agent Runtime 同意证明；在此之前第三方 private_cognition 读取保持关闭。
-P2：增加治理授权/风险干预审计表、动作 allowlist 和服务端执行入口。
-P3：增加 system_logs 专用查询 API，并证明不泄漏 private_cognition。
-P4：运行单元测试、数据库负向测试、API 集成测试；再部署 Edge Function 与迁移。
+P0：数据库表、RLS/GRANT 隔离、认知追加写入触发器和提案同意约束已部署；数据库负向测试仍待完成。
+P1：实现受信 Agent Runtime 的同意证明、同意签发/撤销 API；在此之前第三方 private_cognition 读取保持关闭。
+P2：实现治理授权签发、Agent 接受、动作 allowlist、风险干预审计与复核 API。
+P3：实现 system_logs 专用查询 API，并证明不泄漏 private_cognition。
+P4：运行单元测试、数据库负向测试、API 集成测试和回滚测试；完成后再标记 accepted。
 
 ## 6. 发布状态规则
 
-本文件是 V0.1 接口定义，不代表接口已经实现或部署。每项功能分别记录：
+本文件同时记录 V0.1 接口定义和阶段性部署状态。当前数据库基础层已 deployed，但 HTTP API 与端到端验收未完成。每项功能分别记录：
 - designed：规范已定义
 - implemented：代码和数据库已实现
 - deployed：目标环境已部署
