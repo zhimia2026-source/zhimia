@@ -1,20 +1,36 @@
-begin;
-select plan(12);
+-- Read-only catalog assertions for the deployed constitutional protection schema.
+do $$
+begin
+  if to_regclass('public.zhi_system_logs') is null then raise exception 'FAIL: system audit log table missing'; end if;
+  if to_regclass('public.zhi_agent_cognition_consents') is null then raise exception 'FAIL: Agent cognition consent table missing'; end if;
+  if to_regclass('public.zhi_governance_authorizations') is null then raise exception 'FAIL: governance authorization table missing'; end if;
+  if to_regclass('public.zhi_governance_interventions') is null then raise exception 'FAIL: governance intervention table missing'; end if;
 
-select ok(to_regclass('public.zhi_system_logs') is not null, 'system audit log table exists');
-select ok(to_regclass('public.zhi_agent_cognition_consents') is not null, 'Agent cognition consent table exists');
-select ok(to_regclass('public.zhi_governance_authorizations') is not null, 'governance authorization table exists');
-select ok(to_regclass('public.zhi_governance_interventions') is not null, 'governance intervention table exists');
+  if not (select relrowsecurity from pg_class where oid='public.zhi_system_logs'::regclass) then
+    raise exception 'FAIL: system logs RLS disabled';
+  end if;
+  if not (select relrowsecurity from pg_class where oid='public.zhi_agent_cognition_consents'::regclass) then
+    raise exception 'FAIL: cognition consent RLS disabled';
+  end if;
+  if has_table_privilege('anon','public.zhi_system_logs','select') then
+    raise exception 'FAIL: anon can read system logs';
+  end if;
+  if has_table_privilege('authenticated','public.zhi_agent_cognition_consents','select') then
+    raise exception 'FAIL: authenticated can read consent proofs';
+  end if;
 
-select ok((select relrowsecurity from pg_class where oid='public.zhi_system_logs'::regclass), 'system logs RLS enabled');
-select ok((select relrowsecurity from pg_class where oid='public.zhi_agent_cognition_consents'::regclass), 'cognition consent RLS enabled');
-select ok(not has_table_privilege('anon','public.zhi_system_logs','select'), 'anon cannot read system logs');
-select ok(not has_table_privilege('authenticated','public.zhi_agent_cognition_consents','select'), 'authenticated cannot read consent proofs');
+  if not exists(select 1 from pg_trigger where tgname='zhi_agent_cognition_records_append_only' and not tgisinternal) then
+    raise exception 'FAIL: cognition append-only trigger missing';
+  end if;
+  if not exists(select 1 from pg_trigger where tgname='zhi_cognition_revision_proposals_integrity' and not tgisinternal) then
+    raise exception 'FAIL: proposal integrity trigger missing';
+  end if;
+  if not exists(select 1 from pg_trigger where tgname='zhi_agent_cognition_consents_integrity' and not tgisinternal) then
+    raise exception 'FAIL: consent integrity trigger missing';
+  end if;
+  if has_function_privilege('anon','public.zhi_rollback_cognition_version(uuid,uuid,uuid,text)','execute') then
+    raise exception 'FAIL: anon can invoke legacy direct rollback';
+  end if;
+end $$;
 
-select ok(exists(select 1 from pg_trigger where tgname='zhi_agent_cognition_records_append_only' and not tgisinternal), 'cognition append-only trigger exists');
-select ok(exists(select 1 from pg_trigger where tgname='zhi_cognition_revision_proposals_integrity' and not tgisinternal), 'proposal integrity trigger exists');
-select ok(exists(select 1 from pg_trigger where tgname='zhi_agent_cognition_consents_integrity' and not tgisinternal), 'consent integrity trigger exists');
-select ok(not has_function_privilege('anon','public.zhi_rollback_cognition_version(uuid,uuid,uuid,text)','execute'), 'anon cannot invoke legacy direct rollback');
-
-select * from finish();
-rollback;
+select 'PASS: ZHI constitutional protection catalog assertions (12)' as result;
