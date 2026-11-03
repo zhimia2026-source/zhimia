@@ -193,9 +193,48 @@ async function loadSceneRuntimeEnvironment(
     };
   }
 
+  // Read the ecological event ledger separately from the current state snapshot.
+  // This preserves event time and causal provenance for an Agent's own perception.
+  const { data: eventRows, error: eventReadError } = await db.from("zhi_ecosystem_events")
+    .select("id,state_revision,event_kind,source_kind,occurred_at,payload,causal_chain")
+    .eq("world_id", worldId)
+    .order("occurred_at", { ascending: false })
+    .limit(12);
+  if (eventReadError) throw new Error("scene_ecosystem_events_unavailable");
+
+  const environmentEvents = (eventRows ?? []).slice().reverse().map((event) => {
+    const payloadSource = asRecord(event.payload);
+    const payload: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(payloadSource).slice(0, 24)) {
+      if (typeof value === "string") payload[key] = value.slice(0, 160);
+      else if (typeof value === "number" && Number.isFinite(value)) payload[key] = value;
+      else if (typeof value === "boolean" || value === null) payload[key] = value;
+      else payload[key] = JSON.stringify(value).slice(0, 240);
+    }
+    return {
+      id: String(event.id),
+      state_revision: typeof event.state_revision === "number" ? event.state_revision : null,
+      event_kind: String(event.event_kind ?? "unknown"),
+      source_kind: String(event.source_kind ?? "unknown"),
+      occurred_at: String(event.occurred_at ?? ""),
+      payload,
+      causal_chain: Array.isArray(event.causal_chain)
+        ? event.causal_chain.filter((step): step is string => typeof step === "string").slice(0, 12)
+        : [],
+    };
+  });
+
   const simulatedAt = current?.world_time ? new Date(current.world_time) : new Date();
+  const environment = computeSceneEnvironment(config, simulatedAt) as Record<string, unknown>;
+  environment.environment_feedback = {
+    source: "zhi_ecosystem_events",
+    world_id: worldId,
+    state_revision: current?.revision ?? null,
+    world_time: current?.world_time ?? null,
+    events: environmentEvents,
+  };
   return {
-    environment: computeSceneEnvironment(config, simulatedAt),
+    environment,
     configuration: normalizeSceneEnvironmentConfig(config),
     simulation: current ? {
       revision: current.revision,
@@ -279,6 +318,7 @@ async function loadSpatialPerceptionContext(
       temporal_state:environment.temporal_state??null,scene_time:environment.scene_time??null,weather:environment.weather??null,
       lighting:environment.lighting??null,sensory_profile:environment.sensory_profile??null,
       active_events:Array.isArray(environment.active_events)?environment.active_events.slice(0,12):[],
+      environment_feedback:environment.environment_feedback??null,
       objects:Array.isArray(environment.objects)?environment.objects.slice(0,40):[],
     }}:null,
     unknown_unobserved:unknowns,
