@@ -46,6 +46,109 @@ type ModelState = {
   state: Record<string, any>;
 };
 
+type ObjectProfile = {
+  material: "crystal" | "stone" | "crafted" | "masonry";
+  weatheringRate: number;
+  depositionRate: number;
+  thermalSensitivity: number;
+};
+
+const OBJECT_PROFILES: Record<string, ObjectProfile> = {
+  crystal_forest_tree: { material: "crystal", weatheringRate: 0.0000007, depositionRate: 0.0000012, thermalSensitivity: 0.7 },
+  forest_mist_gate: { material: "stone", weatheringRate: 0.0000015, depositionRate: 0.0000018, thermalSensitivity: 0.4 },
+  ocean_tide_lantern: { material: "crafted", weatheringRate: 0.00000045, depositionRate: 0.000001, thermalSensitivity: 0.5 },
+  memory_echo_stone: { material: "stone", weatheringRate: 0.0000012, depositionRate: 0.0000013, thermalSensitivity: 0.35 },
+  lumina_square: { material: "masonry", weatheringRate: 0.0000009, depositionRate: 0.0000008, thermalSensitivity: 0.3 },
+};
+
+function advanceObjectLifecycles(
+  objects: Record<string, any>,
+  elapsedHours: number,
+  rainfallMm: number,
+  meanTemperatureC: number,
+  windExposure: number,
+  worldTimeMs: number,
+) {
+  const events: Record<string, unknown>[] = [];
+  const totalDays = elapsedHours / 24;
+  for (const [objectId, object] of Object.entries(objects ?? {})) {
+    const profile = OBJECT_PROFILES[objectId] ?? {
+      material: "crafted" as const,
+      weatheringRate: 0.0000002,
+      depositionRate: 0.0000002,
+      thermalSensitivity: 0.2,
+    };
+    const micro = object.micro_state ?? {};
+    const previousStage = object.lifecycle_stage ?? "forming";
+    const ageHours = Number(micro.age_hours ?? 0) + elapsedHours;
+    const wetExposure = Number(micro.wet_exposure_index ?? 0) +
+      rainfallMm * (profile.material === "stone" ? 0.9 : 0.65);
+    const windExposureTotal = Number(micro.wind_exposure_index ?? 0) +
+      windExposure * totalDays;
+    const thermalStress = Number(micro.thermal_stress_index ?? 0) +
+      Math.abs(meanTemperatureC - 18) * profile.thermalSensitivity * totalDays * 0.0001;
+    const weathering = clamp(
+      Number(micro.weathering_index ?? 0) +
+        (profile.weatheringRate * elapsedHours) +
+        (wetExposure * profile.weatheringRate * 0.00001) +
+        (windExposureTotal * profile.weatheringRate * 0.0001) +
+        thermalStress * 0.000001,
+      0,
+      1,
+    );
+    const deposition = clamp(
+      Number(micro.surface_deposition_index ?? 0) +
+        rainfallMm * profile.depositionRate +
+        totalDays * profile.depositionRate,
+      0,
+      1,
+    );
+    const stage = weathering < 0.02
+      ? "newly_formed"
+      : weathering < 0.15
+      ? "weathering"
+      : weathering < 0.45
+      ? "aged"
+      : weathering < 0.8
+      ? "heavily_weathered"
+      : "relic";
+    object.material_profile = profile.material;
+    object.lifecycle_stage = stage;
+    object.lifecycle_status = "tracked_model";
+    object.micro_state = {
+      ...micro,
+      age_hours: Number(ageHours.toFixed(4)),
+      wet_exposure_index: Number(wetExposure.toFixed(8)),
+      wind_exposure_index: Number(windExposureTotal.toFixed(8)),
+      thermal_stress_index: Number(thermalStress.toFixed(8)),
+      weathering_index: Number(weathering.toFixed(10)),
+      surface_deposition_index: Number(deposition.toFixed(10)),
+      last_lifecycle_update_elapsed_hours: Number(elapsedHours.toFixed(4)),
+      lifecycle_model: "zhi_object_lifecycle_v0.1",
+      parameter_quality: "modeled_assumption",
+    };
+    if (stage !== previousStage) {
+      events.push({
+        idempotency_key: "object-stage:" + objectId + ":" + stage + ":" + ageHours.toFixed(0),
+        event_kind: "object_lifecycle_stage_changed",
+        source_kind: "material_process",
+        occurred_at: new Date(worldTimeMs).toISOString(),
+        payload: {
+          object_id: objectId,
+          material: profile.material,
+          previous_stage: previousStage,
+          lifecycle_stage: stage,
+          age_hours: Number(ageHours.toFixed(2)),
+          weathering_index: Number(weathering.toFixed(10)),
+          simulated: true,
+        },
+        causal_chain: ["world_time", "rain_wind_temperature_exposure", "material_weathering", "object_lifecycle_stage"],
+      });
+    }
+  }
+  return events;
+}
+
 function advanceModel(
   worldId: string,
   initial: Record<string, any>,
@@ -91,6 +194,8 @@ function advanceModel(
   let evaporationTotal = 0;
   let runoffTotal = 0;
   let rainHours = 0;
+  let temperatureHours = 0;
+  let windSpeedHours = 0;
   let lastWeather: Record<string, unknown> = {};
   const events: Record<string, unknown>[] = [];
 
@@ -120,6 +225,8 @@ function advanceModel(
       5 * Math.sin(2 * Math.PI * (hourOfDay - 8) / 24) +
       2.5 * Math.sin(2 * Math.PI * (dayOfYear - 80) / 365.25);
     const windSpeedMps = 0.4 + 5 * windSeed;
+    temperatureHours += temperatureC * hours;
+    windSpeedHours += windSpeedMps * hours;
 
     // Rain -> infiltration -> soil water; sunlight/temperature -> evaporation;
     // canopy -> transpiration. All coefficients are versioned model assumptions.
@@ -190,6 +297,19 @@ function advanceModel(
     cursor = segmentEnd;
   }
 
+  const elapsedHours = (toMs - fromMs) / 3_600_000;
+  const averageTemperature = elapsedHours > 0 ? temperatureHours / elapsedHours : 18;
+  const meanWind = elapsedHours > 0 ? windSpeedHours / elapsedHours : 1;
+  const lifecycleEvents = advanceObjectLifecycles(
+    state.objects ?? {},
+    elapsedHours,
+    rainTotal,
+    averageTemperature,
+    meanWind,
+    toMs,
+  );
+  events.push(...lifecycleEvents);
+
   soil.moisture_fraction = Number(moisture.toFixed(8));
   soil.nutrient_index = typeof soil.nutrient_index === "number"
     ? soil.nutrient_index
@@ -217,7 +337,7 @@ function advanceModel(
 
   state.engine = {
     id: "zhi_living_ecosystem",
-    version: "0.1.0",
+    version: "0.2.1",
     model_assumptions: assumptions,
     last_interval_hours: Number(((toMs - fromMs) / 3_600_000).toFixed(6)),
     last_tick_summary: {
@@ -361,7 +481,7 @@ Deno.serve(async (req: Request) => {
     commit,
     summary: result.summary,
     remaining_seconds: Math.max(0, Math.floor((requestedTarget - toMs) / 1000)),
-    model: "zhi_living_ecosystem/0.1.0",
+    model: "zhi_living_ecosystem/0.2.1",
     weather_source: "world_generated_model",
   });
 });
