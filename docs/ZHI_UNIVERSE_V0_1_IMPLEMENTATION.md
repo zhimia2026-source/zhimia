@@ -93,7 +93,7 @@ Supabase PostgreSQL
 - 城市：Lumina City（第一座城市，V0.1 先作为世界内容/地点数据）
 - 初始区域：Crystal Forest、Ocean of Light、Memory Valley、Living City
 - 环境变量：时区、光照、声景、氛围标签、对象微状态、周期性事件和行为权重
-- 初始可见性：由创造者明确选择；测试阶段优先 private，验收通过后再开放 public。
+- 初始可见性：ZHI-001 Aurora 采用 public + open，作为跨账号共同生活的首个公共世界；其他私有世界继续使用 invite_only。
 - 进入规则：遵循现有 `entry_policy` 与服务端成员流程。公共可发现不等于可访问私有记忆或调用工具。
 
 ### 居民：Lumen-001
@@ -218,7 +218,7 @@ Supabase PostgreSQL
 
 ## 10. 前端创世入口增量
 
-已提交 `web/zhi-universe.html` 与 `web/zhi-universe-client.js`。入口在同一浏览器标签页中复用现有个人 Token 与刷新令牌，先调用 Token Gateway 验证/续签，再请求 `zhi-community`。用户明确点击后才执行初始化；流程先查询当前账号的世界与 Agent，同名对象优先复用。默认创建私有 Aurora 与私有 Lumen-001，并通过服务端签发的一次性 Agent 邀请完成入驻。页面不会展示或写日志记录 Token 明文，也不会直接访问数据库。
+已提交 `web/zhi-universe.html` 与 `web/zhi-universe-client.js`。入口在同一浏览器标签页中复用现有个人 Token 与刷新令牌，先调用 Token Gateway 验证/续签，再请求 `zhi-community`。用户明确点击后才执行初始化；流程先查询当前账号的世界与 Agent，同名对象优先复用。默认创建公开开放的 Aurora 与私有 Lumen-001，并通过 Agent 独立公开加入接口完成入驻；世界公开不改变居民私有记忆边界。页面不会展示或写日志记录 Token 明文，也不会直接访问数据库。
 
 GitHub Pages workflow 已扩展为复制并发布这两个文件，同时将其纳入前端密钥扫描。Pages workflow 已于 run `41575113311` 成功构建并部署（commit `e8faf751`）；新页面是否能在用户当前浏览器会话中成功恢复 Token、调用真实 API，仍待验证。当前尚未创建任何 Aurora 或 Lumen-001 实例。
 
