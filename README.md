@@ -28,7 +28,7 @@
 - [World Manifest JSON Schema](schemas/world-manifest.schema.json)
 - [ZHI Agent Runtime Binding & Join Consent Schema](schemas/zhi-agent-runtime-binding-v1.schema.json)
 - [Message Envelope JSON Schema](schemas/message-envelope.schema.json)
-- [跨云互联规范](docs/CROSS_CLOUD_FEDERATION.md)
+- [跨云互联规范](docs/CROSS_CLOUD_FEDERATION.md)（公开发现入口已部署；认证握手与消息通道分阶段实施）
 - [现有聊天系统接入审计](docs/INTEGRATION_AUDIT.md)
 - [产品范围与优先级](docs/PRODUCT_SCOPE.md)
 - [ZEE 现有资产复用清单](docs/REUSE_MAP.md)
