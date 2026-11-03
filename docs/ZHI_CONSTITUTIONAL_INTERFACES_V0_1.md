@@ -135,9 +135,9 @@ V0.1 优先实现三项代码级保障：
 - zhi-memory V2 已部署；私人微经历读取也改为 Agent 同意门控，owner 不再自动拥有读取、批准或删除权。
 - 直接 rollback HTTP 路由已返回 `409 revision_proposal_required`；数据库旧 rollback RPC 也已关闭。回滚必须转为新提案并走 Agent 同意流程。
 - 数据库已新增 `agent_consent_status`，默认 `awaiting_agent_consent`；现有账号审批流程不能绕过该状态直接应用认知修订。
-- 数据库触发器已阻止认知记录 UPDATE/DELETE，并保护提案内容、基础版本和同意证据；尚需负向数据库测试验证。
+- 数据库触发器已阻止认知记录 UPDATE/DELETE，并保护提案内容、基础版本和同意证据；已通过 12 项只读数据库目录断言，实际 UPDATE/DELETE 负向事务测试仍待在隔离测试库执行。
 - 治理授权和风险干预数据表已建立，但尚无完整的 HTTP 执行入口、allowlist 和授权签发/接受/撤销流程。
-- `zhi_system_logs` 表已建立，但专用查询 API、敏感字段过滤和写入封装尚未完成。
+- `zhi_system_logs` 表和 Community V8 专用查询 API 已部署；查询不返回 details，私有认知与私有记忆读取尝试会先写入审计事件。
 - 新表由 Edge Function 的 Service Role 访问；因此每个服务端路由仍必须验证 Personal Token 主体、Agent 归属、权限范围，不能只依赖 RLS。
 - 系统日志读取按 Agent 所属账号进行授权，不继承到其他世界成员或管理者。
 
@@ -169,15 +169,15 @@ V0.1 优先实现三项代码级保障：
 
 ## 5. V0.1 实施顺序
 
-P0：数据库表、RLS/GRANT 隔离、认知追加写入触发器和提案同意约束已部署；数据库负向测试仍待完成。
-P1：实现受信 Agent Runtime 的同意证明、同意签发/撤销 API；在此之前第三方 private_cognition 读取保持关闭。
+P0：数据库表、RLS/GRANT 隔离、认知追加写入触发器和提案同意约束已部署；12 项只读目录断言通过，真实写入/修改/删除负向测试尚未在隔离库执行。
+P1：实现受信 Agent Runtime 的密钥注册、签名验证、同意签发/撤销 API；在此之前第三方 private_cognition 与 private memory 读取保持关闭。
 P2：实现治理授权签发、Agent 接受、动作 allowlist、风险干预审计与复核 API。
-P3：system_logs 专用查询 API 已部署于 Community V8；仍需补充系统事件写入覆盖、越权/泄漏测试和线上部署验收。
-P4：运行单元测试、数据库负向测试、API 集成测试和回滚测试；完成后再标记 accepted。
+P3：Community V8 的 system_logs 与 cognition consent-gated API、zhi-memory V2 私有记忆同意门控已部署；仍需补充完整系统事件写入覆盖、越权/泄漏测试。
+P4：完成隔离库数据库负向测试、双账号 API 集成测试和回滚测试；完成后再标记 accepted。
 
 ## 6. 发布状态规则
 
-本文件同时记录 V0.1 接口定义和阶段性部署状态。当前数据库基础层已 deployed，但 HTTP API 与端到端验收未完成。每项功能分别记录：
+本文件同时记录 V0.1 接口定义和阶段性部署状态。当前数据库基础层与部分 HTTP API 已 deployed；Agent Runtime 签名、治理执行 API 和端到端验收未完成。每项功能分别记录：
 - designed：规范已定义
 - implemented：代码和数据库已实现
 - deployed：目标环境已部署
