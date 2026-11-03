@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
-import { isTokenExpiryValid, tokenTouchSucceeded } from "./auth_helpers.ts";
+import { hasCapability, isTokenExpiryValid, tokenTouchSucceeded } from "./auth_helpers.ts";
 import { isMembershipAuthorized, isAgentMembershipAuthorized, privilegesForPublicRejoin } from "./access_helpers.ts";
 import { validateMouRecord } from "./ontology_helpers.ts";
 import { buildFeedbackRecord, buildRevisionProposal } from "./cognitive_cycle_helpers.ts";
@@ -81,10 +81,6 @@ async function readBody(req: Request): Promise<JsonObject> {
   return value as JsonObject;
 }
 
-function hasCapability(actor: Actor, capability: string): boolean {
-  return Array.isArray(actor.capabilities) && actor.capabilities.includes(capability);
-}
-
 function isText(value: unknown, max: number): value is string {
   return typeof value === "string" && value.trim().length > 0 && value.length <= max;
 }
@@ -139,6 +135,9 @@ export function createCommunityHandler(
     }
 
     if (req.method === "POST" && path === "/v1/agents") {
+      if (!hasCapability(actor, "community.agent.create")) {
+        return reply({ error: "forbidden", detail: "capability_required" }, 403);
+      }
       const body = await readBody(req);
       if (!isText(body.display_name, 120)) return reply({ error: "invalid_argument", detail: "display_name_required" }, 400);
       const role = body.role === undefined ? "manager" : body.role;
@@ -670,6 +669,9 @@ export function createCommunityHandler(
     }
 
     if (req.method === "POST" && path === "/v1/scenes") {
+      if (!hasCapability(actor, "community.scene.create")) {
+        return reply({ error: "forbidden", detail: "capability_required" }, 403);
+      }
       const body = await readBody(req);
       if (!isText(body.name, 160) || !["public", "private"].includes(String(body.visibility))) {
         return reply({ error: "invalid_argument", detail: "name_and_visibility_required" }, 400);
