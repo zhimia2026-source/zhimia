@@ -71,6 +71,18 @@ export function createUniverseClient() {
   }
 
   return {
+    async login(value) {
+      const supplied = String(value || "").trim();
+      if (!supplied) throw new Error("请输入个人令牌。");
+      save(supplied, "");
+      const result = await gateway("login", token);
+      if (!result.response.ok) {
+        save("", "");
+        throw new Error(result.data.message || result.data.detail || result.data.error || ("令牌验证失败 · HTTP " + result.response.status));
+      }
+      if (result.data.refresh_token) save(token, result.data.refresh_token);
+      return { label: result.data.label || "已验证" };
+    },
     async restore() {
       token = sessionStorage.getItem(TOKEN_KEY) || "";
       refreshToken = sessionStorage.getItem(REFRESH_KEY) || "";
