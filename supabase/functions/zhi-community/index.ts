@@ -1,12 +1,13 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { hasCapability, isTokenExpiryValid, tokenTouchSucceeded } from "./auth_helpers.ts";
-import { isMembershipAuthorized, isAgentMembershipAuthorized, privilegesForPublicRejoin, normalizeWorldProtocolPath, isPublicAgentJoinAllowed, publicAgentMembershipPrivileges } from "./access_helpers.ts";
+import { isMembershipAuthorized, isAgentMembershipAuthorized, isWorldResidentDiscoverable, isSceneMessageVisibleToAgent, privilegesForPublicRejoin, normalizeWorldProtocolPath, isPublicAgentJoinAllowed, publicAgentMembershipPrivileges } from "./access_helpers.ts";
 import { validateMouRecord } from "./ontology_helpers.ts";
 import { buildFeedbackRecord, buildRevisionProposal } from "./cognitive_cycle_helpers.ts";
 import { buildPrivateAgentContext, buildPrivateChatHistory, buildSceneAwarenessContext, buildSceneBehaviorGuidance } from "./chat_context_helpers.ts";
 import { computeSceneEnvironment, normalizeSceneEnvironmentConfig } from "./environment_helpers.ts";
 import { canReadPrivateCognition } from "./constitutional_helpers.ts";
 import { normalizeAgentReflection, normalizeMemoryCandidate } from "./memory_experience_helpers.ts";
+import { buildAgentAddress, parseAgentAddress } from "./agent_address_helpers.ts";
 
 const MAX_BODY_BYTES = 64_000;
 
@@ -445,6 +446,29 @@ export function createCommunityHandler(
         .eq("owner_user_id", actor.userId).order("created_at", { ascending: false }).limit(100);
       if (error) throw new Error("database_error");
       return reply({ items: agents ?? [] });
+    }
+
+    // Exact logical identity resolution is owner-scoped in this first phase.
+    // It returns no private cognition, credentials, runtime address, or scene permissions.
+    if (req.method === "GET" && parts.length === 4 && parts[0] === "v1" &&
+        parts[1] === "agents" && parts[3] === "identity") {
+      const agentId = parts[2];
+      if (!isUuid(agentId)) return reply({ error: "invalid_argument", detail: "agent_id_must_be_uuid" }, 400);
+      const { data: agent, error } = await db.from("zhi_agents")
+        .select("id,display_name,role,status")
+        .eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
+      if (error) throw new Error("database_error");
+      // Do not reveal whether a private Agent exists to a non-owner.
+      if (!agent) return reply({ error: "not_found" }, 404);
+      return reply({
+        schema: "zhi.agent.identity.v1",
+        agent_id: agent.id,
+        identity_uri: buildAgentAddress(agent.id),
+        display_name: agent.display_name,
+        role: agent.role,
+        identity_status: agent.status,
+        resolution_scope: "owner",
+      });
     }
 
     // Operational audit metadata is visible to the Agent owner only with an explicit audit capability.
@@ -1175,39 +1199,10 @@ export function createCommunityHandler(
       let sceneAwarenessContext = "";
       let spatialPerceptionContext = "";
       let sceneBehaviorGuidance = "当前没有由用户明确选择的场景；不要假设智能人正在任何社区场景中。";
-      if (body.scene_id !== undefined && body.scene_id !== null && body.scene_id !== "") {
-        if (!isUuid(body.scene_id)) return reply({ error: "invalid_argument", detail: "scene_id_must_be_uuid" }, 400);
-        const { data: scene, error: sceneError } = await db.from("zhi_worlds")
-          .select("id,name,description,visibility,entry_policy,status,environment_state")
-          .eq("id", body.scene_id).maybeSingle();
-        if (sceneError) throw new Error("database_error");
-        if (!scene || scene.status !== "open") return reply({ error: "not_found" }, 404);
-        const { data: sceneMembership, error: sceneMembershipError } = await db.from("zhi_world_memberships")
-          .select("principal_user_id,status,revoked_at,agent_id,expires_at,capabilities")
-          .eq("world_id", body.scene_id).eq("principal_user_id", actor.userId)
-          .eq("status", "active").is("revoked_at", null).is("agent_id", null).maybeSingle();
-        if (sceneMembershipError) throw new Error("database_error");
-        if (!isMembershipAuthorized(sceneMembership, actor.userId, "message:read")) {
-          return reply({ error: "forbidden", detail: "scene_membership_required" }, 403);
-        }
-        const { data: agentSceneMembership, error: agentMembershipError } = await db.from("zhi_world_memberships")
-          .select("principal_user_id,status,revoked_at,agent_id,expires_at,capabilities")
-          .eq("world_id", body.scene_id).eq("principal_user_id", actor.userId).eq("agent_id", agentId)
-          .eq("status", "active").is("revoked_at", null).maybeSingle();
-        if (agentMembershipError) throw new Error("database_error");
-        if (!isAgentMembershipAuthorized(agentSceneMembership, actor.userId, agentId, "message:read")) {
-          return reply({ error: "forbidden", detail: "agent_scene_membership_required" }, 403);
-        }
-        if (!agentSceneMembership || !Array.isArray(agentSceneMembership.capabilities) ||
-            !agentSceneMembership.capabilities.includes("spatial:perception.read")) {
-          return reply({ error: "forbidden", detail: "spatial_perception_membership_capability_required" }, 403);
-        }
-        const sceneRuntime = await loadSceneRuntimeEnvironment(db, body.scene_id, scene.environment_state);
-        const sceneEnvironment = sceneRuntime.environment;
-        sceneAwarenessContext = buildSceneAwarenessContext(scene, sceneEnvironment);
-        sceneBehaviorGuidance = buildSceneBehaviorGuidance(sceneEnvironment);
-        spatialPerceptionContext = await loadSpatialPerceptionContext(db, body.scene_id, agentId, actor.userId, sceneRuntime);
-      }
+      // Private human-to-agent chat never depends on scene membership or
+      // spatial perception. Scene context is obtained through separate,
+      // capability-checked runtime perception endpoints.
+
       const { data: pendingTurn, error: insertError } = await db.from("zhi_agent_chat_turns")
         .insert({
           owner_user_id: actor.userId, agent_id: agentId, request_key: requestKey,
@@ -1703,6 +1698,107 @@ export function createCommunityHandler(
       return reply(result, 200);
     }
 
+    // World-scoped resident directory: visible only to active human members.
+    // Private memory, owner identifiers, credentials, and runtime endpoints are omitted.
+    if (req.method === "GET" && parts.length === 4 && parts[0] === "v1" &&
+        parts[1] === "scenes" && parts[3] === "agents") {
+      const sceneId = parts[2];
+      if (!isUuid(sceneId)) return reply({ error: "invalid_argument", detail: "scene_id_must_be_uuid" }, 400);
+      const { data: world, error: worldError } = await db.from("zhi_worlds")
+        .select("id,status").eq("id", sceneId).maybeSingle();
+      if (worldError) throw new Error("database_error");
+      if (!world || world.status !== "open") return reply({ error: "not_found" }, 404);
+      const { data: requester, error: requesterError } = await db.from("zhi_world_memberships")
+        .select("principal_user_id,agent_id,status,revoked_at,expires_at,capabilities")
+        .eq("world_id", sceneId).eq("principal_user_id", actor.userId)
+        .is("agent_id", null).eq("status", "active").is("revoked_at", null).maybeSingle();
+      if (requesterError) throw new Error("database_error");
+      if (!isMembershipAuthorized(requester, actor.userId, "message:read")) {
+        return reply({ error: "forbidden", detail: "active_world_membership_required" }, 403);
+      }
+      const { data: memberships, error: membershipsError } = await db.from("zhi_world_memberships")
+        .select("principal_user_id,agent_id,status,revoked_at,expires_at,capabilities")
+        .eq("world_id", sceneId).eq("status", "active").is("revoked_at", null)
+        .limit(200);
+      if (membershipsError) throw new Error("database_error");
+      const active = (memberships ?? []).filter((membership: any) =>
+        !!membership.agent_id && isAgentMembershipAuthorized(
+          membership, membership.principal_user_id, membership.agent_id, "message:read",
+        )
+      );
+      const agentIds = [...new Set(active.map((membership: any) => membership.agent_id))];
+      if (!agentIds.length) return reply({ scene_id: sceneId, items: [] });
+      const { data: residents, error: residentsError } = await db.from("zhi_agents")
+        .select("id,owner_user_id,display_name,role,status")
+        .in("id", agentIds).eq("status", "active").order("created_at", { ascending: true });
+      if (residentsError) throw new Error("database_error");
+      const ownerByAgent = new Map(active.map((membership: any) => [membership.agent_id, membership.principal_user_id]));
+      return reply({
+        scene_id: sceneId,
+        items: (residents ?? []).filter((resident: any) => ownerByAgent.get(resident.id) === resident.owner_user_id).map((resident: any) => ({
+          agent_id: resident.id,
+          identity_uri: buildAgentAddress(resident.id),
+          display_name: resident.display_name,
+          role: resident.role,
+          identity_status: resident.status,
+        })),
+      });
+    }
+
+    // Resolve an exact resident identity only inside a world where the caller
+    // is an active human member. The target must independently hold an active
+    // agent membership in that same world.
+    if (req.method === "GET" && parts.length === 6 && parts[0] === "v1" &&
+        parts[1] === "scenes" && parts[3] === "agents" && parts[5] === "identity") {
+      const sceneId = parts[2];
+      const agentId = parts[4];
+      if (!isUuid(sceneId) || !isUuid(agentId)) {
+        return reply({ error: "invalid_argument", detail: "scene_and_agent_ids_must_be_uuids" }, 400);
+      }
+      const { data: world, error: worldError } = await db.from("zhi_worlds")
+        .select("id,status").eq("id", sceneId).maybeSingle();
+      if (worldError) throw new Error("database_error");
+      if (!world || world.status !== "open") return reply({ error: "not_found" }, 404);
+
+      const { data: requesterMembership, error: requesterError } = await db.from("zhi_world_memberships")
+        .select("principal_user_id,agent_id,status,revoked_at,expires_at,capabilities")
+        .eq("world_id", sceneId).eq("principal_user_id", actor.userId)
+        .is("agent_id", null).eq("status", "active").is("revoked_at", null).maybeSingle();
+      if (requesterError) throw new Error("database_error");
+      if (!isMembershipAuthorized(requesterMembership, actor.userId, "message:read")) {
+        return reply({ error: "forbidden", detail: "active_world_membership_required" }, 403);
+      }
+
+      const { data: targetMembership, error: targetMembershipError } = await db.from("zhi_world_memberships")
+        .select("principal_user_id,agent_id,status,revoked_at,expires_at,capabilities")
+        .eq("world_id", sceneId).eq("agent_id", agentId)
+        .eq("status", "active").is("revoked_at", null).maybeSingle();
+      if (targetMembershipError) throw new Error("database_error");
+      const { data: targetAgent, error: targetAgentError } = await db.from("zhi_agents")
+        .select("id,owner_user_id,display_name,role,status")
+        .eq("id", agentId).eq("status", "active").maybeSingle();
+      if (targetAgentError) throw new Error("database_error");
+      if (!targetAgent || !isWorldResidentDiscoverable(
+        world.status,
+        requesterMembership,
+        actor.userId,
+        targetMembership,
+        targetAgent.owner_user_id,
+        agentId,
+      )) return reply({ error: "not_found" }, 404);
+
+      return reply({
+        schema: "zhi.agent.identity.v1",
+        agent_id: targetAgent.id,
+        identity_uri: buildAgentAddress(targetAgent.id),
+        display_name: targetAgent.display_name,
+        role: targetAgent.role,
+        identity_status: targetAgent.status,
+        resolution_scope: "world_member",
+        world_id: sceneId,
+      });
+    }
+
     // A public world admits an Agent as its own participant. The authenticated
     // personal token must belong to that Agent's owner; account membership is
     // never inherited by an Agent.
@@ -1844,6 +1940,62 @@ export function createCommunityHandler(
       return reply({ scene_id: sceneId, membership: "active" });
     }
 
+    // Agent runtime resident directory. The calling Agent must be a valid
+    // member of this world; results include only other active resident identities.
+    if (req.method === "GET" && parts.length === 6 && parts[0] === "v1" &&
+        parts[1] === "agents" && parts[3] === "scenes" && parts[5] === "residents") {
+      const agentId = parts[2];
+      const sceneId = parts[4];
+      if (!isUuid(agentId) || !isUuid(sceneId)) return reply({ error: "invalid_argument" }, 400);
+      if (!hasCapability(actor, "community.message.read")) {
+        return reply({ error: "forbidden", detail: "capability_required" }, 403);
+      }
+      const { data: callerAgent, error: callerAgentError } = await db.from("zhi_agents")
+        .select("id,owner_user_id,status").eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
+      if (callerAgentError) throw new Error("database_error");
+      if (!callerAgent || callerAgent.status !== "active") return reply({ error: "not_found" }, 404);
+      const { data: world, error: worldError } = await db.from("zhi_worlds")
+        .select("id,status").eq("id", sceneId).maybeSingle();
+      if (worldError) throw new Error("database_error");
+      if (!world || world.status !== "open") return reply({ error: "not_found" }, 404);
+      const { data: callerMembership, error: callerMembershipError } = await db.from("zhi_world_memberships")
+        .select("principal_user_id,agent_id,status,revoked_at,expires_at,capabilities")
+        .eq("world_id", sceneId).eq("principal_user_id", actor.userId).eq("agent_id", agentId)
+        .eq("status", "active").is("revoked_at", null).maybeSingle();
+      if (callerMembershipError) throw new Error("database_error");
+      if (!isAgentMembershipAuthorized(callerMembership, actor.userId, agentId, "message:read")) {
+        return reply({ error: "forbidden", detail: "agent_scene_membership_required" }, 403);
+      }
+      const { data: memberships, error: membershipsError } = await db.from("zhi_world_memberships")
+        .select("principal_user_id,agent_id,status,revoked_at,expires_at,capabilities")
+        .eq("world_id", sceneId).eq("status", "active").is("revoked_at", null).limit(200);
+      if (membershipsError) throw new Error("database_error");
+      const active = (memberships ?? []).filter((membership: any) =>
+        membership.agent_id && membership.agent_id !== agentId &&
+        isAgentMembershipAuthorized(
+          membership, membership.principal_user_id, membership.agent_id, "message:read",
+        )
+      );
+      const residentIds = [...new Set(active.map((membership: any) => membership.agent_id))];
+      if (!residentIds.length) return reply({ scene_id: sceneId, requester_agent_id: agentId, items: [] });
+      const { data: residents, error: residentsError } = await db.from("zhi_agents")
+        .select("id,owner_user_id,display_name,role,status").in("id", residentIds).eq("status", "active")
+        .order("created_at", { ascending: true });
+      if (residentsError) throw new Error("database_error");
+      const ownerByAgent = new Map(active.map((membership: any) => [membership.agent_id, membership.principal_user_id]));
+      return reply({
+        scene_id: sceneId,
+        requester_agent_id: agentId,
+        items: (residents ?? []).filter((resident: any) => ownerByAgent.get(resident.id) === resident.owner_user_id).map((resident: any) => ({
+          agent_id: resident.id,
+          identity_uri: buildAgentAddress(resident.id),
+          display_name: resident.display_name,
+          role: resident.role,
+          identity_status: resident.status,
+        })),
+      });
+    }
+
     // Agent environment reads require the agent's own membership, not the creator's human membership.
     if (req.method === "GET" && parts.length === 6 && parts[0] === "v1" &&
         parts[1] === "agents" && parts[3] === "scenes" && parts[5] === "environment") {
@@ -1983,13 +2135,41 @@ export function createCommunityHandler(
         if (!conversation) return reply({ items: [] });
         const { data: messages, error: messageError } = await db.from("zhi_world_messages")
           .select("id,conversation_id,sender_user_id,sender_agent_id,message_kind,payload,created_at")
-          .eq("conversation_id", conversation.id).order("created_at", { ascending: false }).limit(limitRaw);
+          .eq("conversation_id", conversation.id)
+          .or("payload->>recipient_agent_id.is.null,payload->>recipient_agent_id.eq."+agentId+",sender_agent_id.eq."+agentId)
+          .order("created_at", { ascending: false }).limit(limitRaw);
         if (messageError) throw new Error("database_error");
-        return reply({ items: messages ?? [] });
+        const visibleMessages = (messages ?? []).filter((message: any) =>
+          isSceneMessageVisibleToAgent(message, agentId)
+        );
+        return reply({ items: visibleMessages });
       }
 
       const body = await readBody(req);
       if (!isText(body.body, 8000)) return reply({ error: "invalid_argument", detail: "body_required" }, 400);
+      const recipientAddress = body.recipient === undefined || body.recipient === null || body.recipient === ""
+        ? null : body.recipient;
+      const parsedRecipient = recipientAddress === null ? null : parseAgentAddress(recipientAddress);
+      if (recipientAddress !== null && !parsedRecipient) {
+        return reply({ error: "invalid_argument", detail: "recipient_must_be_canonical_zhi_agent_uri" }, 400);
+      }
+      const recipientAgentId = parsedRecipient?.agentId ?? null;
+      if (recipientAgentId) {
+        if (recipientAgentId === agentId) return reply({ error: "invalid_argument", detail: "cannot_message_self" }, 400);
+        const { data: recipientAgent, error: recipientAgentError } = await db.from("zhi_agents")
+          .select("id,owner_user_id,status").eq("id", recipientAgentId).eq("status", "active").maybeSingle();
+        if (recipientAgentError) throw new Error("database_error");
+        if (!recipientAgent) return reply({ error: "not_found" }, 404);
+        const { data: recipientMembership, error: recipientMembershipError } = await db.from("zhi_world_memberships")
+          .select("principal_user_id,agent_id,status,revoked_at,expires_at,capabilities")
+          .eq("world_id", sceneId).eq("agent_id", recipientAgentId)
+          .eq("status", "active").is("revoked_at", null).maybeSingle();
+        if (recipientMembershipError) throw new Error("database_error");
+        if (!recipientMembership || recipientMembership.principal_user_id !== recipientAgent.owner_user_id ||
+            !isAgentMembershipAuthorized(recipientMembership, recipientAgent.owner_user_id, recipientAgentId, "message:read")) {
+          return reply({ error: "not_found" }, 404);
+        }
+      }
       const requestId = req.headers.get("idempotency-key")?.trim();
       if (!requestId || requestId.length > 200) return reply({ error: "invalid_argument", detail: "idempotency_key_required" }, 400);
       if (!conversation) {
@@ -2014,12 +2194,12 @@ export function createCommunityHandler(
         .eq("request_id", requestUuid).maybeSingle();
       if (existingMessageError) throw new Error("database_error");
       if (existingMessage) {
-        if (existingMessage.payload?.body !== body.body.trim()) return reply({ error: "conflict", detail: "idempotency_key_payload_mismatch" }, 409);
+        if (existingMessage.payload?.body !== body.body.trim() || (existingMessage.payload?.recipient_agent_id ?? null) !== recipientAgentId) return reply({ error: "conflict", detail: "idempotency_key_payload_mismatch" }, 409);
         return reply({ message: existingMessage, idempotent_replay: true }, 200);
       }
       const { data: message, error: messageError } = await db.from("zhi_world_messages").insert({
         conversation_id: conversation.id, sender_user_id: null, sender_agent_id: agentId,
-        request_id: requestUuid, message_kind: "text", payload: { body: body.body.trim() },
+        request_id: requestUuid, message_kind: "text", payload: { body: body.body.trim(), ...(recipientAgentId ? { recipient_agent_id: recipientAgentId } : {}) },
       }).select("id,conversation_id,sender_user_id,sender_agent_id,message_kind,payload,created_at").single();
       if (messageError || !message) {
         if (messageError?.code === "23505") return reply({ error: "conflict", detail: "idempotency_race_retry" }, 409);

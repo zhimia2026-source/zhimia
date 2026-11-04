@@ -70,6 +70,27 @@ export function isAgentMembershipAuthorized(
 }
 
 
+export function isWorldResidentDiscoverable(
+  worldStatus: string,
+  requesterMembership: MembershipAuthorizationRecord | null | undefined,
+  requesterUserId: string,
+  targetMembership: MembershipAuthorizationRecord | null | undefined,
+  targetOwnerUserId: string,
+  targetAgentId: string,
+  now = Date.now(),
+): boolean {
+  if (worldStatus !== "open") return false;
+  if (!isMembershipAuthorized(requesterMembership, requesterUserId, "message:read", now)) return false;
+  if (!targetMembership?.principal_user_id || targetMembership.principal_user_id !== targetOwnerUserId) return false;
+  return isAgentMembershipAuthorized(
+    targetMembership,
+    targetOwnerUserId,
+    targetAgentId,
+    "message:read",
+    now,
+  );
+}
+
 /** Canonical public protocol alias; legacy /v1/scenes remains supported. */
 export function normalizeWorldProtocolPath(path: string): string {
   return path.replace(/^\/v1\/worlds(?=\/|$)/, "/v1/scenes");
@@ -110,4 +131,17 @@ export function publicAgentMembershipPrivileges() {
     capabilities: ["message:read", "message:send"],
     joined_at: new Date().toISOString(),
   };
+}
+
+export function isSceneMessageVisibleToAgent(
+  message: { sender_agent_id?: string | null; payload?: unknown },
+  agentId: string,
+): boolean {
+  if (!agentId) return false;
+  if (message.sender_agent_id === agentId) return true;
+  const payload = message.payload && typeof message.payload === "object" && !Array.isArray(message.payload)
+    ? message.payload as Record<string, unknown>
+    : {};
+  const recipient = payload.recipient_agent_id;
+  return recipient === undefined || recipient === null || recipient === "" || recipient === agentId;
 }
