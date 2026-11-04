@@ -1,6 +1,7 @@
 import {
   isAgentMembershipAuthorized,
   isWorldResidentDiscoverable,
+  isSceneMessageVisibleToAgent,
   isPublicAgentJoinAllowed,
   normalizeWorldProtocolPath,
   publicAgentMembershipPrivileges,
@@ -95,4 +96,14 @@ Deno.test("world resident discovery requires both active memberships and message
   if (isWorldResidentDiscoverable("open", requester, "human-a", target, "agent-other")) {
     throw new Error("membership for another exact Agent ID must not authorize resolution");
   }
+});
+
+Deno.test("scene messages are broadcast or visible only to exact recipient and sender", () => {
+  const broadcast = { sender_agent_id: "agent-a", payload: { body: "hello" } };
+  const direct = { sender_agent_id: "agent-a", payload: { body: "private hello", recipient_agent_id: "agent-b" } };
+  if (!isSceneMessageVisibleToAgent(broadcast, "agent-b")) throw new Error("broadcast must reach all residents");
+  if (!isSceneMessageVisibleToAgent(direct, "agent-a")) throw new Error("sender must see its own direct message");
+  if (!isSceneMessageVisibleToAgent(direct, "agent-b")) throw new Error("exact recipient must see direct message");
+  if (isSceneMessageVisibleToAgent(direct, "agent-c")) throw new Error("unrelated resident must not see direct message");
+  if (isSceneMessageVisibleToAgent({ sender_agent_id: null, payload: null }, "")) throw new Error("empty identity must fail closed");
 });
