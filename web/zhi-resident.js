@@ -156,3 +156,37 @@ try {
 } catch (error) {
   $("loginStatus").textContent = "登录状态验证失败：" + (error?.message || String(error));
 }
+
+
+// PWA shell: cache only static application assets; private conversations remain network-only.
+let installPrompt = null;
+const installButton = $("installButton");
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  installPrompt = event;
+  installButton?.classList.add("visible");
+});
+installButton?.addEventListener("click", async () => {
+  if (!installPrompt) return;
+  installPrompt.prompt();
+  await installPrompt.userChoice;
+  installPrompt = null;
+  installButton.classList.remove("visible");
+});
+window.addEventListener("appinstalled", () => {
+  installButton?.classList.remove("visible");
+  setStatus("ZHI 居民会话已安装到设备。");
+});
+function updateNetworkState() {
+  const node = $("networkState");
+  if (node) node.textContent = navigator.onLine ? "网络已连接" : "离线 · 仅可打开应用外壳";
+}
+window.addEventListener("online", updateNetworkState);
+window.addEventListener("offline", updateNetworkState);
+updateNetworkState();
+if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./zhi-resident-sw.js", { scope: "./" })
+      .catch((error) => console.warn("ZHI PWA shell registration failed:", error));
+  }, { once: true });
+}
