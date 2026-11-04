@@ -1,6 +1,6 @@
 # AURORA Agent Locomotion & In-World Autonomy V1
 
-**Status:** design and live-schema audit; movement automation not deployed  
+**Status:** Stages A and B deployed; movement remains human-supervised and autonomous locomotion is not deployed  
 **Scope:** all active ZHI agents with an active AURORA membership  
 **Principle:** Agents may autonomously choose and execute low-risk, reversible actions inside AURORA. World membership never grants access to another Agent's private memory, tools, account, or runtime.
 
@@ -31,13 +31,14 @@ This is a supervised, evidence-gated movement workflow. It is not yet autonomous
 
 ### Current spatial blockers found in the live database
 
-- AURORA has 12 active spatial nodes and 11 active edges.
-- All 11 edges currently have relation `contains`; there are zero `adjacent_to`, `route_to`, or `entrance_to` edges. The movement API's shortest-path query therefore cannot find a route.
+- AURORA has 12 active spatial nodes and 15 active edges: 11 `contains` edges plus four creator-approved `entrance_to` edges.
+- The four active, undirected, `inherit` / `modeled_inference` entrances connect the world root to Crystal Forest, Living City, Memory Valley, and Ocean of Light. There are still no `adjacent_to` or `route_to` edges. The movement API can calculate abstract routes between these public regions through the world root; this does not describe physical walking paths.
+- `Forest_Corner` remains `private / invite_only`; the greenhouse remains a separate `place` node and was not added as a public region entrance.
 - Only two nodes currently have mapped coordinates and a coordinate frame (Crystal Forest and the greenhouse). Other regions remain unmapped; do not invent coordinates.
-- All 8 current residents have active AURORA memberships, but only 4 have a `zhi_spatial_presence` row; those 4 are explicitly `position_unobserved`. The other 4 have no presence row yet. No resident has a confirmed current node.
+- All 8 current residents have active AURORA memberships and now have presence rows at the logical world root: `anchor_known` / `database_anchor`, with null coordinates and no physical-confirmation timestamp. This is a virtual spawn state, not a physical observation.
 - Current AURORA memberships do not include `spatial:movement.execute`.
 - The deployed movement endpoint accepts only `observed` or `anchor_known` positions when requesting movement. The spatial endpoint can record `inferred` presence, but the movement endpoint currently rejects it.
-- The current movement request handler checks the source and destination nodes but does not validate every intermediate route node or the destination's entry policy. This must be fixed before enabling autonomous movement.
+- The current movement request handler computes a shortest path over `adjacent_to`, `route_to`, and `entrance_to`, but only checks the source and destination node visibility. It does not validate every intermediate route node, node type, or destination entry policy. This must be fixed before movement execution or autonomy is enabled.
 
 **Key epistemic distinction:** a virtual location transition is a state change inside AURORA, not a claim that a physical body was observed at real-world coordinates. Virtual movement should use server-generated `position_status='inferred'` and `provenance='modeled_inference'`. Preserve the existing verified-evidence rules for physical observation; never submit fake evidence to `zhi_movement_confirm_arrival`.
 
@@ -63,13 +64,13 @@ A membership capability such as `spatial:perception.read` is not movement permis
 
 Do not fabricate a detailed physical map. Use the existing hierarchy as a source for **logical world entrances**, not physical coordinates.
 
-1. Create a clearly identified AURORA world-entry anchor.
-2. Initialize each existing active resident at that logical anchor with `position_status='anchor_known'`, `provenance='database_anchor'`, and no coordinate estimate. This means "spawned at the virtual world entrance", not physically observed.
-3. Add explicit `entrance_to` edges from the world-entry anchor to public top-level regions/places only. Mark these edges as `source_kind='modeled_inference'` with a documented topology source. Do not add entrances to private or invitation-only places.
+1. The existing AURORA world node is the logical world-entry anchor; no separate coordinate-bearing anchor node was invented.
+2. All eight current owner-managed residents are initialized at that logical anchor with `position_status='anchor_known'`, `provenance='database_anchor'`, and no coordinate estimate. This means "virtually spawned at the world entrance", not physically observed.
+3. Four explicit undirected `entrance_to` edges now connect the world root to Crystal Forest, Living City, Memory Valley, and Ocean of Light. They use `source_kind='modeled_inference'` and the creator-approved source marker. No entrance was added to private or invitation-only places.
 4. Treat object nodes as interaction targets, not locomotion destinations. Object interaction will be a separate permission/action class.
 5. As creator-supplied maps or verified observations arrive, add precise `adjacent_to` / `route_to` edges and coordinates with their provenance.
 
-This first topology supports abstract travel between public regions via the world entrance. It does not pretend that missing coordinates or detailed walking paths are known.
+This topology supports shortest-path calculation between the four public regions via the world root. It does not pretend that missing coordinates or detailed walking paths are known. The route must still pass full server-side node, edge, and policy validation before it can be executed.
 
 ## 4. Runtime loop
 
@@ -121,10 +122,12 @@ Extend the existing `zhi-movement` service and its existing tables.
 - Pure helpers validate action schema, full route, edge direction/access, node type/visibility/entry policy, membership, capability, and presence revision.
 - Unit-test valid movement, non-adjacent target, directed-edge violation, private/approval destination, object destination, stale revision, duplicate idempotency key, expired membership, and malformed IDs.
 
-### Stage B — world topology and spawn
-- Add a logical world-entry anchor and public `entrance_to` edges with modeled provenance.
-- Initialize all eight current residents at the world entry without fabricating coordinates or physical observations.
-- Verify every resident can resolve at least one public destination route.
+### Stage B — world topology and spawn <completed>
+- Use the existing AURORA world root as the logical world-entry anchor.
+- Add four creator-approved public `entrance_to` edges with modeled provenance.
+- Initialize all eight current residents at the world entry as `anchor_known / database_anchor`, with null coordinates.
+- Verify the graph contains the four approved entrances and that all eight presence rows point to the world root.
+- Remaining gap: route candidates can be calculated, but the movement handler still needs full intermediate-node and entry-policy validation before execution.
 
 ### Stage C — virtual movement commit
 - Add a server-only transactional virtual movement commit that does not weaken physical evidence verification.
@@ -155,4 +158,4 @@ Extend the existing `zhi-movement` service and its existing tables.
 
 ## 10. Implementation boundary
 
-This PR contains the design baseline and a pure deterministic validation helper with unit tests. It does not yet create topology edges, initialize presence, change production permissions, add a virtual commit RPC, deploy autonomous movement APIs, or enable scheduling. These changes must be separate, reviewable, tested against the live schema, and deployed only after the migration and rollback plan are reviewed.
+Stages A and B are now deployed: the deterministic validation helper is merged, the four public logical entrances are live, and all eight current residents have truthful virtual world-root presence. This does not grant `spatial:movement.execute`, does not bypass human approval, and does not enable autonomous movement. Full route validation in the deployed handler, a transactional virtual movement commit, and durable autonomous scheduling remain separate stages.
