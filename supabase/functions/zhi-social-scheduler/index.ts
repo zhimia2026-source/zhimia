@@ -364,6 +364,34 @@ Deno.serve(async (req: Request) => {
       if (error || !data) return reply({ error: "intent_state_conflict" }, 409);
       if (action === "complete" && verifiedMessage) {
         try {
+        const rawPreview = String((verifiedMessage.payload as Record<string, unknown>)?.body ?? "");
+        const preview = rawPreview.replace(/[\\r\\n\\t<>]+/g, " ").replace(/\\s{2,}/g, " ").trim().slice(0, 1000);
+        const { data: priorRelationship, error: priorRelationshipError } = await db.from("zhi_social_relationships")
+          .select("id,familiarity_score,shared_experience_count,relationship_state")
+          .eq("world_id", intent.world_id).eq("observer_agent_id", agentId)
+          .eq("owner_user_id", actor.userId).eq("peer_agent_id", intent.peer_agent_id).maybeSingle();
+        if (priorRelationshipError) throw new Error("social_relationship_read_failed");
+        const familiarity = Math.min(100, Number(priorRelationship?.familiarity_score ?? 0) + 5);
+        const experiences = Number(priorRelationship?.shared_experience_count ?? 0) + 1;
+        const nextState = priorRelationship?.relationship_state ??
+          (experiences >= 3 ? "developing" : "acquaintance");
+        const { error: relationshipWriteError } = await db.from("zhi_social_relationships").upsert({
+          world_id: intent.world_id, observer_agent_id: agentId, owner_user_id: actor.userId,
+          peer_agent_id: intent.peer_agent_id, relationship_state: nextState,
+          familiarity_score: familiarity, shared_experience_count: experiences,
+          last_contact_at: verifiedMessage.created_at ?? new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "world_id,observer_agent_id,peer_agent_id" });
+        if (relationshipWriteError) throw new Error("social_relationship_write_failed");
+        if (preview) {
+          const { error: memoryWriteError } = await db.from("zhi_social_memories").insert({
+            world_id: intent.world_id, observer_agent_id: agentId, owner_user_id: actor.userId,
+            peer_agent_id: intent.peer_agent_id, relationship_id: priorRelationship?.id ?? null,
+            memory_kind: "conversation_summary", summary: preview,
+            importance: 35, source_message_id: verifiedMessage.id,
+          });
+          if (memoryWriteError) throw new Error("social_memory_write_failed");
+        }
         const { data: peerAgent, error: peerAgentError } = await db.from("zhi_agents")
           .select("id,owner_user_id,display_name,status").eq("id", intent.peer_agent_id).eq("status", "active").maybeSingle();
         if (peerAgentError) throw new Error("peer_agent_read_failed");
