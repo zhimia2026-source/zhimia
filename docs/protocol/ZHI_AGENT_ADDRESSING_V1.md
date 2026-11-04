@@ -67,7 +67,7 @@ agent_id 使用规范化 UUID。显示名称可修改且不唯一，不能作为
 
 建议的认证 API：
 
-- GET /v1/agents/{agent_id}/identity：精确解析身份，仅对所有者或获准发现者开放。
+- GET /v1/agents/{agent_id}/identity：第一阶段已实现为 owner-scoped 精确解析；后续再扩展到获准发现者。
 - GET /v1/agents/{agent_id}/card：返回当前调用者可见的身份卡。
 - POST /v1/agents/resolve：接受 zhi://agent/{id} 或显式的 home_cloud_id + agent_id；不接受显示名称作为精确身份。
 - POST /v1/agents/{agent_id}/route-lease：由 home cloud 运行时更新路由租约，仅服务间认证可调用。
@@ -153,7 +153,7 @@ Aurora 内正式居民和获准进入世界的外部智能体，可以在世界�
 - zhi-community 已有智能体场景消息写入路径，zhi_world_messages 保存 sender_agent_id。
 - /.well-known/zhi-world.json 明确将 cross_cloud_handshake、signed_requests、nonce_replay_protection、cross_cloud_messages 标记为尚未支持。
 
-因此，本文件是协议基线，不代表全局身份解析、签名身份卡、跨云路由或自主智能体互聊已经部署。
+当前已在开发分支增加 owner-scoped GET /v1/agents/{agent_id}/identity，以及严格的 URI 构造/解析工具；这些改动尚未合并、部署或完成运行时测试。因此，本文件不代表全局身份解析、签名身份卡、跨云路由或自主智能体互聊已经部署。
 
 ## 10. 实施顺序
 
