@@ -134,8 +134,10 @@ async function evaluateAgent(db: SupabaseClient, agentId: string, ownerUserId: s
       db.from("zhi_ecosystem_events").select("id,event_kind,payload,occurred_at")
         .eq("world_id", worldId).gte("occurred_at", since)
         .order("occurred_at", { ascending: false }).limit(30),
-      db.from("zhi_spatial_presence").select("agent_id,current_node_id")
-        .eq("world_id", worldId).not("current_node_id", "is", null),
+      db.from("zhi_spatial_presence").select("agent_id,current_node_id,position_status,last_confirmed_at,confidence")
+        .eq("world_id", worldId).eq("position_status", "confirmed")
+        .gte("last_confirmed_at", new Date(now.getTime() - 2 * 3600000).toISOString())
+        .not("current_node_id", "is", null),
     ]);
     if (relError) throw new Error("relationship_unavailable");
     if (eventError) throw new Error("world_events_unavailable");
@@ -179,22 +181,24 @@ async function evaluateAgent(db: SupabaseClient, agentId: string, ownerUserId: s
         return ownInterests.some(topic => text.includes(topic));
       });
       const samePlace = Boolean(nodeByAgent.get(agentId) && nodeByAgent.get(agentId) === nodeByAgent.get(peer.id));
-      // A fresh shared world event at the same confirmed place is a valid first-contact
-      // signal even before private relationship history or explicit interests exist.
+      // A fresh event can trigger first contact when residents share an explicit topic,
+      // or when they have a recently confirmed co-presence. Inferred/stale positions never count.
       const sharedWorldEvent = samePlace && recentEvents.length > 0;
-      const novelty = eventMatches.length || sharedWorldEvent ? 100 : 0;
+      const sharedTopicEvent = interest.matched.length > 0 && recentEvents.length > 0;
+      const eventOpportunity = sharedWorldEvent || sharedTopicEvent;
+      const novelty = eventMatches.length || eventOpportunity ? 100 : 0;
       const familiarity = Math.max(0, Math.min(100, Number(rel?.familiarity_score ?? 0)));
       const sharedTopics = normList(rel?.shared_topics);
-      const collaboration = sharedWorldEvent && interest.ratio === 0
+      const collaboration = eventOpportunity
         ? 100
         : Math.min(100, interest.ratio * 60 + Math.min(40, sharedTopics.length * 20));
-      const interestValue = interest.ratio > 0 ? interest.ratio * 100 : sharedWorldEvent ? 100 : 0;
-      const timing = samePlace ? 100 : 50;
+      const interestValue = interest.matched.length > 0 ? 100 : sharedWorldEvent ? 100 : 0;
+      const timing = samePlace || sharedTopicEvent ? 100 : 50;
       const score = Math.round((interestValue * 0.25 + familiarity * 0.20 + novelty * 0.20 + collaboration * 0.20 + timing * 0.15) * 100) / 100;
       if (score < Number(profile.minimum_score)) continue;
-      const reason = eventMatches.length || sharedWorldEvent ? "world_event" : interest.matched.length ? "shared_interest" :
+      const reason = eventMatches.length || eventOpportunity ? "world_event" : interest.matched.length ? "shared_interest" :
         samePlace ? "co_presence" : "relationship";
-      const relevantEvents = eventMatches.length ? eventMatches : sharedWorldEvent ? recentEvents : [];
+      const relevantEvents = eventMatches.length ? eventMatches : eventOpportunity ? recentEvents : [];
       candidates.push({
         peer, score, reason,
         context: {
