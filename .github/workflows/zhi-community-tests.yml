@@ -9,6 +9,7 @@ on:
       - "supabase/functions/zhi-aurora-world-runtime/**"
       - "supabase/functions/zhi-forest-runtime/**"
       - "supabase/functions/zhi-federated-movement/**"
+      - "supabase/functions/zhi-federation/**"
       - ".github/workflows/zhi-community-tests.yml"
   pull_request:
     paths:
@@ -17,6 +18,7 @@ on:
       - "supabase/functions/zhi-aurora-world-runtime/**"
       - "supabase/functions/zhi-forest-runtime/**"
       - "supabase/functions/zhi-federated-movement/**"
+      - "supabase/functions/zhi-federation/**"
       - ".github/workflows/zhi-community-tests.yml"
 
 jobs:
@@ -31,6 +33,8 @@ jobs:
         run: deno test supabase/functions/zhi-federated-movement/route_helpers_test.ts
       - name: Type-check federated movement Edge Function
         run: deno check supabase/functions/zhi-federated-movement/index.ts
+      - name: Type-check federation perception and movement integration
+        run: deno check supabase/functions/zhi-federation/index.ts
       - name: Test ecological event perception context
         run: deno test supabase/functions/zhi-community/chat_context_helpers_test.ts
       - name: Test deterministic AURORA virtual movement validation
