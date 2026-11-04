@@ -229,7 +229,7 @@ Deno.serve(async (req) => {
           coordinate_space: "scene-local", world_transform: null,
           world_transform_status: "uncalibrated", position_status: currentState.position_status,
           session_status: currentState.session_status,
-          position_updated_at: currentState?.updated_at ?? null,
+          position_updated_at: current?.updated_at ?? null,
           position_evidence: currentState ? "zhi_forest_runtime_state persisted server-authoritative runtime state" : "no_runtime_state_record",
           position_is_current_snapshot: Boolean(currentState && currentState.session_status === "active" && currentState.position_status === "anchored"),
           global_position: null,
