@@ -199,7 +199,12 @@ begin
     jsonb_build_object(
       'source','modeled_virtual_movement',
       'approved_by_user_id',p_actor_user_id,
-      'private_memory_included',false
+      'private_memory_included',false,
+      'causal_chain',jsonb_build_array(
+        jsonb_build_object('stage','creator_approval','movement_request_id',v_req.id),
+        jsonb_build_object('stage','route_validation','route_node_ids',v_req.route_node_ids),
+        jsonb_build_object('stage','modeled_presence_commit','presence_revision',v_new_revision)
+      )
     )
   );
 
