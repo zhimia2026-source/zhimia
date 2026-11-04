@@ -77,6 +77,7 @@ Deno.serve(async (req) => {
     session_status: current.session_status,
     position_status: current.position_status,
     environment_state: current.environment_state,
+    updated_at: current.updated_at,
   } : initialState();
 
   if (action === "perceive") {
