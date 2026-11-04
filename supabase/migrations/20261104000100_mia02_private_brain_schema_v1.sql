@@ -464,7 +464,7 @@ begin
   new.updated_at := now();
   return new;
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION mia_brain.mia_evolution_log_candidate_transition()
@@ -490,7 +490,7 @@ begin
   values (new.candidate_id, new.identity_id, prev, new.state, 'mia-evolution-pipeline',
     case when tg_op='INSERT' then 'candidate_created' else 'state_transition' end, summary, idem);
   return new;
-end; $function$
+end; $function$;
 
 
 CREATE OR REPLACE FUNCTION mia_brain.mia_evolution_prevent_candidate_event_mutation()
@@ -501,7 +501,7 @@ AS $function$
 begin
   raise exception 'Evolution candidate events are append-only';
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION mia_brain.mia_forest_autonomy_claim_tick()
@@ -519,14 +519,14 @@ begin
   update mia_brain.mia_forest_autonomy_control set last_tick_at=now(),updated_at=now() where singleton=true;
   return true;
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION mia_brain.prevent_mia_evolution_rollback_event_mutation()
  RETURNS trigger
  LANGUAGE plpgsql
  SET search_path TO 'pg_catalog'
-AS $function$ begin raise exception 'mia_evolution_rollback_events is append-only; insert a linked correction event instead'; end; $function$
+AS $function$ begin raise exception 'mia_evolution_rollback_events is append-only; insert a linked correction event instead'; end; $function$;
 
 
 CREATE TRIGGER mia_evolution_candidate_events_no_mutation BEFORE DELETE OR UPDATE ON mia_brain.mia_evolution_candidate_events FOR EACH ROW EXECUTE FUNCTION mia_evolution_prevent_candidate_event_mutation();
