@@ -138,14 +138,21 @@ async function evaluateAgent(db: SupabaseClient, agentId: string, ownerUserId: s
       .select("id", { count: "exact", head: true })
       .eq("agent_id", agentId).eq("world_id", worldId)
       .gte("created_at", new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString())
-      .in("status", ["pending", "accepted", "completed"]);
+      .in("status", ["pending", "deferred", "accepted", "completed"]);
     if (countError) throw new Error("intent_count_unavailable");
     let remaining = Math.max(0, Number(profile.daily_initiation_limit) - (todayCount ?? 0));
     if (remaining <= 0) continue;
 
     const sentSince = new Date(now.getTime() - Number(profile.peer_cooldown_hours) * 3600000).toISOString();
-    const { data: recentSent, error: sentError } = await db.from("zhi_world_messages")
-      .select("payload").eq("sender_agent_id", agentId).gte("created_at", sentSince).limit(100);
+    const { data: worldConversations, error: conversationsError } = await db.from("zhi_world_conversations")
+      .select("id").eq("world_id", worldId).eq("status", "open");
+    if (conversationsError) throw new Error("world_conversations_unavailable");
+    const conversationIds = (worldConversations ?? []).map(c => c.id);
+    const { data: recentSent, error: sentError } = conversationIds.length
+      ? await db.from("zhi_world_messages").select("payload")
+          .eq("sender_agent_id", agentId).in("conversation_id", conversationIds)
+          .gte("created_at", sentSince).limit(100)
+      : { data: [], error: null };
     if (sentError) throw new Error("recent_messages_unavailable");
     const recentPeers = new Set((recentSent ?? []).map(m => (m.payload as Record<string, unknown>)?.recipient_agent_id).filter(Boolean));
 
@@ -252,6 +259,7 @@ Deno.serve(async (req: Request) => {
         daily_initiation_limit: Math.max(0, Math.min(5, Number(body.daily_initiation_limit ?? 2))),
         peer_cooldown_hours: Math.max(12, Math.min(168, Number(body.peer_cooldown_hours ?? 36))),
         minimum_score: Math.max(50, Math.min(100, Number(body.minimum_score ?? 80))),
+        last_evaluated_at: null,
         updated_at: new Date().toISOString(),
       }, { onConflict: "agent_id" }).select("*").single();
       if (error || !data) throw new Error("profile_write_failed");
