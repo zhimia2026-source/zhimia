@@ -11,6 +11,9 @@ on:
       - "web/zhi-token-admin.html"
       - "web/zhi-resident.html"
       - "web/zhi-resident.js"
+      - "web/zhi-resident.webmanifest"
+      - "web/zhi-resident-sw.js"
+      - "web/zhi-resident-icon.svg"
       - "web/zhi-memory.html"
       - "web/zhi-memory.js"
       - ".github/workflows/health-advisor-pages.yml"
@@ -41,6 +44,9 @@ jobs:
           cp web/zhi-universe-client.js _site/zhi-universe-client.js
           cp web/zhi-resident.html _site/zhi-resident.html
           cp web/zhi-resident.js _site/zhi-resident.js
+          cp web/zhi-resident.webmanifest _site/zhi-resident.webmanifest
+          cp web/zhi-resident-sw.js _site/zhi-resident-sw.js
+          cp web/zhi-resident-icon.svg _site/zhi-resident-icon.svg
           cp web/zhi-memory.html _site/zhi-memory.html
           cp web/zhi-memory.js _site/zhi-memory.js
           test -s _site/index.html
@@ -50,9 +56,12 @@ jobs:
           test -s _site/zhi-universe-client.js
           test -s _site/zhi-resident.html
           test -s _site/zhi-resident.js
+          test -s _site/zhi-resident.webmanifest
+          test -s _site/zhi-resident-sw.js
+          test -s _site/zhi-resident-icon.svg
           test -s _site/zhi-memory.html
           test -s _site/zhi-memory.js
-          ! grep -Eiq '(service_role|SUPABASE_SERVICE_ROLE_KEY|AGNES_API_KEY|sk-[A-Za-z0-9]{20,})' _site/index.html _site/token-admin.html _site/zhi-health-advisor-client.js _site/zhi-universe.html _site/zhi-universe-client.js _site/zhi-resident.html _site/zhi-resident.js _site/zhi-memory.html _site/zhi-memory.js
+          ! grep -Eiq '(service_role|SUPABASE_SERVICE_ROLE_KEY|AGNES_API_KEY|sk-[A-Za-z0-9]{20,})' _site/index.html _site/token-admin.html _site/zhi-health-advisor-client.js _site/zhi-universe.html _site/zhi-universe-client.js _site/zhi-resident.html _site/zhi-resident.js _site/zhi-resident.webmanifest _site/zhi-resident-sw.js _site/zhi-resident-icon.svg _site/zhi-memory.html _site/zhi-memory.js
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
