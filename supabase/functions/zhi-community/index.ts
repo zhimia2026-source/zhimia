@@ -1904,13 +1904,22 @@ export function createCommunityHandler(
         const reflectionResult = await reflectionResponse.json().catch(() => ({}));
         const rawReflectionContent = reflectionResult?.choices?.[0]?.message?.content;
         const creatorMessage = normalizeAgentCreatorMessage(rawReflectionContent);
+        let creatorDecision = creatorMessage ? "send_proposed" : "invalid_payload";
+        if (!creatorMessage && typeof rawReflectionContent === "string") {
+          try {
+            const cleaned = rawReflectionContent.trim().replace(/^\x60{3}(?:json)?\s*/i, "").replace(/\s*\x60{3}$/i, "");
+            const parsed = JSON.parse(cleaned);
+            const candidate = parsed && typeof parsed === "object" ? parsed.creator_message : null;
+            if (candidate && typeof candidate === "object" && candidate.send === false) creatorDecision = "model_declined";
+          } catch { /* malformed model output is classified as invalid_payload */ }
+        }
         reflectionStage = "creator_message_decision";
         console.info(JSON.stringify({
           event: "creator_inbox_reflection_completed",
           agent_id: agentId,
           turn_id: completed.id,
           response_content_present: typeof rawReflectionContent === "string" && rawReflectionContent.length > 0,
-          decision: creatorMessage ? "send_proposed" : "no_valid_send_proposal",
+          decision: creatorDecision,
         }));
         if (creatorMessage) {
           // Low-frequency delivery: at most one note per Agent in six hours and two in 24 hours.
@@ -2009,7 +2018,11 @@ export function createCommunityHandler(
           agent_id: agentId,
           turn_id: completed.id,
           stage: reflectionStage,
-          error_code: reflectionError instanceof Error ? reflectionError.message.slice(0, 80) : "unknown_error",
+          error_code: reflectionError instanceof Error && reflectionError.message === "reflection_provider_error"
+            ? "reflection_provider_error"
+            : reflectionError instanceof Error && reflectionError.message === "database_error"
+            ? "database_error"
+            : "unexpected_error",
         }));
         growth = { reflection: "unavailable", memory: "not_saved" };
       }
