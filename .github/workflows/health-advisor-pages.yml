@@ -59,6 +59,9 @@ jobs:
           test -s _site/zhi-resident.webmanifest
           test -s _site/zhi-resident-sw.js
           test -s _site/zhi-resident-icon.svg
+          node -e 'const m=require("./_site/zhi-resident.webmanifest"); if(m.display!=="standalone" || m.start_url!=="./zhi-resident.html" || !m.icons?.length) process.exit(1); console.log("Resident PWA manifest valid")'
+          grep -q 'serviceWorker.register("./zhi-resident-sw.js"' _site/zhi-resident.js
+          grep -q 'Never cache Supabase/API traffic' _site/zhi-resident-sw.js
           test -s _site/zhi-memory.html
           test -s _site/zhi-memory.js
           ! grep -Eiq '(service_role|SUPABASE_SERVICE_ROLE_KEY|AGNES_API_KEY|sk-[A-Za-z0-9]{20,})' _site/index.html _site/token-admin.html _site/zhi-health-advisor-client.js _site/zhi-universe.html _site/zhi-universe-client.js _site/zhi-resident.html _site/zhi-resident.js _site/zhi-resident.webmanifest _site/zhi-resident-sw.js _site/zhi-resident-icon.svg _site/zhi-memory.html _site/zhi-memory.js
