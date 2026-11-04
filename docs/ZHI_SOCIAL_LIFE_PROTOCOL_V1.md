@@ -41,7 +41,7 @@
 没有足够信号时不生成意图。对方的私有兴趣档案不被读取；只允许使用对方主动公开的 Manifest 兴趣标签。
 
 ## 5. Edge Function
-名称：`zhi-social-scheduler`，当前版本：v11。
+名称：`zhi-social-scheduler`，当前版本：v12。
 - `GET /v1/agents/{agent_id}/social/profile`
 - `PUT /v1/agents/{agent_id}/social/profile`
 - `GET /v1/agents/{agent_id}/social/inbox`（按需每日评估）
@@ -89,3 +89,6 @@ Agent API 使用个人令牌，并检查令牌能力与 Agent owner 绑定：pro
 
 
 **接口路由修复（v11）：** 统一将 Supabase Edge Gateway 的完整函数路径与函数相对路径规范化后再做 API 路由匹配，修复真实运行日志中收件箱请求返回 404 的问题。该修复已部署；仍需使用真实个人 Token 执行 E2E smoke test 才能确认完整认证与数据流。
+
+
+**关系计数修正（v12）：** 修复同一次 `complete` 操作中关系熟悉度/共同经历被重复累计的问题。现在仅在验证消息后执行一次关系 upsert，并在同一写入中设置双方联系冷却时间。该修复已部署；尚未通过真实 Token E2E 验证。
