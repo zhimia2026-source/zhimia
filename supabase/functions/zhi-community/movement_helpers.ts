@@ -2,6 +2,7 @@ export type MovementNode = {
   id: string;
   world_id: string;
   status: string;
+  node_type: string;
   visibility: string;
   entry_policy: string;
 };
@@ -52,6 +53,7 @@ export type VirtualMovementValidation =
       | "presence_revision_conflict"
       | "invalid_route"
       | "node_unavailable"
+      | "node_not_traversable"
       | "node_not_public"
       | "node_entry_not_open"
       | "edge_not_traversable";
@@ -116,6 +118,7 @@ export function validateVirtualMovement(
   for (const nodeId of route) {
     const node = nodes.get(nodeId);
     if (!node || node.status !== "active") return { ok: false, reason: "node_unavailable" };
+    if (!["world", "region", "place"].includes(node.node_type)) return { ok: false, reason: "node_not_traversable" };
     if (node.visibility !== "public") return { ok: false, reason: "node_not_public" };
     if (!OPEN_POLICIES.has(node.entry_policy)) return { ok: false, reason: "node_entry_not_open" };
   }
