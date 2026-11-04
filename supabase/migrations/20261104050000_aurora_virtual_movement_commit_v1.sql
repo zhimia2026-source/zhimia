@@ -22,6 +22,7 @@ declare
   v_to uuid;
   v_new_revision bigint;
   v_world_status text;
+  i integer;
 begin
   if p_movement_request_id is null or p_actor_user_id is null then
     raise exception 'invalid_virtual_movement_identity';
