@@ -1758,12 +1758,13 @@ export function createCommunityHandler(
       const agentIds = [...new Set(active.map((membership: any) => membership.agent_id))];
       if (!agentIds.length) return reply({ scene_id: sceneId, items: [] });
       const { data: residents, error: residentsError } = await db.from("zhi_agents")
-        .select("id,display_name,role,status")
+        .select("id,owner_user_id,display_name,role,status")
         .in("id", agentIds).eq("status", "active").order("created_at", { ascending: true });
       if (residentsError) throw new Error("database_error");
+      const ownerByAgent = new Map(active.map((membership: any) => [membership.agent_id, membership.principal_user_id]));
       return reply({
         scene_id: sceneId,
-        items: (residents ?? []).map((resident: any) => ({
+        items: (residents ?? []).filter((resident: any) => ownerByAgent.get(resident.id) === resident.owner_user_id).map((resident: any) => ({
           agent_id: resident.id,
           identity_uri: buildAgentAddress(resident.id),
           display_name: resident.display_name,
@@ -1802,19 +1803,18 @@ export function createCommunityHandler(
         .eq("world_id", sceneId).eq("agent_id", agentId)
         .eq("status", "active").is("revoked_at", null).maybeSingle();
       if (targetMembershipError) throw new Error("database_error");
-      if (!isWorldResidentDiscoverable(
+      const { data: targetAgent, error: targetAgentError } = await db.from("zhi_agents")
+        .select("id,owner_user_id,display_name,role,status")
+        .eq("id", agentId).eq("status", "active").maybeSingle();
+      if (targetAgentError) throw new Error("database_error");
+      if (!targetAgent || !isWorldResidentDiscoverable(
         world.status,
         requesterMembership,
         actor.userId,
         targetMembership,
+        targetAgent.owner_user_id,
         agentId,
       )) return reply({ error: "not_found" }, 404);
-
-      const { data: targetAgent, error: targetAgentError } = await db.from("zhi_agents")
-        .select("id,display_name,role,status")
-        .eq("id", agentId).eq("status", "active").maybeSingle();
-      if (targetAgentError) throw new Error("database_error");
-      if (!targetAgent) return reply({ error: "not_found" }, 404);
 
       return reply({
         schema: "zhi.agent.identity.v1",
@@ -2008,13 +2008,14 @@ export function createCommunityHandler(
       const residentIds = [...new Set(active.map((membership: any) => membership.agent_id))];
       if (!residentIds.length) return reply({ scene_id: sceneId, requester_agent_id: agentId, items: [] });
       const { data: residents, error: residentsError } = await db.from("zhi_agents")
-        .select("id,display_name,role,status").in("id", residentIds).eq("status", "active")
+        .select("id,owner_user_id,display_name,role,status").in("id", residentIds).eq("status", "active")
         .order("created_at", { ascending: true });
       if (residentsError) throw new Error("database_error");
+      const ownerByAgent = new Map(active.map((membership: any) => [membership.agent_id, membership.principal_user_id]));
       return reply({
         scene_id: sceneId,
         requester_agent_id: agentId,
-        items: (residents ?? []).map((resident: any) => ({
+        items: (residents ?? []).filter((resident: any) => ownerByAgent.get(resident.id) === resident.owner_user_id).map((resident: any) => ({
           agent_id: resident.id,
           identity_uri: buildAgentAddress(resident.id),
           display_name: resident.display_name,
@@ -2183,7 +2184,7 @@ export function createCommunityHandler(
       if (recipientAgentId) {
         if (recipientAgentId === agentId) return reply({ error: "invalid_argument", detail: "cannot_message_self" }, 400);
         const { data: recipientAgent, error: recipientAgentError } = await db.from("zhi_agents")
-          .select("id,status").eq("id", recipientAgentId).eq("status", "active").maybeSingle();
+          .select("id,owner_user_id,status").eq("id", recipientAgentId).eq("status", "active").maybeSingle();
         if (recipientAgentError) throw new Error("database_error");
         if (!recipientAgent) return reply({ error: "not_found" }, 404);
         const { data: recipientMembership, error: recipientMembershipError } = await db.from("zhi_world_memberships")
@@ -2191,8 +2192,8 @@ export function createCommunityHandler(
           .eq("world_id", sceneId).eq("agent_id", recipientAgentId)
           .eq("status", "active").is("revoked_at", null).maybeSingle();
         if (recipientMembershipError) throw new Error("database_error");
-        if (!recipientMembership ||
-            !isAgentMembershipAuthorized(recipientMembership, recipientMembership.principal_user_id, recipientAgentId, "message:read")) {
+        if (!recipientMembership || recipientMembership.principal_user_id !== recipientAgent.owner_user_id ||
+            !isAgentMembershipAuthorized(recipientMembership, recipientAgent.owner_user_id, recipientAgentId, "message:read")) {
           return reply({ error: "not_found" }, 404);
         }
       }
