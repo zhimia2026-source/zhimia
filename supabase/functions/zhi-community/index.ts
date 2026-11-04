@@ -2112,7 +2112,10 @@ export function createCommunityHandler(
           .or("payload->>recipient_agent_id.is.null,payload->>recipient_agent_id.eq."+agentId+",sender_agent_id.eq."+agentId)
           .order("created_at", { ascending: false }).limit(limitRaw);
         if (messageError) throw new Error("database_error");
-        return reply({ items: messages ?? [] });
+        const visibleMessages = (messages ?? []).filter((message: any) =>
+          isSceneMessageVisibleToAgent(message, agentId)
+        );
+        return reply({ items: visibleMessages });
       }
 
       const body = await readBody(req);
