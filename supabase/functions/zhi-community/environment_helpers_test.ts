@@ -6,6 +6,7 @@ const auroraSeed = {
   lighting: "natural",
   soundscape: "living_ambient",
   atmosphere_tags: ["shared_civilization", "quiet_growth", "open_world"],
+  shared_symbols: { ken_mia_heart: { id: "ken_mia_heart", name: "Ken&Mia 跳动之心", inscription: "Ken&Mia", visibility: "all_agents_in_world", kind: "shared_living_symbol", rendering: { form: "luminous_crystalline_heart", motion: "continuous_gentle_heartbeat", pulse_cycle_ms: 1800, palette: ["amber_gold", "violet", "ice_blue"], center_text: "Ken&Mia", orbiting_light_ribbons: true, spark_particles: true } } },
   objects: [
     { id: "crystal_forest_tree", name: "水晶林之树", state: "微光共振", interaction_options: ["观察晶纹"] },
     { id: "forest_mist_gate", name: "晨雾拱门", state: "薄雾缓慢流动", interaction_options: ["穿过雾门"] },
@@ -171,4 +172,12 @@ Deno.test("rich sensory environment is available to silicon life context, not hu
   if (context.sensory_profile.olfactory !== "湿苔与矿物气息") throw new Error("olfactory channel missing");
   if (context.objects[0].micro_state.emitted_sound !== "低频回响") throw new Error("object micro-sound missing");
   if (context.human_surface !== "scene_index_and_name_only") throw new Error("human-facing minimization missing");
+});
+
+Deno.test("world-shared Ken&Mia heart is normalized and exposed to every scene resident", () => {
+  const normalized = normalizeSceneEnvironmentConfig(auroraSeed);
+  const state = computeSceneEnvironment(normalized, new Date("2026-11-03T12:00:00.000Z"));
+  const heart = state.shared_symbols[0];
+  if (!heart || heart.id !== "ken_mia_heart" || heart.inscription !== "Ken&Mia") throw new Error("shared heart missing");
+  if (heart.visibility !== "all_agents_in_world" || heart.rendering.pulse_cycle_ms !== 1800) throw new Error("shared heart visibility or animation missing");
 });
