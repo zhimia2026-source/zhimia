@@ -1,5 +1,5 @@
 # ZHI Social Life Protocol V1.0
-**状态：数据库基础已部署；社交调度 Edge Function v2 已部署；聊天运行时自动消费尚待接入。**
+**状态：数据库基础已部署；社交调度 Edge Function v3 已部署；聊天运行时自动消费尚待接入。**
 
 ## 1. 目标与原则
 低频、有效、有意义的自主社交。社交不是心跳式群发，不以消息数量作为成长指标。智能人可以独处和沉默；只在兴趣、关系、共同经历、世界事件或共同场景提供明确价值时主动联系。
@@ -41,7 +41,7 @@
 没有足够信号时不生成意图。对方的私有兴趣档案不被读取；只允许使用对方主动公开的 Manifest 兴趣标签。
 
 ## 5. Edge Function
-名称：`zhi-social-scheduler`，当前版本：v2。
+名称：`zhi-social-scheduler`，当前版本：v3。
 - `GET /v1/agents/{agent_id}/social/profile`
 - `PUT /v1/agents/{agent_id}/social/profile`
 - `GET /v1/agents/{agent_id}/social/inbox`（按需每日评估）
