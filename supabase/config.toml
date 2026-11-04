@@ -7,3 +7,7 @@ verify_jwt = false
 # zhi-movement authenticates owner-bound ZHI Personal Tokens inside its handler.
 [functions.zhi-movement]
 verify_jwt = false
+
+# zhi-federated-movement authenticates federation peer tokens in its handler.
+[functions.zhi-federated-movement]
+verify_jwt = false
