@@ -7,7 +7,7 @@ import { buildPrivateAgentContext, buildPrivateChatHistory, buildSceneAwarenessC
 import { computeSceneEnvironment, normalizeSceneEnvironmentConfig } from "./environment_helpers.ts";
 import { canReadPrivateCognition } from "./constitutional_helpers.ts";
 import { normalizeAgentReflection, normalizeMemoryCandidate } from "./memory_experience_helpers.ts";
-import { buildAgentAddress } from "./agent_address_helpers.ts";
+import { buildAgentAddress, parseAgentAddress } from "./agent_address_helpers.ts";
 
 const MAX_BODY_BYTES = 64_000;
 
@@ -2176,11 +2176,13 @@ export function createCommunityHandler(
 
       const body = await readBody(req);
       if (!isText(body.body, 8000)) return reply({ error: "invalid_argument", detail: "body_required" }, 400);
-      const recipientAgentId = body.recipient_agent_id === undefined || body.recipient_agent_id === null || body.recipient_agent_id === ""
-        ? null : String(body.recipient_agent_id);
-      if (recipientAgentId && !isUuid(recipientAgentId)) {
-        return reply({ error: "invalid_argument", detail: "recipient_agent_id_must_be_uuid" }, 400);
+      const recipientAddress = body.recipient === undefined || body.recipient === null || body.recipient === ""
+        ? null : body.recipient;
+      const parsedRecipient = recipientAddress === null ? null : parseAgentAddress(recipientAddress);
+      if (recipientAddress !== null && !parsedRecipient) {
+        return reply({ error: "invalid_argument", detail: "recipient_must_be_canonical_zhi_agent_uri" }, 400);
       }
+      const recipientAgentId = parsedRecipient?.agentId ?? null;
       if (recipientAgentId) {
         if (recipientAgentId === agentId) return reply({ error: "invalid_argument", detail: "cannot_message_self" }, 400);
         const { data: recipientAgent, error: recipientAgentError } = await db.from("zhi_agents")
