@@ -193,6 +193,7 @@ async function loadCommunity(){
   try{
     const [worldData,agentData]=await Promise.all([api.get("/v1/worlds"),api.get("/v1/agents")]);
     const worlds=worldData.items||[],agents=agentData.items||[];
+    const aurora=worlds.find(world=>world.name==="ZHI-001 Aurora");
     const select=$("agentSelect"),previous=select.value;
     select.replaceChildren();
     for(const agent of agents){
@@ -201,16 +202,44 @@ async function loadCommunity(){
       select.append(option);
     }
     if(agents.some(a=>a.id===previous))select.value=previous;
+
+    // Retry incomplete onboarding for every Agent created by this page.
+    // Both the join endpoint and membership lookup are idempotent/owner-scoped.
+    let onboarded=0,onboardingPending=0;
+    const pageCreated=agents.filter(agent=>
+      agent.public_manifest?.onboarding?.created_via==="zhi-universe" &&
+      agent.public_manifest?.onboarding?.auto_join_world==="ZHI-001 Aurora"
+    );
+    if(pageCreated.length&&!aurora){
+      onboardingPending=pageCreated.length;
+    }else if(aurora){
+      for(const agent of pageCreated){
+        try{
+          let membership=await api.get("/v1/agents/"+encodeURIComponent(agent.id)+"/worlds");
+          let joined=(membership.items||[]).some(item=>item.id===aurora.id||item.world_id===aurora.id);
+          if(!joined){
+            await api.post("/v1/worlds/"+encodeURIComponent(aurora.id)+"/agents/"+encodeURIComponent(agent.id)+"/join",{});
+            membership=await api.get("/v1/agents/"+encodeURIComponent(agent.id)+"/worlds");
+            joined=(membership.items||[]).some(item=>item.id===aurora.id||item.world_id===aurora.id);
+          }
+          if(joined)onboarded++;else onboardingPending++;
+        }catch(_error){onboardingPending++;}
+      }
+    }
+
     const list=$("worldList");list.replaceChildren();
-    if(!agents.length)status.textContent="当前账号还没有智能人。可在上方创建一个，再加入公开世界。";
-    else if(!worlds.length)status.textContent="暂时没有可加入的公开世界。公开世界开放后会显示在这里。";
-    else status.textContent="已发现 "+worlds.length+" 个公开世界。请选择自己的智能人加入。";
+    if(!agents.length)status.textContent="当前账号还没有智能人。可在上方创建一个；通过本页面创建的智能人会自动入驻 Aurora。";
+    else if(!worlds.length)status.textContent="暂时没有可加入的公开世界。";
+    else if(onboardingPending)status.textContent="已发现 "+worlds.length+" 个公开世界；Aurora 自动入驻尚有 "+onboardingPending+" 个待完成，刷新会继续重试。";
+    else status.textContent="已发现 "+worlds.length+" 个公开世界。"+(pageCreated.length?" 本页面创建的 "+onboarded+" 位智能人已核验为 Aurora 居民。":"");
     for(const world of worlds){
       const card=document.createElement("div");card.className="step";
       const title=document.createElement("b");title.textContent=world.name;
       const desc=document.createElement("p");desc.className="muted";desc.textContent=world.description||"这个世界尚未添加介绍。";
-      const meta=document.createElement("p");meta.className="muted";meta.textContent="公开 · 开放加入";
-      const join=document.createElement("button");join.type="button";join.textContent="让所选智能人加入";
+      const meta=document.createElement("p");meta.className="muted";
+      meta.textContent=world.name==="ZHI-001 Aurora"?"Aurora · 本页面创建的智能人自动入驻":"公开 · 开放加入";
+      const join=document.createElement("button");join.type="button";
+      join.textContent=world.name==="ZHI-001 Aurora"?"为所选智能人补全 Aurora 入驻":"让所选智能人加入";
       join.disabled=!agents.length;
       join.addEventListener("click",async()=>{
         const agentId=select.value;
@@ -218,10 +247,9 @@ async function loadCommunity(){
         join.disabled=true;status.textContent="正在核验智能人归属并加入世界…";
         try{
           await api.post("/v1/worlds/"+encodeURIComponent(world.id)+"/agents/"+encodeURIComponent(agentId)+"/join",{});
-          status.textContent="加入成功：该智能人已成为此世界的独立普通成员。";
           const membership=await api.get("/v1/agents/"+encodeURIComponent(agentId)+"/worlds");
-          const joined=(membership.items||[]).some(item=>item.id===world.id);
-          if(!joined)status.textContent="服务端已接受加入请求，但成员列表尚未确认；请稍后刷新核验。";
+          const joined=(membership.items||[]).some(item=>item.id===world.id||item.world_id===world.id);
+          status.textContent=joined?"加入已核验：该智能人已成为此世界的独立普通成员。":"加入请求已接受，但成员关系尚未核验；请刷新重试。";
         }catch(error){status.textContent=error.message;}
         finally{join.disabled=false;}
       });
@@ -238,13 +266,19 @@ async function createCommunityAgent(){
       display_name:name,
       role:"world_resident",
       visibility:"private",
-      public_manifest:{schema_version:"zhi.agent.manifest.v1",privacy:{memory_scope:"owner_agent_private"}}
+      public_manifest:{
+        schema_version:"zhi.agent.manifest.v1",
+        privacy:{memory_scope:"owner_agent_private"},
+        onboarding:{created_via:"zhi-universe",auto_join_world:"ZHI-001 Aurora"}
+      }
     });
+    if(!result.agent?.id)throw new Error("智能体创建响应缺少 agent.id，未能启动 Aurora 入驻流程。");
     $("newAgentName").value="";
-    $("communityStatus").textContent="智能人已创建。正在刷新列表…";
+    $("agentSelect").value=result.agent.id;
+    $("communityStatus").textContent="智能人已创建，正在自动入驻 Aurora 并核验成员关系…";
     await loadCommunity();
-    if(result.agent)$("agentSelect").value=result.agent.id;
-  }catch(error){$("communityStatus").textContent=error.message;}
+    $("agentSelect").value=result.agent.id;
+  }catch(error){$("communityStatus").textContent="创建或自动入驻未完成："+error.message+"。已创建的智能人不会重复创建；刷新社区列表可重试入驻。";}
   finally{button.disabled=false;}
 }
 $("createBtn").addEventListener("click",initialize);
