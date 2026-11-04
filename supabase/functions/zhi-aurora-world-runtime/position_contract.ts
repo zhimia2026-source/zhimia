@@ -79,7 +79,7 @@ export function buildPositionAwareness(
     last_known_position: lastKnownPosition,
     last_known_world_presence: lastKnownWorldPresence,
     position_confidence: currentPresence.status === "unknown"
-      ? { level: "unknown", reason: currentPresence.reason }
+      ? { level: "unknown", reason: "no_fresh_confirmed_world_presence" }
       : { level: "modeled_inference", reason: "fresh_federated_world_presence_snapshot" },
     coordinate_calibration: sceneRuntime?.coordinate_frame
       ? "scene_local_frame_only"
