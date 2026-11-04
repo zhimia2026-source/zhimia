@@ -1,7 +1,7 @@
 # AURORA Resident Logical Spawn V1
 
-**Status:** prepared in GitHub PR; not applied to production.  
-**Migration:** `20261104043000_aurora_resident_logical_spawn_v1.sql`
+**Status:** applied to the existing Supabase production project and verified read-only on 2026-11-04.  
+**Migration:** `20261104043015_aurora_resident_logical_spawn_v1.sql`
 
 ## Purpose
 
