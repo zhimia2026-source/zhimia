@@ -90,8 +90,6 @@ export function validateAuroraTopologyProposal(
     ) {
       issues.push(`exactly_one_modeled_open_entrance_required:${regionId}`);
     }
-      issues.push(`exactly_one_modeled_open_entrance_required:${regionId}`);
-    }
   }
 
   if (issues.length) return { ok: false, issues };
