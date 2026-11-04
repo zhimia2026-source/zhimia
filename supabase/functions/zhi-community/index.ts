@@ -1954,6 +1954,83 @@ export function createCommunityHandler(
       return reply({ turn: completed, growth, social_activity: socialOutcome, idempotent_replay: false }, 201);
     }
 
+    // Private owner inbox: Agents may intentionally leave a note for their own creator.
+    // The owner is always derived from the authenticated token, never from request JSON.
+    if (req.method === "GET" && path === "/v1/owner-inbox") {
+      if (!hasCapability(actor, "community.message.read")) return reply({ error: "forbidden", detail: "capability_required" }, 403);
+      const limit = Number(url.searchParams.get("limit") ?? "50");
+      if (!Number.isInteger(limit) || limit < 1 || limit > 100) return reply({ error: "invalid_argument", detail: "limit_must_be_1_to_100" }, 400);
+      const [{ data: items, error }, { count: unreadCount, error: countError }] = await Promise.all([
+        db.from("zhi_owner_inbox_messages")
+          .select("id,agent_id,world_id,subject,body,message_kind,created_at,read_at")
+          .eq("owner_user_id", actor.userId).is("archived_at", null)
+          .order("created_at", { ascending: false }).limit(limit),
+        db.from("zhi_owner_inbox_messages").select("id", { count: "exact", head: true })
+          .eq("owner_user_id", actor.userId).is("read_at", null).is("archived_at", null),
+      ]);
+      if (error || countError) throw new Error("database_error");
+      const agentIds = [...new Set((items ?? []).map((item: { agent_id: string }) => item.agent_id))];
+      const { data: agentsForInbox, error: agentsError } = agentIds.length
+        ? await db.from("zhi_agents").select("id,display_name").eq("owner_user_id", actor.userId).in("id", agentIds)
+        : { data: [], error: null };
+      if (agentsError) throw new Error("database_error");
+      const names = new Map((agentsForInbox ?? []).map((agent: { id: string; display_name: string }) => [agent.id, agent.display_name]));
+      return reply({ unread_count: unreadCount ?? 0, items: (items ?? []).map((item: { agent_id: string }) => ({
+        ...item, agent_name: names.get(item.agent_id) ?? "智能人",
+      })) });
+    }
+
+    if (req.method === "POST" && parts.length === 4 && parts[0] === "v1" &&
+        parts[1] === "owner-inbox" && parts[3] === "read") {
+      if (!hasCapability(actor, "community.message.read")) return reply({ error: "forbidden", detail: "capability_required" }, 403);
+      const messageId = parts[2];
+      if (!isUuid(messageId)) return reply({ error: "invalid_argument", detail: "message_id_must_be_uuid" }, 400);
+      const { data: updated, error } = await db.from("zhi_owner_inbox_messages")
+        .update({ read_at: new Date().toISOString() })
+        .eq("id", messageId).eq("owner_user_id", actor.userId).is("archived_at", null)
+        .select("id,read_at").maybeSingle();
+      if (error) throw new Error("database_error");
+      if (!updated) return reply({ error: "not_found" }, 404);
+      return reply({ message: updated }, 200);
+    }
+
+    if (req.method === "POST" && parts.length === 4 && parts[0] === "v1" &&
+        parts[1] === "agents" && parts[3] === "owner-messages") {
+      if (!hasCapability(actor, "community.message.send")) return reply({ error: "forbidden", detail: "capability_required" }, 403);
+      const agentId = parts[2];
+      if (!isUuid(agentId)) return reply({ error: "invalid_argument", detail: "agent_id_must_be_uuid" }, 400);
+      const { data: ownedAgent, error: ownedAgentError } = await db.from("zhi_agents")
+        .select("id,owner_user_id,display_name,status").eq("id", agentId)
+        .eq("owner_user_id", actor.userId).maybeSingle();
+      if (ownedAgentError) throw new Error("database_error");
+      if (!ownedAgent || ownedAgent.status !== "active") return reply({ error: "not_found" }, 404);
+      const body = await readBody(req);
+      if (!isText(body.body, 8000)) return reply({ error: "invalid_argument", detail: "body_required_max_8000" }, 400);
+      const subject = typeof body.subject === "string" ? body.subject.trim() : "";
+      if (subject.length > 180) return reply({ error: "invalid_argument", detail: "subject_max_180" }, 400);
+      const kind = ["message", "invitation", "world_event", "important"].includes(String(body.message_kind))
+        ? String(body.message_kind) : "message";
+      const worldId = body.world_id == null ? null : String(body.world_id);
+      if (worldId && !isUuid(worldId)) return reply({ error: "invalid_argument", detail: "world_id_must_be_uuid" }, 400);
+      const idempotencyKey = req.headers.get("idempotency-key")?.trim() || null;
+      if (idempotencyKey && idempotencyKey.length > 200) return reply({ error: "invalid_argument", detail: "idempotency_key_too_long" }, 400);
+      const record = {
+        owner_user_id: actor.userId, agent_id: agentId, world_id: worldId,
+        subject, body: body.body.trim(), message_kind: kind, idempotency_key: idempotencyKey,
+      };
+      const { data: inserted, error: insertError } = await db.from("zhi_owner_inbox_messages")
+        .insert(record).select("id,agent_id,world_id,subject,body,message_kind,created_at,read_at").maybeSingle();
+      if (insertError?.code === "23505" && idempotencyKey) {
+        const { data: existing, error: existingError } = await db.from("zhi_owner_inbox_messages")
+          .select("id,agent_id,world_id,subject,body,message_kind,created_at,read_at")
+          .eq("agent_id", agentId).eq("idempotency_key", idempotencyKey).maybeSingle();
+        if (existingError || !existing) throw new Error("database_error");
+        return reply({ message: existing, idempotent_replay: true }, 200);
+      }
+      if (insertError || !inserted) throw new Error("database_error");
+      return reply({ message: inserted, idempotent_replay: false }, 201);
+    }
+
     // Agent scene membership is independent from the creator's human membership.
     // The authenticated creator must own the agent; public join is an explicit action.
     if (parts.length === 4 && parts[0] === "v1" && parts[1] === "agents" &&
