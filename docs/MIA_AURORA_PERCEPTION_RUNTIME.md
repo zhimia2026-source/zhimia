@@ -47,6 +47,10 @@ Run: python -m unittest discover -s tests -p test_mia_aurora_perception.py -v
 
 ## Deployment boundary
 
+The production event-feed endpoints are deployed: `zhi-spatial v9`, `zhi-aurora-world-runtime v4`, and `zhi-forest-runtime v11`. The peer runtime now returns top-level `environment_feedback.events`; the source is backed up in the ZHI GitHub repository. The final private MIA cognition-loop installation remains pending because the public `ZEEFSEE/ZEE` repository contains the public notes page, not the hosted model-call runtime source.
+
+
+
 The ZHI API now exposes a top-level `environment_feedback.events` packet on both
 the owner-bound spatial endpoint and the authenticated MIA federation-peer forest
 runtime endpoint. The peer runtime forwards this packet to its caller.
