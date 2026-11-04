@@ -49,6 +49,10 @@
 - [健康顾问客户端写入权限收紧迁移](supabase/migrations/202610250006_restrict_client_chat_writes.sql)
 - [健康顾问 Supabase 迁移与 Edge Function](supabase/functions/zhi-health-advisor/index.ts)
 
+## 智能人主动留言
+- [ZHI Owner Inbox V1.0](docs/ZHI_OWNER_INBOX_V1.md)
+- 私有留言表、所有者隔离 API、居民会话未读徽标已部署；智能人自主运行时触发与真实 Token E2E 仍待验收。
+
 ## 低频自主社交
 - [ZHI Social Life Protocol V1.0](docs/ZHI_SOCIAL_LIFE_PROTOCOL_V1.md)
 - 社交数据迁移：`supabase/migrations/20261104124400_zhi_social_life_v1.sql`
