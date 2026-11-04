@@ -1,0 +1,5 @@
+# ZHI Edge Function deployment settings.
+# zhi-community authenticates ZHI Personal Tokens inside its handler
+# (token hash, expiry, revocation, and capability checks). These are not Supabase Auth JWTs.
+[functions.zhi-community]
+verify_jwt = false
