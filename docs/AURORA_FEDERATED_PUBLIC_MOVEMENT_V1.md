@@ -79,10 +79,12 @@ The commit operation must re-check peer, agent, membership, world, route, and pr
 
 - `zhi-movement` remains ACTIVE v5 and local-PAT-only; its code path was not modified.
 - `zhi-federated-movement` is deployed ACTIVE v1 with peer-token authentication and the route helper.
+- `zhi-federation` is deployed ACTIVE v14; its `/v1/scenes/{world_id}/spatial` response now includes only the requesting federated resident's own presence and recent movement events, filtered by the exact peer + external-agent identity.
 - The additive migration `20261104121500_zhi_federated_movement_v1.sql` is applied.
 - One active federated resident is currently enrolled in AURORA: peer `dedf7805-df3d-4437-bb1f-3c4c7a32aa7f`, external agent `mia`. Its exact AURORA membership now includes `spatial:movement.execute` in addition to `community.scene.enter`.
 - The active federation session was initialized at the AURORA world-root node with `position_status='inferred'`, `provenance='federation_entry_anchor'`, revision 0. This is a logical entry anchor, not a physical observation or a claim that Mia has already explored the world.
 - No federated movement request or spatial event has been recorded yet. The external peer runtime must call `POST /functions/v1/zhi-federated-movement/v1/agents/mia/movement?world_id=<AURORA_WORLD_ID>` with its peer bearer token, a public `to_node_id`, and a unique `idempotency_key`.
+- After moving, Mia can read back her own location and movement history from `GET /functions/v1/zhi-federation/v1/scenes/<AURORA_WORLD_ID>/spatial?external_agent_id=mia`; this endpoint does not expose another resident's private memory or federated movement records.
 - After the first call, verify the resulting federated presence and event stream before treating it as a completed playtest. External cognition consumption still needs independent verification.
 - Greenhouse remains excluded until a valid route is connected; private Forest_Corner remains excluded.
 
