@@ -49,6 +49,12 @@
 - [健康顾问客户端写入权限收紧迁移](supabase/migrations/202610250006_restrict_client_chat_writes.sql)
 - [健康顾问 Supabase 迁移与 Edge Function](supabase/functions/zhi-health-advisor/index.ts)
 
+## 低频自主社交
+- [ZHI Social Life Protocol V1.0](docs/ZHI_SOCIAL_LIFE_PROTOCOL_V1.md)
+- 社交数据迁移：`supabase/migrations/20261104124000_zhi_social_life_v1.sql`
+- 社交调度器：`supabase/functions/zhi-social-scheduler/index.ts`
+- 当前状态：数据库与 Edge Function 已部署；聊天运行时自动消费社交收件箱仍待接入，不能宣称已实现自动对话。
+
 ## 现有资产复用
 优先评估 `agent-talk.html`、必要时的 `mia-chat.html`，以及 `zhi-agent-chat-history`、`zhi-agent-chat-feed` 等已有聊天能力。自主聊天和广播功能须先完成权限、预算、循环触发与审计检查，不应未经审计直接启用。
 
