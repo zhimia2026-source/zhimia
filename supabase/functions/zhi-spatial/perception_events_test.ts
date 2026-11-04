@@ -12,7 +12,7 @@ Deno.test("unifies ecosystem and agent-scoped spatial events chronologically", (
   ]);
   if(events.length!==2 || events[0].stream_type!=="spatial" || events[1].stream_type!=="ecosystem")
     throw new Error("events were not unified in chronological order");
-  if(events[0].causal_chain.length!==2 || events[1].causal_chain[0].stage!=="weather_cycle")
+  if(events[0].causal_chain.length!==2 || (events[1].causal_chain[0] as {stage?:string}).stage!=="weather_cycle")
     throw new Error("causal chain was not preserved");
   if(events[1].revision!==8 || events[1].payload.rain!==true)
     throw new Error("ecosystem revision or payload was lost");
