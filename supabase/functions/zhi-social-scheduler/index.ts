@@ -63,7 +63,15 @@ function normList(value: unknown): string[] {
 }
 function manifestInterests(value: unknown): string[] {
   if (!value || typeof value !== "object" || Array.isArray(value)) return [];
-  return normList((value as Record<string, unknown>).interests);
+  const manifest = value as Record<string, unknown>;
+  const declared = normList(manifest.interests);
+  if (declared.length) return declared;
+  const personality = manifest.personality && typeof manifest.personality === "object" && !Array.isArray(manifest.personality)
+    ? manifest.personality as Record<string, unknown> : {};
+  return normList([
+    ...(Array.isArray(personality.traits) ? personality.traits : []),
+    ...(Array.isArray(personality.capability_layer) ? personality.capability_layer : []),
+  ]);
 }
 function eventText(value: unknown): string {
   if (!value || typeof value !== "object" || Array.isArray(value)) return "";
@@ -280,7 +288,7 @@ Deno.serve(async (req: Request) => {
       const { data, error } = await db.from("zhi_social_intents").select(
         "id,world_id,peer_agent_id,trigger_kind,reason_code,value_score,context,status,not_before,expires_at,created_at"
       ).eq("agent_id", agentId).eq("owner_user_id", actor.userId)
-        .in("status", ["pending", "deferred"]).lte("not_before", new Date().toISOString())
+        .in("status", ["pending", "deferred", "accepted"]).lte("not_before", new Date().toISOString())
         .gt("expires_at", new Date().toISOString()).order("value_score", { ascending: false }).limit(10);
       if (error) throw new Error("inbox_read_failed");
       return reply({ items: data ?? [], evaluated_on_wake: true });
