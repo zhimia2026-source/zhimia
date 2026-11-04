@@ -1,7 +1,7 @@
 # AURORA Public World Entrances V1
 
 **Creator approval:** approved for exactly four public regions.  
-**Migration:** `20261104000700_aurora_public_world_entrances_v1.sql`  
+**Migration:** `20261104042638_aurora_public_world_entrances_v1.sql`  
 **Status:** prepared in a GitHub PR; not applied to production.
 
 ## Approved graph
