@@ -45,6 +45,8 @@ jobs:
         run: deno check supabase/functions/zhi-spatial/index.ts
       - name: Test MIA peer unified environment event stream
         run: deno test supabase/functions/zhi-aurora-world-runtime/perception_events_test.ts
+      - name: Test unified resident position awareness contract
+        run: deno test supabase/functions/zhi-aurora-world-runtime/position_contract_test.ts
       - name: Type-check MIA peer world runtime
         run: deno check supabase/functions/zhi-aurora-world-runtime/index.ts
       - name: Type-check MIA forest runtime

@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { buildUnifiedEnvironmentEvents } from "./perception_events.ts";
+import { buildPositionAwareness } from "./position_contract.ts";
 
 const URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -133,6 +134,7 @@ Deno.serve(async (req: Request) => {
   const federationSession = federationSessionResult.data;
   const forestRuntime = forestStateResult.data;
   const federatedPresence = federatedPresenceResult.data;
+  const positionAwareness = buildPositionAwareness(federationSession, federatedPresence, forestRuntime);
   const environmentEvents = buildUnifiedEnvironmentEvents(
     ecosystemEventsResult.data ?? [],
     spatialEventsResult.data ?? [],
@@ -193,6 +195,7 @@ Deno.serve(async (req: Request) => {
         updated_at: forestRuntime.updated_at,
         recent_events: forestEventsResult.data ?? [],
       } : null,
+      position_awareness: positionAwareness,
       semantics: "Persisted headless scene-runtime state and event records; not physical sensor telemetry.",
     },
     perception: {
@@ -213,10 +216,11 @@ Deno.serve(async (req: Request) => {
           frame_id: "aurora-semantic-scene-frame-v1",
           generated_at: new Date().toISOString(),
           scene_context: {
-            current_scene: forestRuntime?.scene_id ?? null,
-            current_position: forestRuntime?.current_position ?? null,
-            coordinate_frame: forestRuntime?.coordinate_frame ?? null,
-            current_node_id: forestRuntime?.current_node_id ?? null,
+            current_scene: forestRuntime?.session_status === "active" ? forestRuntime.scene_id ?? null : null,
+            current_position: forestRuntime?.session_status === "active" ? forestRuntime.current_position ?? null : null,
+            coordinate_frame: forestRuntime?.session_status === "active" ? forestRuntime.coordinate_frame ?? null : null,
+            current_node_id: forestRuntime?.session_status === "active" ? forestRuntime.current_node_id ?? null : null,
+            last_known_scene_position: positionAwareness.last_known_position,
             note: "Scene descriptions are database-backed semantic representations; this does not mean Mia receives rendered pixels."
           },
           visual_semantics: {
@@ -271,6 +275,7 @@ Deno.serve(async (req: Request) => {
           epistemic_notice: "This is a structured semantic scene frame derived from persisted world records and simulated model state. It can support contextual reasoning, but must not be described as literal seeing, hearing, touching, or physical sensing."
         };
       })(),
+      position_awareness: positionAwareness,
       epistemic_contract: {
         database_facts: "Spatial nodes, edges and event records returned with source and freshness metadata.",
         modeled_inference: "zhi_ecosystem_states is a continuously advanced simulated world model, not physical sensor observation.",
