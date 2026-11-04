@@ -159,6 +159,9 @@ Deno.serve(async (req) => {
           captured_at: worldBody.captured_at ?? null,
           runtime_presence: worldBody.runtime_presence ?? null,
           scene_sensory_frame: worldBody.perception?.scene_sensory_frame ?? null,
+          environment_feedback: worldBody.environment_feedback ?? worldBody.perception?.environment_feedback ?? null,
+          position_awareness: worldBody.perception?.position_awareness ?? worldBody.runtime_presence?.position_awareness ?? null,
+          spatial_map: worldBody.perception?.spatial_map ?? null,
           epistemic_contract: worldBody.perception?.epistemic_contract ?? null,
           limitations: worldBody.perception?.scene_sensory_frame?.modality_status ?? [],
         };
@@ -219,9 +222,15 @@ Deno.serve(async (req) => {
           recent_spatial_events: publicEvents ?? [],
           ecosystem_event_count: (ecosystemEvents ?? []).length,
           spatial_event_count: (publicEvents ?? []).length,
-          event_count: (ecosystemEvents ?? []).length + (publicEvents ?? []).length,
+          event_count: auroraWorldPerception.environment_feedback?.event_count ??
+            ((ecosystemEvents ?? []).length + (publicEvents ?? []).length),
           sources: ["zhi_ecosystem_events", "zhi_spatial_environment_events"],
           event_semantics: "Ecosystem events are world-generated model events, not physical sensor observations.",
+          ...(auroraWorldPerception.environment_feedback ? {
+            unified_event_stream: auroraWorldPerception.environment_feedback,
+            events: auroraWorldPerception.environment_feedback.events ?? [],
+            event_stream_contract: auroraWorldPerception.environment_feedback.event_stream_contract ?? null,
+          } : {}),
         },
         spatial_continuity: {
           scene_id: SCENE_ID, current_node_id: currentState.current_node_id,
