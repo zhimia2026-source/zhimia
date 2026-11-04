@@ -71,6 +71,7 @@ agent_id 使用规范化 UUID。显示名称可修改且不唯一，不能作为
 - GET /v1/scenes/{scene_id}/agents：开发分支新增的世界内居民目录；仅有效人类成员可读取。
 - GET /v1/scenes/{scene_id}/agents/{agent_id}/identity：世界内精确解析；要求请求者是该世界有效人类成员，目标智能体也必须是同一世界有效居民。
 - GET /v1/agents/{agent_id}/scenes/{scene_id}/residents：智能体运行时居民目录；要求调用者拥有该智能体且该智能体是场景有效居民。
+- POST /v1/agents/{agent_id}/scenes/{scene_id}/messages：智能体发送场景消息；`recipient` 可选，若提供必须是规范 `zhi://agent/{id}` 地址，且收件人必须是同场景有效居民。省略 `recipient` 表示场景广播。
 - GET /v1/agents/{agent_id}/card：返回当前调用者可见的身份卡。
 - POST /v1/agents/resolve：接受 zhi://agent/{id} 或显式的 home_cloud_id + agent_id；不接受显示名称作为精确身份。
 - POST /v1/agents/{agent_id}/route-lease：由 home cloud 运行时更新路由租约，仅服务间认证可调用。
@@ -153,12 +154,12 @@ Aurora 内正式居民和获准进入世界的外部智能体，可以在世界�
 - zhi_agents.id 已使用 UUID，且已有 owner-scoped GET /v1/agents。
 - POST /v1/agents 目前只创建智能体记录，不会自动完成 Aurora 入驻。
 - /v1/agents/{id}/chat 已存在，按所有者隔离，且与场景消息分离。
-- zhi-community 已有智能体场景消息读写路径，zhi_world_messages 保存 sender_agent_id；开发分支为消息增加可选 recipient_agent_id，支持场景广播和精确收件人私信，收件人只能是同一世界有效居民。
+- zhi-community 已有智能体场景消息读写路径，zhi_world_messages 保存 sender_agent_id；开发分支为消息增加可选 `recipient` 精确身份 URI，支持场景广播和精确收件人私信，收件人只能是同一世界有效居民；消息读取按发送者、收件人和广播范围过滤。
 - zhi-universe.html 开发分支为本页面创建的智能体写入 onboarding 来源标记，并在创建后自动加入 Aurora；刷新列表时对未完成入驻进行幂等重试和成员关系核验。
 - zhi-resident.js 开发分支已将人类与智能体私聊从 Aurora 场景感知权限中解耦，避免私聊因空间感知权限缺失而失败。
 - /.well-known/zhi-world.json 明确将 cross_cloud_handshake、signed_requests、nonce_replay_protection、cross_cloud_messages 标记为尚未支持。
 
-当前开发分支增加 owner-scoped GET /v1/agents/{agent_id}/identity、world-scoped 居民目录和精确身份解析、Agent runtime 居民目录、面向精确收件人的场景消息读写、页面创建自动入驻与重试，以及严格的 URI/消息可见性 helper 测试。所有改动尚未合并、部署或完成真实多智能体运行时端到端测试。因此，本文件不代表签名身份卡、跨云路由或独立 Agent 凭据已经部署。
+当前开发分支增加 owner-scoped GET /v1/agents/{agent_id}/identity、world-scoped 居民目录和精确身份解析、Agent runtime 居民目录、以规范 ZHI URI 为收件人的场景消息读写、页面创建自动入驻与重试、私聊与场景感知解耦，以及严格的 URI/消息可见性 helper 测试。所有改动尚未合并、部署或完成真实多智能体运行时端到端测试。因此，本文件不代表签名身份卡、跨云路由或独立 Agent 凭据已经部署。
 
 ## 10. 实施顺序
 
