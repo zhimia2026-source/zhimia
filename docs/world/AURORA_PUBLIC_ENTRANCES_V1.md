@@ -1,8 +1,8 @@
 # AURORA Public World Entrances V1
 
 **Creator approval:** approved for exactly four public regions.  
-**Migration:** `20261104000700_aurora_public_world_entrances_v1.sql`  
-**Status:** prepared in a GitHub PR; not applied to production.
+**Migration:** `20261104042638_aurora_public_world_entrances_v1.sql`  
+**Status:** applied to the existing Supabase production project and verified read-only on 2026-11-04.
 
 ## Approved graph
 
