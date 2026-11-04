@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { shortestPublicRoute } from "./route_helpers.ts";
 
 const json = (body: unknown, status=200, headers: Record<string,string>={}) =>
   new Response(JSON.stringify(body), { status, headers: {
@@ -50,31 +51,6 @@ async function authenticatePeer(db:SupabaseClient,req:Request){
   if(touchError||!touched) return null;
   return {id:peer.id};
 }
-function shortestPath(start:string,target:string,edges:any[]):string[]|null{
-  const graph=new Map<string,string[]>();
-  for(const e of edges??[]){
-    if(!graph.has(e.from_node_id)) graph.set(e.from_node_id,[]);
-    graph.get(e.from_node_id)!.push(e.to_node_id);
-    if(!e.directed){
-      if(!graph.has(e.to_node_id)) graph.set(e.to_node_id,[]);
-      graph.get(e.to_node_id)!.push(e.from_node_id);
-    }
-  }
-  const queue=[start], prev=new Map<string,string|null>([[start,null]]);
-  for(let i=0;i<queue.length;i++){
-    const node=queue[i];
-    if(node===target) break;
-    for(const next of graph.get(node)??[]){
-      if(prev.has(next)) continue;
-      prev.set(next,node); queue.push(next);
-    }
-  }
-  if(!prev.has(target)) return null;
-  const path:string[]=[]; let cursor:string|null=target;
-  while(cursor!==null){path.push(cursor);cursor=prev.get(cursor)??null;}
-  path.reverse();
-  return path.length<=32?path:null;
-}
 const statusFor=(code:string)=>{
   if(code==="invalid_token") return 401;
   if(code.includes("denied")||code.includes("required")) return 403;
@@ -97,7 +73,7 @@ Deno.serve(async(req:Request)=>{
     const marker="/functions/v1/zhi-federated-movement";
     const path=url.pathname.includes(marker)?url.pathname.slice(url.pathname.indexOf(marker)+marker.length):url.pathname;
     const parts=path.split("/").filter(Boolean);
-    if(parts.length!==3||parts[0]!=="v1"||parts[1]!=="agents"||! /^[a-zA-Z0-9._:-]{1,160}$/.test(parts[2]))
+    if(parts.length!==4||parts[0]!=="v1"||parts[1]!=="agents"||! /^[a-zA-Z0-9._:-]{1,160}$/.test(parts[2])||parts[3]!=="movement")
       return reply({error:"not_found"},404);
     const externalAgentId=parts[2];
     const db=dbClient();
@@ -174,7 +150,7 @@ Deno.serve(async(req:Request)=>{
       .in("access_policy",["inherit","open"]).limit(2000);
     if(edgesError) throw new Error("database_error");
     const traversableEdges=(edges??[]).filter((e:any)=>allowedIds.has(e.from_node_id)&&allowedIds.has(e.to_node_id));
-    const route=shortestPath(presence.current_node_id,targetId,traversableEdges);
+    const route=shortestPublicRoute(presence.current_node_id,targetId,traversableEdges);
     if(!route) return reply({error:"federated_route_not_found"},409);
 
     const {data:committed,error:commitError}=await db.rpc("zhi_federated_movement_commit",{
