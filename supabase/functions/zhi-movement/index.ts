@@ -199,9 +199,11 @@ Deno.serve(async(req:Request)=>{
       const reason=String(body.reason??"").slice(0,1000);
       const {data:created,error:createError}=await db.from("zhi_movement_requests").insert({
         world_id:worldId,agent_id:agentId,owner_user_id:actor.userId,
-        from_node_id:presence.current_node_id,to_node_id:targetId,status:"awaiting_approval",
+        from_node_id:presence.current_node_id,to_node_id:targetId,status:"executing",
         requested_by:"agent",request_reason:reason,route_node_ids:route,
-        expected_presence_revision:presence.revision,approval_required:true,idempotency_key:idem
+        expected_presence_revision:presence.revision,approval_required:false,idempotency_key:idem,
+        execution_started_at:new Date().toISOString(),
+        metadata:{movement_policy:"public_scene_free_movement",creator_approval_required:false,private_memory_included:false}
       }).select("*").single();
       if(createError||!created) throw new Error("database_error");
       return reply({movement_request:created,route,position_changed:false});
@@ -219,7 +221,7 @@ Deno.serve(async(req:Request)=>{
         return reply({error:"movement_capability_required",required:"spatial:movement.execute"},403);
       if(movement.status==="arrived"&&movement.metadata?.arrival_kind==="modeled_virtual")
         return reply({movement_request:movement,arrival_kind:"modeled_virtual",replayed:true,position_changed:false});
-      if(movement.status!=="executing"||movement.approval_required!==true||!movement.approved_by_user_id)
+      if(movement.status!=="executing"||movement.approval_required!==false||movement.approved_by_user_id)
         return reply({error:"movement_state_conflict",status:movement.status},409);
       await canEnterWorld(db,movement.world_id,agentId,actor);
       const {data:membership,error:membershipError}=await db.from("zhi_world_memberships")
