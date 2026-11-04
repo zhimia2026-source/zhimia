@@ -6,10 +6,10 @@ const agentId = process.env.ZHI_AGENT_ID ?? "";
 assert.ok(base && token && agentId, "Set SUPABASE_URL, ZHI_PERSONAL_TOKEN and ZHI_AGENT_ID");
 
 const endpoint = `${base}/functions/v1/zhi-social-scheduler/v1/agents/${agentId}/social`;
-const unauth = await fetch(`${endpoint}/inbox`);
+const unauth = await fetch(`${endpoint}/inbox`, { headers: process.env.SUPABASE_ANON_KEY ? { apikey: process.env.SUPABASE_ANON_KEY } : {} });
 assert.equal(unauth.status, 401, "Unauthenticated inbox access must be rejected");
 
-const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
+const headers = { authorization: `Bearer ${token}`, "content-type": "application/json", ...(process.env.SUPABASE_ANON_KEY ? { apikey: process.env.SUPABASE_ANON_KEY } : {}) };
 const profile = await fetch(`${endpoint}/profile`, { headers });
 assert.equal(profile.status, 200, `Profile read requires agent.memory.read; got ${profile.status}`);
 {
