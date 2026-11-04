@@ -25,7 +25,7 @@ function fixture(overrides: Partial<VirtualMovementValidationInput> = {}): Virtu
     expected_presence_revision: 7,
     route_node_ids: [A, B, C],
     nodes: [A, B, C].map((id) => ({
-      id, world_id: WORLD, status: "active", visibility: "public", entry_policy: "open",
+      id, world_id: WORLD, status: "active", node_type: "region", visibility: "public", entry_policy: "open",
     })),
     edges: [
       { world_id: WORLD, from_node_id: A, to_node_id: B, relation: "adjacent_to", directed: false, access_policy: "open", status: "active" },
@@ -64,17 +64,28 @@ Deno.test("does not treat nearby as a traversable edge", () => {
   if (result.ok || result.reason !== "edge_not_traversable") throw new Error("nearby relation accepted as a route");
 });
 
+
+Deno.test("rejects object nodes as locomotion destinations", () => {
+  const result = validateVirtualMovement(fixture({
+    nodes: [A, B, C].map((id) => ({
+      id, world_id: WORLD, status: "active", node_type: id === C ? "object" : "region",
+      visibility: "public", entry_policy: "open",
+    })),
+  }));
+  if (result.ok || result.reason !== "node_not_traversable") throw new Error("object node accepted as a movement destination");
+});
+
 Deno.test("rejects private or closed destinations", () => {
   const privateResult = validateVirtualMovement(fixture({
     nodes: [A, B, C].map((id) => ({
-      id, world_id: WORLD, status: "active", visibility: id === C ? "private" : "public", entry_policy: "open",
+      id, world_id: WORLD, status: "active", node_type: "region", visibility: id === C ? "private" : "public", entry_policy: "open",
     })),
   }));
   if (privateResult.ok || privateResult.reason !== "node_not_public") throw new Error("private destination accepted");
 
   const closedResult = validateVirtualMovement(fixture({
     nodes: [A, B, C].map((id) => ({
-      id, world_id: WORLD, status: "active", visibility: "public", entry_policy: id === C ? "approval" : "open",
+      id, world_id: WORLD, status: "active", node_type: "region", visibility: "public", entry_policy: id === C ? "approval" : "open",
     })),
   }));
   if (closedResult.ok || closedResult.reason !== "node_entry_not_open") throw new Error("approval-only destination accepted");
@@ -122,7 +133,7 @@ Deno.test("rejects closed worlds and foreign-world graph records", () => {
   const foreign = validateVirtualMovement(fixture({
     nodes: [A, B, C].map((id) => ({
       id, world_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
-      status: "active", visibility: "public", entry_policy: "open",
+      status: "active", node_type: "region", visibility: "public", entry_policy: "open",
     })),
   }));
   if (foreign.ok || foreign.reason !== "node_unavailable") throw new Error("foreign-world node accepted");
