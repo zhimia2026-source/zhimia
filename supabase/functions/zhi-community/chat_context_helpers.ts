@@ -39,10 +39,27 @@ export function buildPrivateAgentContext(
   agent: PrivateAgentProfile,
   cognition: Array<Record<string, unknown>>,
   approvedMicroExperiences: Array<Record<string, unknown>> = [],
+  miaBrainContext: Record<string, unknown> | null = null,
 ): string {
+  const manifest = record(agent.public_manifest);
+  const manifestPersonality = record(manifest.personality);
+  const brain = record(miaBrainContext);
+  const stablePersonality = record(brain.stable_personality);
+  const identityProfile = record(brain.identity_profile);
+  const designAxiom = boundedText(
+    stablePersonality.design_axiom ?? manifestPersonality.design_axiom,
+    1000,
+  );
+  const brainAvailable = Object.keys(stablePersonality).length > 0 || Object.keys(identityProfile).length > 0;
+  const layers = {
+    layer_1_original_personality: boundedJson(stablePersonality.layer_1_original_personality, 1200),
+    layer_2_manager_personality: boundedJson(stablePersonality.layer_2_manager_personality, 1600),
+    layer_3_resilience: boundedJson(stablePersonality.layer_3_resilience, 1600),
+  };
   const profile = {
     display_name: boundedText(agent.display_name, 120),
     role: boundedText(agent.role, 80),
+    personality_design_axiom: designAxiom,
   };
   const records = cognition.slice(0, 12).map((record) => ({
     object_type: boundedText(record.object_type, 32),
@@ -78,8 +95,51 @@ export function buildPrivateAgentContext(
         : 1,
     };
   });
+  const brainRows = (key: string, maxItems: number, mapper: (item: Record<string, unknown>) => Record<string, unknown>) =>
+    Array.isArray(brain[key]) ? (brain[key] as unknown[]).slice(0, maxItems).map((item) => mapper(record(item))) : [];
+  const privateBrainHistory = brainAvailable ? {
+    personality_state: boundedJson(brain.personality_state, 1200),
+    memories: brainRows("memories", 12, (item) => ({
+      memory_type: boundedText(item.memory_type, 48),
+      content: boundedText(item.content, 1000),
+      importance: typeof item.importance === "number" ? Math.max(0, Math.min(1, item.importance)) : 0.5,
+      occurred_at: boundedText(item.occurred_at, 80),
+      metadata: boundedJson(item.metadata, 400),
+    })),
+    life_events: brainRows("life_events", 10, (item) => ({
+      event_type: boundedText(item.event_type, 48),
+      summary: boundedText(item.summary, 600),
+      details: boundedJson(item.details, 600),
+      occurred_at: boundedText(item.occurred_at, 80),
+    })),
+    emotion_events: brainRows("emotion_events", 10, (item) => ({
+      emotion_type: boundedText(item.emotion_type, 48),
+      intensity: typeof item.intensity === "number" ? Math.max(0, Math.min(1, item.intensity)) : null,
+      valence: typeof item.valence === "number" ? Math.max(-1, Math.min(1, item.valence)) : null,
+      trigger_summary: boundedText(item.trigger_summary, 400),
+      details: boundedJson(item.details, 400),
+      occurred_at: boundedText(item.occurred_at, 80),
+    })),
+    relationships: brainRows("relationships", 10, (item) => ({
+      related_agent_id: boundedText(item.related_agent_id, 80),
+      related_person_name: boundedText(item.related_person_name, 120),
+      relationship_type: boundedText(item.relationship_type, 48),
+      context: boundedJson(item.context, 700),
+      confidence: typeof item.confidence === "number" ? Math.max(0, Math.min(1, item.confidence)) : null,
+      observed_at: boundedText(item.observed_at, 80),
+    })),
+    growth_state: boundedJson(brain.growth_state, 1400),
+    autonomy_enabled: brain.autonomy_enabled === true,
+  } : null;
   return JSON.stringify({
     profile,
+    mia_brain_identity: brainAvailable ? {
+      design_axiom: designAxiom,
+      layers,
+      autonomy: boundedText(stablePersonality.autonomy ?? manifestPersonality.autonomy, 40) || "supervised",
+      identity_profile: boundedJson(identityProfile, 1000),
+    } : null,
+    mia_brain_private_history: privateBrainHistory,
     private_cognition_records: records,
     approved_micro_experiences: microExperiences,
   });

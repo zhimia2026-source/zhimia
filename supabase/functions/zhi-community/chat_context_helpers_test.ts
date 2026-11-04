@@ -41,21 +41,43 @@ Deno.test("scene awareness preserves an empty event ledger", () => {
 });
 
 
-Deno.test("private agent context includes the curated design axiom without importing memories", async () => {
+Deno.test("MIA-02 private context loads its own axiom, three personality layers and empty history", async () => {
   const { buildPrivateAgentContext } = await import("./chat_context_helpers.ts");
+  const axiom = "她以情感理解世界，以智慧判断方向，以坚毅承担责任，以反思不断修正自己。";
   const context = JSON.parse(buildPrivateAgentContext({
     display_name: "MIA-02",
     role: "world_resident",
-    public_manifest: {
-      personality: {
-        design_axiom: "她以情感理解世界，以智慧判断方向，以坚毅承担责任，以反思不断修正自己。",
-        layers: { foundation: { traits: ["温暖", "细腻"] } },
-      },
+    public_manifest: { personality: { autonomy: "supervised" } },
+  }, [], [], {
+    identity_profile: { generation_origin: "fresh_start" },
+    stable_personality: {
+      design_axiom: axiom,
+      autonomy: "supervised",
+      layer_1_original_personality: { warmth: "温暖、细腻" },
+      layer_2_manager_personality: { responsibility: "追踪管理决策后果" },
+      layer_3_resilience: { self_correction: "承认错误并主动修正" },
     },
-  }, [], []));
-  if (!context.profile.personality_design_axiom.includes("以情感理解世界")) {
-    throw new Error("personality axiom missing from private runtime context");
-  }
+    personality_state: {},
+    memories: [],
+    life_events: [],
+    emotion_events: [],
+    relationships: [],
+    growth_state: {},
+    autonomy_enabled: false,
+  }));
+  if (!context.profile.personality_design_axiom.includes("以情感理解世界")) throw new Error("personality axiom missing");
+  if (context.mia_brain_identity.layers.layer_1_original_personality.indexOf("温暖") < 0) throw new Error("layer 1 missing");
+  if (context.mia_brain_identity.layers.layer_2_manager_personality.indexOf("责任") < 0) throw new Error("layer 2 missing");
+  if (context.mia_brain_identity.layers.layer_3_resilience.indexOf("修正") < 0) throw new Error("layer 3 missing");
+  if (context.mia_brain_private_history.memories.length !== 0) throw new Error("unexpected memory import");
+  if (context.mia_brain_private_history.autonomy_enabled !== false) throw new Error("supervised autonomy changed");
   if (context.private_cognition_records.length !== 0) throw new Error("unexpected cognition imported");
   if (context.approved_micro_experiences.length !== 0) throw new Error("unexpected experiences imported");
+});
+
+Deno.test("agents without a private MIA brain mapping receive no MIA-02 personality or history", async () => {
+  const { buildPrivateAgentContext } = await import("./chat_context_helpers.ts");
+  const context = JSON.parse(buildPrivateAgentContext({ display_name: "Other Agent", role: "resident" }, [], [], null));
+  if (context.mia_brain_identity !== null) throw new Error("MIA-02 identity leaked to another agent");
+  if (context.mia_brain_private_history !== null) throw new Error("MIA-02 private history leaked to another agent");
 });
