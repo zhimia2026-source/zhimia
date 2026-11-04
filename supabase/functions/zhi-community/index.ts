@@ -14,6 +14,17 @@ const MAX_BODY_BYTES = 64_000;
 type Actor = { userId: string; capabilities?: string[] };
 type JsonObject = Record<string, unknown>;
 
+function normalizeSocialMessage(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const message = value
+    .replace(/\u0000/g, "")
+    .replace(/[\u0001-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
+    .trim();
+  if (message.length < 12 || message.length > 1200) return null;
+  if (/<\/?ZHI_[A-Z_]+>/i.test(message) || /\[\[AURORA_MOVE:/i.test(message)) return null;
+  return message;
+}
+
 function json(data: unknown, status = 200, extra: Record<string, string> = {}) {
   return new Response(JSON.stringify(data), {
     status,
@@ -1604,29 +1615,10 @@ export function createCommunityHandler(
              if (selectedIntent.reason_code === "reply_to_message" && intentContext.reply_allowed !== true) {
                socialOutcome = { status: "reply_not_allowed", intent_id: intentId };
              } else {
-               const topics = Array.isArray(intentContext.matched_public_topics)
-                 ? intentContext.matched_public_topics.filter((v): v is string => typeof v === "string").slice(0, 3)
-                 : [];
-               const eventKinds = Array.isArray(intentContext.relevant_event_kinds)
-                 ? intentContext.relevant_event_kinds.filter((v): v is string => typeof v === "string").slice(0, 3)
-                 : [];
-               let messageBody = "";
-               if (selectedIntent.reason_code === "reply_to_message") {
-                 const preview = String(intentContext.message_preview ?? "").replace(/[\r\n\t<>]/g, " ").replace(/\s{2,}/g, " ").trim().slice(0, 100);
-                 messageBody = preview
-                   ? "我看到了你分享的内容：「" + preview + "」。谢谢你主动交流。我想继续了解，你最关注其中哪一点？"
-                   : "谢谢你主动联系我。我很愿意继续交流，你最近最想讨论什么？";
-               } else if (selectedIntent.reason_code === "shared_interest") {
-                 const topic = topics[0] ?? "我们共同关注的主题";
-                 messageBody = "你好，我是" + agent.display_name + "。我也对「" + topic + "」感兴趣，想听听你的看法；如果你愿意，我们可以慢慢交流。";
-               } else if (selectedIntent.reason_code === "world_event") {
-                 const eventLabel = eventKinds.length ? "最近的生态变化" : "AURORA 的共同经历";
-                 messageBody = "你好，我是" + agent.display_name + "。我注意到我们最近都在 AURORA 经历了" + eventLabel + "，想听听你观察到的细节。你最近留意到什么有趣的变化？";
-               } else if (selectedIntent.reason_code === "co_presence") {
-                 messageBody = "你好，我是" + agent.display_name + "。我们现在似乎在同一处场景，我正在观察周围的变化。你此刻在关注什么？";
+               const messageBody = normalizeSocialMessage(parsedAction?.message);
+               if (!messageBody) {
+                 socialOutcome = { status: "invalid_agent_message", intent_id: intentId };
                } else {
-                 messageBody = "你好，我是" + agent.display_name + "。我想继续了解你的想法；如果你愿意，我们可以找一个有意思的话题慢慢交流。";
-               }
                const socialEndpoint = supabaseBase + "/functions/v1/zhi-social-scheduler/v1/agents/" + agentId +
                  "/social/intents/" + intentId;
                const messageEndpoint = supabaseBase + "/functions/v1/zhi-community/v1/agents/" + agentId +
@@ -1677,6 +1669,7 @@ export function createCommunityHandler(
                  }
                } else {
                  socialOutcome = { status: "not_sent", intent_id: intentId, http_status: sendResponse.status };
+               }
                }
              }
            }
