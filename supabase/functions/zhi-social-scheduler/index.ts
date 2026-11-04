@@ -359,6 +359,7 @@ Deno.serve(async (req: Request) => {
         .eq("status", intent.status).select("id,status").maybeSingle();
       if (error || !data) return reply({ error: "intent_state_conflict" }, 409);
       if (action === "complete" && verifiedMessage) {
+        try {
         const { data: peerAgent, error: peerAgentError } = await db.from("zhi_agents")
           .select("id,owner_user_id,display_name,status").eq("id", intent.peer_agent_id).eq("status", "active").maybeSingle();
         if (peerAgentError) throw new Error("peer_agent_read_failed");
@@ -393,8 +394,13 @@ Deno.serve(async (req: Request) => {
               expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
               idempotency_key: replyKey,
             }, { onConflict: "idempotency_key", ignoreDuplicates: true });
-            if (replyQueueError) throw new Error("incoming_social_intent_queue_failed");
+            if (replyQueueError) console.warn(JSON.stringify({ event: "incoming_social_intent_queue_failed", agent_id: agentId }));
           }
+        }
+        } catch {
+          // The outbound message is already verified and completed; a failed reply notification
+          // must not turn a successful send into a failed chat response.
+          console.warn(JSON.stringify({ event: "incoming_social_intent_queue_failed", agent_id: agentId }));
         }
       }
       return reply({ intent: data });
