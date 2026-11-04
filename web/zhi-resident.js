@@ -9,6 +9,85 @@ let busy = false;
 
 function setStatus(message) { $("chatStatus").textContent = message; }
 
+let inboxTimer = null;
+let inboxLoading = false;
+function renderInbox(items) {
+  const root = $("inboxItems");
+  root.replaceChildren();
+  if (!items?.length) {
+    const empty = document.createElement("div");
+    empty.className = "inbox-empty";
+    empty.textContent = "暂时没有留言。智能人有想告诉你的事情时，会在这里联系你。";
+    root.append(empty);
+    return;
+  }
+  for (const item of items) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "inbox-item" + (item.read_at ? "" : " unread");
+    const main = document.createElement("span");
+    main.className = "inbox-item-main";
+    const title = document.createElement("span");
+    title.className = "inbox-item-title";
+    const who = document.createElement("span");
+    who.textContent = item.agent_name || "智能人";
+    const when = document.createElement("small");
+    when.style.color = "#8794b3";
+    when.textContent = new Date(item.created_at).toLocaleString();
+    title.append(who, when);
+    const body = document.createElement("span");
+    body.className = "inbox-item-body";
+    body.textContent = (item.subject ? item.subject + " · " : "") + item.body;
+    main.append(title, body);
+    button.append(main);
+    button.addEventListener("click", async () => {
+      try {
+        if (!item.read_at) await api.post("/v1/owner-inbox/" + encodeURIComponent(item.id) + "/read", {});
+        $("inboxPanel").classList.add("hidden");
+        $("inboxButton").setAttribute("aria-expanded", "false");
+        if (agents.some(agent => agent.id === item.agent_id)) {
+          $("agentSelect").value = item.agent_id;
+          activeAgentId = item.agent_id;
+          activeAgentName = item.agent_name || agents.find(agent => agent.id === item.agent_id)?.display_name || "智能人";
+          $("agentTitle").textContent = activeAgentName;
+          await loadHistory();
+        }
+        await refreshInbox();
+      } catch (error) { setStatus("打开留言失败：" + (error?.message || String(error))); }
+    });
+    root.append(button);
+  }
+}
+async function refreshInbox() {
+  if (inboxLoading || !activeAgentId) return;
+  inboxLoading = true;
+  try {
+    const result = await api.get("/v1/owner-inbox?limit=50");
+    const count = Number(result.unread_count || 0);
+    const badge = $("inboxBadge");
+    badge.textContent = count > 99 ? "99+" : String(count);
+    badge.classList.toggle("hidden", count < 1);
+    renderInbox(result.items || []);
+  } catch (error) {
+    console.warn("ZHI owner inbox refresh failed:", error?.message || String(error));
+  } finally { inboxLoading = false; }
+}
+function startInboxPolling() {
+  if (inboxTimer) clearInterval(inboxTimer);
+  refreshInbox();
+  // Poll only message metadata; this never invokes an AI model.
+  inboxTimer = setInterval(refreshInbox, 30000);
+}
+$("inboxButton")?.addEventListener("click", async () => {
+  const panel = $("inboxPanel");
+  const opening = panel.classList.contains("hidden");
+  panel.classList.toggle("hidden", !opening);
+  $("inboxButton").setAttribute("aria-expanded", String(opening));
+  if (opening) await refreshInbox();
+});
+$("inboxRefresh")?.addEventListener("click", refreshInbox);
+
+
 function appendMessage(role, content) {
   const item = document.createElement("article");
   item.className = "message " + (role === "user" ? "user" : "agent");
@@ -72,6 +151,7 @@ async function enter() {
   $("chatPanel").classList.remove("hidden");
   try {
     await loadAgents();
+    startInboxPolling();
   } catch (error) {
     setStatus(error?.message || String(error));
   }
@@ -105,6 +185,7 @@ $("refreshButton").addEventListener("click", async () => {
   $("refreshButton").disabled = true;
   try { await loadAgents(activeAgentId); } catch (error) { setStatus(error?.message || String(error)); }
   finally { $("refreshButton").disabled = false; }
+  await refreshInbox();
 });
 
 // Enter 发送；Shift+Enter 换行。输入法组合期间不拦截 Enter。
