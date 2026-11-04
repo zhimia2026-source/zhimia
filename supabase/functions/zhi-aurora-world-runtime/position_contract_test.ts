@@ -58,3 +58,16 @@ Deno.test("stale or closed presence is unknown", () => {
   equal(stale.current_presence.status, "unknown", "stale snapshot unknown");
   equal(closed.current_presence.status, "unknown", "closed session unknown");
 });
+
+Deno.test("missing or unsupported position status never becomes current", () => {
+  for (const status of [null, "teleported", "unknown", "historical", "left"]) {
+    const result = buildPositionAwareness(
+      { session_status: "active", closed_at: null },
+      { current_node_id: "crystal-forest", position_status: status, provenance: "modeled_inference",
+        revision: 3, updated_at: "2026-11-04T11:59:00.000Z" },
+      null,
+      now,
+    );
+    equal(result.current_presence.status, "unknown", "unsupported status " + status);
+  }
+});
