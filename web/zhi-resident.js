@@ -166,7 +166,15 @@ window.addEventListener("beforeinstallprompt", (event) => {
   installPrompt = event;
   installButton?.classList.add("visible");
 });
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const isStandalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+if (isIOS && !isStandalone) installButton?.classList.add("visible");
 installButton?.addEventListener("click", async () => {
+  if (isIOS && !isStandalone && !installPrompt) {
+    setStatus("在 iPhone/iPad 的 Safari 中，点击“分享”图标，再选择“添加到主屏幕”，即可安装 ZHI 居民会话。");
+    return;
+  }
   if (!installPrompt) return;
   installPrompt.prompt();
   await installPrompt.userChoice;
