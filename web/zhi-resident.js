@@ -76,8 +76,11 @@ function startInboxPolling() {
   if (inboxTimer) clearInterval(inboxTimer);
   refreshInbox();
   // Poll only message metadata; this never invokes an AI model.
-  inboxTimer = setInterval(refreshInbox, 30000);
+  inboxTimer = setInterval(() => { if (!document.hidden) refreshInbox(); }, 30000);
 }
+// Mobile browsers suspend background timers; refresh immediately when the page returns.
+document.addEventListener("visibilitychange", () => { if (!document.hidden && inboxTimer) refreshInbox(); });
+window.addEventListener("focus", () => { if (inboxTimer) refreshInbox(); });
 $("inboxButton")?.addEventListener("click", async () => {
   const panel = $("inboxPanel");
   const opening = panel.classList.contains("hidden");
