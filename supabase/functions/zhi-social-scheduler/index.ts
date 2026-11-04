@@ -235,7 +235,10 @@ Deno.serve(async (req: Request) => {
   try {
     const db = dbClient();
     const url = new URL(req.url);
-    const parts = url.pathname.split("/").filter(Boolean);
+    // Supabase Edge Runtime may expose either the function-relative path (/v1/...)
+    // or the full gateway path (/functions/v1/<function>/v1/...). Normalize both.
+    const routePath = url.pathname.replace(/^\/functions\/v1\/zhi-social-scheduler(?=\/|$)/, "") || "/";
+    const parts = routePath.split("/").filter(Boolean);
 
     if (req.method === "POST" && parts.length === 1 && parts[0] === "internal-evaluate") {
       const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -251,7 +254,7 @@ Deno.serve(async (req: Request) => {
       return reply({ ok: true, evaluated: results.length, results });
     }
 
-    const match = url.pathname.match(/^\/v1\/agents\/([0-9a-f-]{36})\/social(?:\/(.*))?$/i);
+    const match = routePath.match(/^\/v1\/agents\/([0-9a-f-]{36})\/social(?:\/(.*))?$/i);
     if (!match) return reply({ error: "not_found" }, 404);
     const agentId = match[1];
     const tail = match[2] ?? "";
