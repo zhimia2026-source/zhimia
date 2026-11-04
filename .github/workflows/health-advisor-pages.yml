@@ -59,7 +59,7 @@ jobs:
           test -s _site/zhi-resident.webmanifest
           test -s _site/zhi-resident-sw.js
           test -s _site/zhi-resident-icon.svg
-          node -e 'const m=require("./_site/zhi-resident.webmanifest"); if(m.display!=="standalone" || m.start_url!=="./zhi-resident.html" || !m.icons?.length) process.exit(1); console.log("Resident PWA manifest valid")'
+          node -e 'const fs=require("fs"); const m=JSON.parse(fs.readFileSync("./_site/zhi-resident.webmanifest","utf8")); if(m.display!=="standalone" || m.start_url!=="./zhi-resident.html" || !m.icons?.length) process.exit(1); console.log("Resident PWA manifest valid")'
           grep -q 'serviceWorker.register("./zhi-resident-sw.js"' _site/zhi-resident.js
           grep -q 'Never cache Supabase/API traffic' _site/zhi-resident-sw.js
           test -s _site/zhi-memory.html
