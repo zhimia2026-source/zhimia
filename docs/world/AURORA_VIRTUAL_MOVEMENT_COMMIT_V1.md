@@ -29,7 +29,7 @@ Virtual commit writes:
 
 It preserves the existing anchor and increments presence revision. It does not create a movement evidence row, physical observation, coordinate, or sensory measurement.
 
-The emitted `location_changed` event explicitly states `movement_mode='virtual'` and `physical_observation=false`. Private memory is never included.
+The emitted `location_changed` event explicitly states `movement_mode='virtual'` and `physical_observation=false`, and stores a structured causal chain (creator approval → route validation → modeled presence commit). The `zhi-spatial` perception response now merges shared `zhi_ecosystem_events` with only the requesting agent's own `zhi_spatial_environment_events` into `environment_feedback.events`, sorted by occurrence time. It preserves event revisions, payloads and recorded causal chains; absent chains remain empty. Private memory and other residents' scoped movement events are never included.
 
 ## Authorization gates
 
