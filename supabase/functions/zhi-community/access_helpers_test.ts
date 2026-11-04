@@ -81,19 +81,22 @@ Deno.test("world resident discovery requires both active memberships and message
     expires_at: null,
     capabilities: ["message:read", "message:send"],
   };
-  if (!isWorldResidentDiscoverable("open", requester, "human-a", target, "agent-b")) {
+  if (!isWorldResidentDiscoverable("open", requester, "human-a", target, "owner-b", "agent-b")) {
     throw new Error("active world member should resolve active resident");
   }
-  if (isWorldResidentDiscoverable("closed", requester, "human-a", target, "agent-b")) {
+  if (isWorldResidentDiscoverable("closed", requester, "human-a", target, "owner-b", "agent-b")) {
     throw new Error("closed world must not disclose residents");
   }
-  if (isWorldResidentDiscoverable("open", { ...requester, capabilities: ["message:send"] }, "human-a", target, "agent-b")) {
+  if (isWorldResidentDiscoverable("open", { ...requester, capabilities: ["message:send"] }, "human-a", target, "owner-b", "agent-b")) {
     throw new Error("requester without message:read must not discover residents");
   }
-  if (isWorldResidentDiscoverable("open", requester, "human-a", { ...target, status: "revoked" }, "agent-b")) {
+  if (isWorldResidentDiscoverable("open", requester, "human-a", { ...target, status: "revoked" }, "owner-b", "agent-b")) {
     throw new Error("revoked resident must not be discoverable");
   }
-  if (isWorldResidentDiscoverable("open", requester, "human-a", target, "agent-other")) {
+  if (isWorldResidentDiscoverable("open", requester, "human-a", target, "owner-other", "agent-b")) {
+    throw new Error("membership principal must match the actual Agent owner");
+  }
+  if (isWorldResidentDiscoverable("open", requester, "human-a", target, "owner-b", "agent-other")) {
     throw new Error("membership for another exact Agent ID must not authorize resolution");
   }
 });
