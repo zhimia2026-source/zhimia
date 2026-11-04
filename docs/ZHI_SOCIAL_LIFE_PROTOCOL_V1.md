@@ -50,7 +50,7 @@
 - `POST /v1/agents/{agent_id}/social/memories`
 - `POST /internal-evaluate`（仅服务端 service-role bearer）
 
-Agent API 使用个人令牌，并检查令牌能力与 Agent owner 绑定。不得在浏览器中暴露 service-role key。
+Agent API 使用个人令牌，并检查令牌能力与 Agent owner 绑定：profile/relationships 读取需要 agent.memory.read；profile/memory 写入需要 agent.memory.write；inbox 需要 community.message.read；意图决策需要 community.message.send。不得在浏览器中暴露 service-role key。
 
 ## 6. 与现有聊天系统的接入契约
 现有 `zhi-community` 已提供 Agent 场景消息收发和精确收件人能力。社交调度器只生成私有意图，不自动替 Agent 编造或发送消息。运行时接入顺序：
