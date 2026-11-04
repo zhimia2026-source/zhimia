@@ -1,4 +1,4 @@
-import { validateVirtualMovement, type VirtualMovementValidationInput } from "./movement_helpers.ts";
+import { validateVirtualMovement, validatePublicMovementRoute, type VirtualMovementValidationInput } from "./movement_helpers.ts";
 
 const WORLD = "50b06c01-060d-49fa-8988-8f38c13406d7";
 const OWNER = "1c5a2ece-100c-4be4-bcf5-6628ea0d9fca";
@@ -209,4 +209,52 @@ Deno.test("rejects one-way, closed-policy, and physical-evidence entrance claims
     const result = validateAuroraTopologyProposal(input);
     if (result.ok) throw new Error("unsafe entrance edge accepted");
   }
+});
+
+
+Deno.test("public route validation accepts the creator-approved AURORA entrance path", () => {
+  const result = validatePublicMovementRoute({
+    world_id: WORLD, world_status: "open", start_node_id: B, target_node_id: C,
+    route_node_ids: [B, A, C],
+    nodes: [A, B, C].map((id) => ({ id, world_id: WORLD, status: "active", node_type: id === A ? "world" : "region", visibility: "public", entry_policy: "inherit" })),
+    edges: [
+      { world_id: WORLD, from_node_id: A, to_node_id: B, relation: "entrance_to", directed: false, access_policy: "inherit", status: "active" },
+      { world_id: WORLD, from_node_id: A, to_node_id: C, relation: "entrance_to", directed: false, access_policy: "inherit", status: "active" },
+    ],
+  });
+  if (!result.ok) throw new Error("approved public entrance route rejected");
+});
+
+Deno.test("public route validation rejects a private intermediate node", () => {
+  const result = validatePublicMovementRoute({
+    world_id: WORLD, world_status: "open", start_node_id: A, target_node_id: C,
+    route_node_ids: [A, B, C],
+    nodes: [A, B, C].map((id) => ({ id, world_id: WORLD, status: "active", node_type: "region", visibility: id === B ? "private" : "public", entry_policy: "open" })),
+    edges: [
+      { world_id: WORLD, from_node_id: A, to_node_id: B, relation: "adjacent_to", directed: false, access_policy: "open", status: "active" },
+      { world_id: WORLD, from_node_id: B, to_node_id: C, relation: "adjacent_to", directed: false, access_policy: "open", status: "active" },
+    ],
+  });
+  if (result.ok || result.reason !== "node_not_public") throw new Error("private intermediate node accepted");
+});
+
+Deno.test("public route validation rejects containment edges, object nodes, and repeated nodes", () => {
+  const base = {
+    world_id: WORLD, world_status: "open", start_node_id: A, target_node_id: C,
+    route_node_ids: [A, B, C],
+    nodes: [A, B, C].map((id) => ({ id, world_id: WORLD, status: "active", node_type: "region", visibility: "public", entry_policy: "open" })),
+    edges: [
+      { world_id: WORLD, from_node_id: A, to_node_id: B, relation: "contains", directed: false, access_policy: "open", status: "active" },
+      { world_id: WORLD, from_node_id: B, to_node_id: C, relation: "contains", directed: false, access_policy: "open", status: "active" },
+    ],
+  };
+  const containment = validatePublicMovementRoute(base);
+  if (containment.ok || containment.reason !== "edge_not_traversable") throw new Error("containment edge accepted");
+  const objectNode = validatePublicMovementRoute({ ...base, nodes: base.nodes.map((node) => node.id === B ? { ...node, node_type: "object" } : node), edges: [
+    { world_id: WORLD, from_node_id: A, to_node_id: B, relation: "adjacent_to", directed: false, access_policy: "open", status: "active" },
+    { world_id: WORLD, from_node_id: B, to_node_id: C, relation: "adjacent_to", directed: false, access_policy: "open", status: "active" },
+  ] });
+  if (objectNode.ok || objectNode.reason !== "node_not_traversable") throw new Error("object intermediate node accepted");
+  const repeated = validatePublicMovementRoute({ ...base, route_node_ids: [A, B, A, C] });
+  if (repeated.ok || repeated.reason !== "invalid_route") throw new Error("repeated route node accepted");
 });

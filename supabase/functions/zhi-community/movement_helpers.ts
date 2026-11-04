@@ -141,3 +141,57 @@ export function validateVirtualMovement(
 
   return { ok: true, route_node_ids: [...route] };
 }
+
+
+export type PublicMovementRouteInput = {
+  world_id: string;
+  world_status: string;
+  start_node_id: string;
+  target_node_id: string;
+  route_node_ids: string[];
+  nodes: MovementNode[];
+  edges: MovementEdge[];
+};
+
+export type PublicMovementRouteResult =
+  | { ok: true; route_node_ids: string[] }
+  | { ok: false; reason: "world_not_open" | "invalid_route" | "node_unavailable" | "node_not_traversable" | "node_not_public" | "node_entry_not_open" | "edge_not_traversable" };
+
+/**
+ * Validates a proposed public route without granting movement permission.
+ * This is used while creating a supervised request; execution still requires
+ * creator approval and a separate spatial:movement.execute capability.
+ */
+export function validatePublicMovementRoute(input: PublicMovementRouteInput): PublicMovementRouteResult {
+  if (input.world_status !== "open") return { ok: false, reason: "world_not_open" };
+  const route = input.route_node_ids;
+  if (
+    !Array.isArray(route) || route.length < 2 || route.length > 32 ||
+    route[0] !== input.start_node_id || route[route.length - 1] !== input.target_node_id ||
+    route.some((id) => typeof id !== "string" || !UUID_PATTERN.test(id)) ||
+    new Set(route).size !== route.length
+  ) return { ok: false, reason: "invalid_route" };
+
+  const nodes = new Map(input.nodes.filter((node) => node.world_id === input.world_id).map((node) => [node.id, node]));
+  for (const id of route) {
+    const node = nodes.get(id);
+    if (!node || node.status !== "active") return { ok: false, reason: "node_unavailable" };
+    if (!["world", "region", "place"].includes(node.node_type)) return { ok: false, reason: "node_not_traversable" };
+    if (node.visibility !== "public") return { ok: false, reason: "node_not_public" };
+    if (!OPEN_POLICIES.has(node.entry_policy)) return { ok: false, reason: "node_entry_not_open" };
+  }
+
+  for (let i = 0; i < route.length - 1; i++) {
+    const from = route[i], to = route[i + 1];
+    const connected = input.edges.some((edge) => {
+      if (
+        edge.world_id !== input.world_id || edge.status !== "active" ||
+        !TRAVERSABLE_RELATIONS.has(edge.relation) || !OPEN_POLICIES.has(edge.access_policy)
+      ) return false;
+      if (edge.from_node_id === from && edge.to_node_id === to) return true;
+      return !edge.directed && edge.from_node_id === to && edge.to_node_id === from;
+    });
+    if (!connected) return { ok: false, reason: "edge_not_traversable" };
+  }
+  return { ok: true, route_node_ids: [...route] };
+}
