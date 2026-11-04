@@ -75,15 +75,16 @@ export function isWorldResidentDiscoverable(
   requesterMembership: MembershipAuthorizationRecord | null | undefined,
   requesterUserId: string,
   targetMembership: MembershipAuthorizationRecord | null | undefined,
+  targetOwnerUserId: string,
   targetAgentId: string,
   now = Date.now(),
 ): boolean {
   if (worldStatus !== "open") return false;
   if (!isMembershipAuthorized(requesterMembership, requesterUserId, "message:read", now)) return false;
-  if (!targetMembership?.principal_user_id) return false;
+  if (!targetMembership?.principal_user_id || targetMembership.principal_user_id !== targetOwnerUserId) return false;
   return isAgentMembershipAuthorized(
     targetMembership,
-    targetMembership.principal_user_id,
+    targetOwnerUserId,
     targetAgentId,
     "message:read",
     now,
