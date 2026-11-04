@@ -10,6 +10,7 @@ on:
   pull_request:
     paths:
       - "supabase/functions/zhi-community/**"
+      - "supabase/functions/zhi-spatial/**"
       - ".github/workflows/zhi-community-tests.yml"
 
 jobs:
