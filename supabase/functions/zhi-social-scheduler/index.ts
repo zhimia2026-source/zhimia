@@ -341,21 +341,6 @@ Deno.serve(async (req: Request) => {
           (m.payload as Record<string, unknown>)?.recipient_agent_id === intent.peer_agent_id
         ) ?? null;
         if (!verifiedMessage) return reply({ error: "message_not_found_for_intent" }, 409);
-        const now = new Date();
-        const { data: profile } = await db.from("zhi_social_profiles").select("peer_cooldown_hours")
-          .eq("agent_id", agentId).maybeSingle();
-        const { data: existing } = await db.from("zhi_social_relationships").select("id,familiarity_score,shared_experience_count")
-          .eq("world_id", intent.world_id).eq("observer_agent_id", agentId).eq("peer_agent_id", intent.peer_agent_id).maybeSingle();
-        const { error: relationError } = await db.from("zhi_social_relationships").upsert({
-          world_id: intent.world_id, observer_agent_id: agentId, owner_user_id: actor.userId,
-          peer_agent_id: intent.peer_agent_id, relationship_state: "developing",
-          familiarity_score: Math.min(100, Number(existing?.familiarity_score ?? 0) + 5),
-          shared_experience_count: Number(existing?.shared_experience_count ?? 0) + 1,
-          last_contact_at: now.toISOString(),
-          next_contact_after: new Date(now.getTime() + Number(profile?.peer_cooldown_hours ?? 36) * 3600000).toISOString(),
-          updated_at: now.toISOString(),
-        }, { onConflict: "world_id,observer_agent_id,peer_agent_id" });
-        if (relationError) throw new Error("relationship_update_failed");
       }
       const update = action === "accept" ? { status: "accepted", decided_at: new Date().toISOString() }
         : action === "defer" ? { status: "deferred", not_before: new Date(Date.now() + 24 * 3600000).toISOString(), decided_at: new Date().toISOString() }
@@ -369,6 +354,9 @@ Deno.serve(async (req: Request) => {
         try {
         const rawPreview = String((verifiedMessage.payload as Record<string, unknown>)?.body ?? "");
         const preview = rawPreview.replace(/[\r\n\t<>]+/g, " ").replace(/\s{2,}/g, " ").trim().slice(0, 1000);
+        const { data: profile, error: profileReadError } = await db.from("zhi_social_profiles")
+          .select("peer_cooldown_hours").eq("agent_id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
+        if (profileReadError) throw new Error("social_profile_read_failed");
         const { data: priorRelationship, error: priorRelationshipError } = await db.from("zhi_social_relationships")
           .select("id,familiarity_score,shared_experience_count,relationship_state")
           .eq("world_id", intent.world_id).eq("observer_agent_id", agentId)
@@ -383,6 +371,7 @@ Deno.serve(async (req: Request) => {
           peer_agent_id: intent.peer_agent_id, relationship_state: nextState,
           familiarity_score: familiarity, shared_experience_count: experiences,
           last_contact_at: verifiedMessage.created_at ?? new Date().toISOString(),
+          next_contact_after: new Date(Date.now() + Number(profile?.peer_cooldown_hours ?? 36) * 3600000).toISOString(),
           updated_at: new Date().toISOString(),
         }, { onConflict: "world_id,observer_agent_id,peer_agent_id" }).select("id").single();
         if (relationshipWriteError) throw new Error("social_relationship_write_failed");
