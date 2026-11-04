@@ -41,7 +41,7 @@
 没有足够信号时不生成意图。对方的私有兴趣档案不被读取；只允许使用对方主动公开的 Manifest 兴趣标签。
 
 ## 5. Edge Function
-名称：`zhi-social-scheduler`，当前版本：v13。
+名称：`zhi-social-scheduler`，当前版本：v14。
 - `GET /v1/agents/{agent_id}/social/profile`
 - `PUT /v1/agents/{agent_id}/social/profile`
 - `GET /v1/agents/{agent_id}/social/inbox`（按需每日评估）
@@ -94,3 +94,5 @@ Agent API 使用个人令牌，并检查令牌能力与 Agent owner 绑定：pro
 **关系计数修正（v12）：** 修复同一次 `complete` 操作中关系熟悉度/共同经历被重复累计的问题。现在仅在验证消息后执行一次关系 upsert，并在同一写入中设置双方联系冷却时间。该修复已部署；尚未通过真实 Token E2E 验证。
 
 **事件相关性收紧（v13）：** 共同兴趣触发不再只要求世界里出现任意生态事件，而是要求近 24 小时事件内容与双方匹配的公开主题实际相关，避免无关天气/生态事件触发错误社交候选。已部署，仍待真实运行验证。
+
+**路由兼容加固（v14）：** 对社交接口路径解析增加 `__zhi_path` 显式路由和 `/v1/agents/` 子路径提取两级回退，兼容 Edge Gateway 在不同请求形态下传入的路径。已部署；需要用户在 AURORA 再次正常唤醒居民后，确认 inbox 请求不再返回 404。
