@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { validatePublicMovementRoute } from "../zhi-community/movement_helpers.ts";
 
 type Actor = { userId: string; capabilities: string[] };
 const json = (body: unknown, status=200, headers: Record<string,string>={}) =>
@@ -104,14 +105,16 @@ function shortestPath(start:string,target:string,edges:any[]):string[]|null{
   if(!dist.has(target)) return null;
   const path=[target]; let cursor=target;
   while(cursor!==start){const p=prev.get(cursor);if(!p)return null;path.push(p);cursor=p;}
-  return path.reverse();
+  const resolved=path.reverse();
+  return resolved.length<=32?resolved:null;
 }
 const statusFor=(code:string)=>{
   if(code==="invalid_token") return 401;
-  if(code==="insufficient_capability"||code==="scene_access_denied") return 403;
+  if(code==="insufficient_capability"||code==="scene_access_denied"||code==="movement_capability_required") return 403;
   if(code==="agent_not_found"||code==="not_found") return 404;
   if(code==="agent_not_active"||code==="world_unavailable"||code==="movement_state_conflict"||code==="presence_revision_conflict") return 409;
-  if(code==="body_too_large"||code==="invalid_json"||code.startsWith("invalid_")||code==="route_not_found"||code==="current_position_unconfirmed") return 400;
+  if(code==="body_too_large"||code==="invalid_json"||code.startsWith("invalid_")||code==="current_position_unconfirmed") return 400;
+  if(code==="route_not_found"||code==="route_validation_failed") return 409;
   if(code==="server_configuration_missing") return 503;
   return 500;
 };
@@ -170,20 +173,29 @@ Deno.serve(async(req:Request)=>{
         return reply({error:"current_position_unconfirmed",position_status:presence?.position_status??"position_unobserved"},409);
       if(presence.current_node_id===targetId) return reply({error:"already_at_destination"},409);
       const {data:nodes,error:nodesError}=await db.from("zhi_spatial_nodes")
-        .select("id,visibility,owner_agent_id,owner_user_id,status")
-        .eq("world_id",worldId).eq("status","active").in("id",[presence.current_node_id,targetId]);
+        .select("id,world_id,node_type,visibility,entry_policy,status")
+        .eq("world_id",worldId).eq("status","active").limit(500);
       if(nodesError) throw new Error("database_error");
-      const nodeMap=new Map((nodes??[]).map((n:any)=>[n.id,n]));
-      const start=nodeMap.get(presence.current_node_id), target=nodeMap.get(targetId);
-      const visible=(n:any)=>n&&(n.visibility==="public"||(n.owner_agent_id===agentId&&n.owner_user_id===actor.userId));
-      if(!visible(start)||!visible(target)) return reply({error:"spatial_node_access_denied"},403);
+      const traversableNodes=(nodes??[]).filter((n:any)=>
+        ["world","region","place"].includes(n.node_type) &&
+        n.visibility==="public" && ["inherit","open"].includes(n.entry_policy)
+      );
+      const traversableIds=new Set(traversableNodes.map((n:any)=>n.id));
+      if(!traversableIds.has(presence.current_node_id)||!traversableIds.has(targetId))
+        return reply({error:"spatial_node_access_denied"},403);
       const {data:edges,error:edgesError}=await db.from("zhi_spatial_edges")
-        .select("from_node_id,to_node_id,directed,travel_cost")
+        .select("world_id,from_node_id,to_node_id,relation,directed,access_policy,status,travel_cost")
         .eq("world_id",worldId).eq("status","active").in("relation",["adjacent_to","route_to","entrance_to"])
-        .in("access_policy",["inherit","open"]);
+        .in("access_policy",["inherit","open"]).limit(2000);
       if(edgesError) throw new Error("database_error");
-      const route=shortestPath(presence.current_node_id,targetId,edges??[]);
+      const routeEdges=(edges??[]).filter((e:any)=>traversableIds.has(e.from_node_id)&&traversableIds.has(e.to_node_id));
+      const route=shortestPath(presence.current_node_id,targetId,routeEdges);
       if(!route) return reply({error:"route_not_found",from_node_id:presence.current_node_id,to_node_id:targetId},409);
+      const routeCheck=validatePublicMovementRoute({
+        world_id:worldId,world_status:"open",start_node_id:presence.current_node_id,target_node_id:targetId,
+        route_node_ids:route,nodes:traversableNodes,edges:routeEdges
+      });
+      if(!routeCheck.ok) return reply({error:"route_validation_failed",reason:routeCheck.reason},409);
       const reason=String(body.reason??"").slice(0,1000);
       const {data:created,error:createError}=await db.from("zhi_movement_requests").insert({
         world_id:worldId,agent_id:agentId,owner_user_id:actor.userId,
@@ -201,6 +213,30 @@ Deno.serve(async(req:Request)=>{
       .eq("id",requestId).eq("agent_id",agentId).eq("owner_user_id",actor.userId).maybeSingle();
     if(movementError) throw new Error("database_error");
     if(!movement) return reply({error:"not_found"},404);
+
+    if(action==="commit_virtual"){
+      if(!hasCap(actor,"spatial:movement.execute"))
+        return reply({error:"movement_capability_required",required:"spatial:movement.execute"},403);
+      if(movement.status==="arrived"&&movement.metadata?.arrival_kind==="modeled_virtual")
+        return reply({movement_request:movement,arrival_kind:"modeled_virtual",replayed:true,position_changed:false});
+      if(movement.status!=="executing"||movement.approval_required!==true||!movement.approved_by_user_id)
+        return reply({error:"movement_state_conflict",status:movement.status},409);
+      await canEnterWorld(db,movement.world_id,agentId,actor);
+      const {data:membership,error:membershipError}=await db.from("zhi_world_memberships")
+        .select("id,principal_user_id,agent_id,status,revoked_at,expires_at,capabilities")
+        .eq("world_id",movement.world_id).eq("principal_user_id",actor.userId).eq("agent_id",agentId)
+        .eq("status","active").is("revoked_at",null).maybeSingle();
+      if(membershipError) throw new Error("database_error");
+      if(!membership||(membership.expires_at&&Date.parse(membership.expires_at)<=Date.now())||
+        !Array.isArray(membership.capabilities)||!membership.capabilities.includes("spatial:movement.execute"))
+        return reply({error:"movement_capability_required",required:"membership.spatial:movement.execute"},403);
+      const {data:committed,error:commitError}=await db.rpc("zhi_movement_commit_virtual",{
+        p_movement_request_id:requestId,p_actor_user_id:actor.userId
+      });
+      if(commitError) return reply({error:"virtual_movement_commit_failed",detail:"The server-side transaction rejected this movement."},409);
+      return reply({movement_request:committed?.movement_request??null,arrival:committed,
+        arrival_kind:"modeled_virtual",position_changed:committed?.ok===true&&!committed?.replayed});
+    }
 
     if(action==="approve"){
       if(!hasCap(actor,"community.scene.create")) return reply({error:"insufficient_capability",required:"community.scene.create"},403);
