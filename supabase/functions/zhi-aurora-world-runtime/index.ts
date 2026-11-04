@@ -86,7 +86,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const [nodesResult, edgesResult, ecosystemResult, ecosystemEventsResult, spatialEventsResult,
-    federationSessionResult, forestStateResult, forestEventsResult] = await Promise.all([
+    federationSessionResult, forestStateResult, forestEventsResult, federatedPresenceResult, federatedMovementEventsResult] = await Promise.all([
     db.from("zhi_spatial_nodes")
       .select("id,parent_node_id,node_type,stable_key,name,description,coordinate,coordinate_frame,visibility,entry_policy,observability,source_kind,source_ref,source_updated_at,observed_at,valid_until,metadata,status")
       .eq("world_id", WORLD_ID).eq("status", "active").order("node_type").limit(500),
@@ -113,9 +113,17 @@ Deno.serve(async (req: Request) => {
       .select("sequence,event_type,position,payload,occurred_at")
       .eq("world_id", WORLD_ID).eq("peer_id", peer.id).eq("external_agent_id", EXTERNAL_AGENT_ID)
       .order("sequence", { ascending: false }).limit(12),
+    db.from("zhi_federated_spatial_presence")
+      .select("current_node_id,position_status,provenance,revision,updated_at")
+      .eq("world_id", WORLD_ID).eq("peer_id", peer.id).eq("external_agent_id", EXTERNAL_AGENT_ID).maybeSingle(),
+    db.from("zhi_federated_spatial_events")
+      .select("id,event_type,from_node_id,to_node_id,occurred_at,perception_delta,metadata")
+      .eq("world_id", WORLD_ID).eq("peer_id", peer.id).eq("external_agent_id", EXTERNAL_AGENT_ID)
+      .order("occurred_at", { ascending: false }).limit(25),
   ]);
   if (nodesResult.error || edgesResult.error || ecosystemResult.error || ecosystemEventsResult.error ||
-      spatialEventsResult.error || federationSessionResult.error || forestStateResult.error || forestEventsResult.error) {
+      spatialEventsResult.error || federationSessionResult.error || forestStateResult.error || forestEventsResult.error ||
+      federatedPresenceResult.error || federatedMovementEventsResult.error) {
     return reply({ ok: false, error: "world_perception_read_failed" }, 503);
   }
 
@@ -124,19 +132,22 @@ Deno.serve(async (req: Request) => {
   const ecosystem = ecosystemResult.data;
   const federationSession = federationSessionResult.data;
   const forestRuntime = forestStateResult.data;
+  const federatedPresence = federatedPresenceResult.data;
   const environmentEvents = buildUnifiedEnvironmentEvents(
     ecosystemEventsResult.data ?? [],
     spatialEventsResult.data ?? [],
     forestEventsResult.data ?? [],
+    federatedMovementEventsResult.data ?? [],
   );
   const environmentFeedback = {
     source: "zhi-aurora-world-runtime.v1",
     event_stream_contract: {
-      includes: ["zhi_ecosystem_events", "zhi_spatial_environment_events", "zhi_forest_runtime_events"],
+      includes: ["zhi_ecosystem_events", "zhi_spatial_environment_events", "zhi_forest_runtime_events", "zhi_federated_spatial_events"],
       ordering: "occurred_at_ascending",
       ecosystem_scope: "shared_world_events",
       spatial_scope: "public_world_events_only",
       runtime_scope: "authenticated_mia_peer_scene_only",
+      federated_spatial_scope: "requesting_peer_and_external_agent_only",
       causal_chain: "preserved_when_recorded; empty_when_not_recorded",
       epistemic_rule: "modeled world and runtime events are not physical sensor observations",
     },
@@ -162,6 +173,13 @@ Deno.serve(async (req: Request) => {
       authority_level: governance.authority_level, permissions: governance.permissions },
     runtime_presence: {
       federation_session: federationSession ?? null,
+      federated_spatial_presence: federatedPresence ? {
+        current_node_id: federatedPresence.current_node_id,
+        position_status: federatedPresence.position_status,
+        provenance: federatedPresence.provenance,
+        revision: federatedPresence.revision,
+        updated_at: federatedPresence.updated_at,
+      } : null,
       scene_runtime: forestRuntime ? {
         scene_id: forestRuntime.scene_id,
         current_node_id: forestRuntime.current_node_id,
