@@ -33,5 +33,7 @@ jobs:
           deno-version: v2.x
       - name: Type-check health advisor Edge Function
         run: deno check supabase/functions/zhi-health-advisor/index.ts
+      - name: Type-check ZHI movement Edge Function
+        run: deno check supabase/functions/zhi-movement/index.ts
       - name: Run health advisor safety tests
         run: deno test supabase/functions/zhi-health-advisor/safety_test.ts
