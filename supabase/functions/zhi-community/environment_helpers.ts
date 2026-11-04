@@ -91,6 +91,35 @@ function normalizeSensoryProfile(value: unknown): JsonRecord {
   };
 }
 
+
+function normalizeSharedSymbols(value: unknown): JsonRecord[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 50).flatMap((entry) => {
+    const item = record(entry);
+    const id = boundedText(item.id, 80);
+    const name = boundedText(item.name, 120);
+    const inscription = boundedText(item.inscription, 80);
+    const visibility = boundedText(item.visibility, 80);
+    const rendering = record(item.rendering);
+    if (!id || !name || !inscription || visibility !== "all_agents_in_world") return [];
+    return [{
+      id, name, inscription, visibility,
+      kind: boundedText(item.kind, 80) ?? "shared_symbol",
+      meaning: boundedText(item.meaning, 500),
+      rendering: {
+        form: boundedText(rendering.form, 80),
+        motion: boundedText(rendering.motion, 80),
+        pulse_cycle_ms: boundedNumber(rendering.pulse_cycle_ms, 300, 10000),
+        palette: boundedList(rendering.palette, 8),
+        center_text: boundedText(rendering.center_text, 80),
+        heartline: boundedText(rendering.heartline, 100),
+        orbiting_light_ribbons: rendering.orbiting_light_ribbons === true,
+        spark_particles: rendering.spark_particles === true,
+      },
+    }];
+  });
+}
+
 /** Deterministic, read-time scene state. It never reads or writes private memories. */
 export function computeSceneEnvironment(raw: unknown, now = new Date()) {
   const state = record(raw);
@@ -114,6 +143,7 @@ export function computeSceneEnvironment(raw: unknown, now = new Date()) {
   let weather = normalizeWeather(state.weather);
   let sensoryProfile = normalizeSensoryProfile(state.sensory_profile);
   let atmosphereTags = boundedList(state.atmosphere_tags);
+  const sharedSymbols = normalizeSharedSymbols(state.shared_symbols);
   const objects = (Array.isArray(state.objects) ? state.objects : []).slice(0, 100).flatMap((value) => {
     const item = record(value);
     const id = boundedText(item.id, 80);
@@ -181,6 +211,7 @@ export function computeSceneEnvironment(raw: unknown, now = new Date()) {
     weather,
     sensory_profile: sensoryProfile,
     atmosphere_tags: atmosphereTags,
+    shared_symbols: sharedSymbols,
     objects,
     regions,
     active_events: activeEvents.map((event) => ({
@@ -197,7 +228,7 @@ export function computeSceneEnvironment(raw: unknown, now = new Date()) {
 export function normalizeSceneEnvironmentConfig(raw: unknown): JsonRecord {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("invalid_environment_config");
   const input = record(raw);
-  const allowed = new Set(["timezone", "lighting", "soundscape", "weather", "sensory_profile", "atmosphere_tags", "objects", "regions", "events", "behavior_weights"]);
+  const allowed = new Set(["timezone", "lighting", "soundscape", "weather", "sensory_profile", "atmosphere_tags", "shared_symbols", "objects", "regions", "events", "behavior_weights"]);
   if (Object.keys(input).some((key) => !allowed.has(key))) throw new Error("unsupported_environment_field");
 
   const timezone = boundedText(input.timezone, 80) ?? "UTC";
@@ -299,6 +330,7 @@ export function normalizeSceneEnvironmentConfig(raw: unknown): JsonRecord {
     weather: normalizeWeather(input.weather),
     sensory_profile: normalizeSensoryProfile(input.sensory_profile),
     atmosphere_tags: boundedList(input.atmosphere_tags),
+    shared_symbols: normalizeSharedSymbols(input.shared_symbols),
     objects,
     regions,
     events,
