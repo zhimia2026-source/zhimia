@@ -237,7 +237,13 @@ Deno.serve(async (req: Request) => {
     const url = new URL(req.url);
     // Supabase Edge Runtime may expose either the function-relative path (/v1/...)
     // or the full gateway path (/functions/v1/<function>/v1/...). Normalize both.
-    const routePath = url.pathname.replace(/^\/functions\/v1\/zhi-social-scheduler(?=\/|$)/, "") || "/";
+    const requestedPath = url.searchParams.get("__zhi_path");
+    const agentRouteIndex = url.pathname.lastIndexOf("/v1/agents/");
+    const routePath = requestedPath?.startsWith("/v1/")
+      ? requestedPath
+      : agentRouteIndex >= 0
+        ? url.pathname.slice(agentRouteIndex)
+        : url.pathname.replace(/^\/functions\/v1\/zhi-social-scheduler(?=\/|$)/, "") || "/";
     const parts = routePath.split("/").filter(Boolean);
 
     if (req.method === "POST" && parts.length === 1 && parts[0] === "internal-evaluate") {
