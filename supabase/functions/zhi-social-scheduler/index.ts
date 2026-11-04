@@ -70,6 +70,7 @@ function manifestInterests(value: unknown): string[] {
     ? manifest.personality as Record<string, unknown> : {};
   return normList([
     ...(Array.isArray(personality.traits) ? personality.traits : []),
+    ...(Array.isArray(personality.initial_traits) ? personality.initial_traits : []),
     ...(Array.isArray(personality.capability_layer) ? personality.capability_layer : []),
   ]);
 }
@@ -198,14 +199,15 @@ async function evaluateAgent(db: SupabaseClient, agentId: string, ownerUserId: s
       const sharedWorldEvent = samePlace && recentEvents.length > 0;
       const sharedTopicEvent = interest.matched.length > 0 && eventMatches.length > 0;
       const eventOpportunity = sharedWorldEvent || sharedTopicEvent;
-      const novelty = eventMatches.length || eventOpportunity ? 100 : 0;
+      const interestOpportunity = interest.matched.length > 0;
+      const novelty = eventMatches.length || eventOpportunity || interestOpportunity ? 100 : 0;
       const familiarity = Math.max(0, Math.min(100, Number(rel?.familiarity_score ?? 0)));
       const sharedTopics = normList(rel?.shared_topics);
-      const collaboration = eventOpportunity
+      const collaboration = eventOpportunity || interestOpportunity
         ? 100
         : Math.min(100, interest.ratio * 60 + Math.min(40, sharedTopics.length * 20));
-      const interestValue = interest.matched.length > 0 ? 100 : sharedWorldEvent ? 100 : 0;
-      const timing = samePlace || sharedTopicEvent ? 100 : 50;
+      const interestValue = interestOpportunity || sharedWorldEvent ? 100 : 0;
+      const timing = samePlace || sharedTopicEvent || interestOpportunity ? 100 : 50;
       const score = Math.round((interestValue * 0.25 + familiarity * 0.20 + novelty * 0.20 + collaboration * 0.20 + timing * 0.15) * 100) / 100;
       if (score < Number(profile.minimum_score)) continue;
       const reason = eventMatches.length || eventOpportunity ? "world_event" : interest.matched.length ? "shared_interest" :
