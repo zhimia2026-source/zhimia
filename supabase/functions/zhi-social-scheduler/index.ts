@@ -365,7 +365,7 @@ Deno.serve(async (req: Request) => {
       if (action === "complete" && verifiedMessage) {
         try {
         const rawPreview = String((verifiedMessage.payload as Record<string, unknown>)?.body ?? "");
-        const preview = rawPreview.replace(/[\\r\\n\\t<>]+/g, " ").replace(/\\s{2,}/g, " ").trim().slice(0, 1000);
+        const preview = rawPreview.replace(/[\r\n\t<>]+/g, " ").replace(/\s{2,}/g, " ").trim().slice(0, 1000);
         const { data: priorRelationship, error: priorRelationshipError } = await db.from("zhi_social_relationships")
           .select("id,familiarity_score,shared_experience_count,relationship_state")
           .eq("world_id", intent.world_id).eq("observer_agent_id", agentId)
