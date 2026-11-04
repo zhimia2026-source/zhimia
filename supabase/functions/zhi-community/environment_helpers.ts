@@ -105,9 +105,17 @@ function normalizeSharedSymbols(value: unknown): JsonRecord[] {
     return [{
       id, name, inscription, visibility,
       kind: boundedText(item.kind, 80) ?? "shared_symbol",
+      embodiment: {
+        attached_to_agent_id: boundedText(record(item.embodiment).attached_to_agent_id, 80),
+        location: boundedText(record(item.embodiment).location, 80),
+        visibility_mode: boundedText(record(item.embodiment).visibility_mode, 80),
+        attachment: boundedText(record(item.embodiment).attachment, 80),
+      },
       meaning: boundedText(item.meaning, 500),
       rendering: {
         form: boundedText(rendering.form, 80),
+        placement: boundedText(rendering.placement, 80),
+        chest_visibility: boundedText(rendering.chest_visibility, 80),
         motion: boundedText(rendering.motion, 80),
         pulse_cycle_ms: boundedNumber(rendering.pulse_cycle_ms, 300, 10000),
         palette: boundedList(rendering.palette, 8),
