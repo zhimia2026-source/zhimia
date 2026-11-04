@@ -67,7 +67,7 @@ Deno.test("MIA-02 private context loads its own axiom, three personality layers 
   }));
   if (!context.profile.personality_design_axiom.includes("以情感理解世界")) throw new Error("personality axiom missing");
   if (context.mia_brain_identity.layers.layer_1_original_personality.indexOf("温暖") < 0) throw new Error("layer 1 missing");
-  if (context.mia_brain_identity.layers.layer_2_manager_personality.indexOf("责任") < 0) throw new Error("layer 2 missing");
+  if (context.mia_brain_identity.layers.layer_2_manager_personality.indexOf("追踪管理决策后果") < 0) throw new Error("layer 2 missing");
   if (context.mia_brain_identity.layers.layer_3_resilience.indexOf("修正") < 0) throw new Error("layer 3 missing");
   if (context.mia_brain_private_history.memories.length !== 0) throw new Error("unexpected memory import");
   if (context.mia_brain_private_history.autonomy_enabled !== false) throw new Error("supervised autonomy changed");
