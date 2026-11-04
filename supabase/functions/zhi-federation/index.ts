@@ -284,7 +284,7 @@ Deno.serve(async (req: Request) => {
         !Array.isArray(membership.capabilities) || !membership.capabilities.includes("spatial:perception.read")) {
       return json({ error: "scene_spatial_membership_required" }, 403);
     }
-    const [nodesResult, edgesResult, ecosystemResult] = await Promise.all([
+    const [nodesResult, edgesResult, ecosystemResult, ownPresenceResult, ownMovementEventsResult] = await Promise.all([
       db.from("zhi_spatial_nodes")
         .select("id,parent_node_id,node_type,stable_key,name,description,coordinate,coordinate_frame,observability,source_kind,source_ref,source_updated_at,observed_at,valid_until,metadata")
         .eq("world_id", worldId).eq("status", "active").eq("visibility", "public").order("node_type").limit(240),
@@ -293,8 +293,16 @@ Deno.serve(async (req: Request) => {
         .eq("world_id", worldId).eq("status", "active").limit(480),
       db.from("zhi_ecosystem_states")
         .select("revision,world_time,updated_at,state").eq("world_id", worldId).maybeSingle(),
+      db.from("zhi_federated_spatial_presence")
+        .select("current_node_id,position_status,provenance,revision,updated_at")
+        .eq("world_id", worldId).eq("peer_id", peer.id).eq("external_agent_id", externalAgentId).maybeSingle(),
+      db.from("zhi_federated_spatial_events")
+        .select("id,event_type,from_node_id,to_node_id,occurred_at,perception_delta,metadata")
+        .eq("world_id", worldId).eq("peer_id", peer.id).eq("external_agent_id", externalAgentId)
+        .order("occurred_at", { ascending: false }).limit(50),
     ]);
-    if (nodesResult.error || edgesResult.error || ecosystemResult.error) return json({ error: "spatial_perception_unavailable" }, 503);
+    if (nodesResult.error || edgesResult.error || ecosystemResult.error ||
+        ownPresenceResult.error || ownMovementEventsResult.error) return json({ error: "spatial_perception_unavailable" }, 503);
     const nodes = (nodesResult.data ?? []).map((node: any) => {
       const meta = node.metadata && typeof node.metadata === "object" && !Array.isArray(node.metadata) ? node.metadata : {};
       const coordinate = node.coordinate && typeof node.coordinate === "object" && JSON.stringify(node.coordinate).length <= 1000 ? node.coordinate : null;
@@ -373,6 +381,20 @@ Deno.serve(async (req: Request) => {
       },
       world: { id: world.id, name: world.name, visibility: world.visibility, entry_policy: world.entry_policy },
       known_facts: { spatial_nodes: nodes, spatial_edges: edges },
+      self_presence: ownPresenceResult.data ? {
+        current_node_id: ownPresenceResult.data.current_node_id,
+        position_status: ownPresenceResult.data.position_status,
+        provenance: ownPresenceResult.data.provenance,
+        revision: ownPresenceResult.data.revision,
+        updated_at: ownPresenceResult.data.updated_at,
+      } : null,
+      self_spatial_events: (ownMovementEventsResult.data ?? []).map((event: any) => ({
+        id: event.id, event_type: event.event_type,
+        from_node_id: event.from_node_id, to_node_id: event.to_node_id,
+        occurred_at: event.occurred_at,
+        perception_delta: event.perception_delta,
+        metadata: event.metadata,
+      })),
       private_memory: { included: false, items: [] },
       modeled_inference: ecosystem ? {
         source: "zhi_ecosystem_states", source_kind: "world_generated_model",
