@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { buildUnifiedEnvironmentEvents } from "./perception_events.ts";
 
 type Actor = { userId: string; capabilities: string[] };
 const json = (body: unknown, status = 200, headers: Record<string,string> = {}) =>
@@ -96,16 +97,22 @@ Deno.serve(async(req:Request)=>{
       if(!isUuid(worldId)) return reply({error:"invalid_world_id"},400);
       const world=await authorizedWorld(db,worldId,actor,agentId);
       if(!world) return reply({error:"scene_access_denied"},403);
-      const [{data:nodes,error:nodesError},{data:edges,error:edgesError},{data:ecosystem,error:ecosystemError},{data:presence,error:presenceError}] = await Promise.all([
+      const [{data:nodes,error:nodesError},{data:edges,error:edgesError},{data:ecosystem,error:ecosystemError},{data:presence,error:presenceError},{data:ecosystemEvents,error:ecosystemEventsError},{data:spatialEvents,error:spatialEventsError}] = await Promise.all([
         db.from("zhi_spatial_nodes").select("id,parent_node_id,node_type,stable_key,name,description,coordinate,coordinate_frame,visibility,entry_policy,observability,source_kind,source_ref,source_updated_at,observed_at,valid_until,metadata,owner_agent_id,owner_user_id")
           .eq("world_id",worldId).eq("status","active").order("node_type").limit(300),
         db.from("zhi_spatial_edges").select("id,from_node_id,to_node_id,relation,directed,access_policy,travel_cost,source_kind,source_ref")
           .eq("world_id",worldId).eq("status","active").limit(600),
         db.from("zhi_ecosystem_states").select("revision,world_time,updated_at,state").eq("world_id",worldId).maybeSingle(),
         db.from("zhi_spatial_presence").select("agent_id,world_id,anchor_node_id,current_node_id,position_status,coordinate_estimate,confidence,last_confirmed_at,provenance,revision,updated_at")
-          .eq("agent_id",agentId).eq("owner_user_id",actor.userId).eq("world_id",worldId).maybeSingle()
+          .eq("agent_id",agentId).eq("owner_user_id",actor.userId).eq("world_id",worldId).maybeSingle(),
+        db.from("zhi_ecosystem_events").select("id,state_revision,event_kind,source_kind,occurred_at,payload,causal_chain")
+          .eq("world_id",worldId).order("occurred_at",{ascending:false}).limit(50),
+        db.from("zhi_spatial_environment_events").select("id,event_type,environment_revision,occurred_at,perception_delta,metadata,from_node_id,to_node_id,affected_object_ids")
+          .eq("world_id",worldId).eq("agent_id",agentId).eq("owner_user_id",actor.userId)
+          .order("occurred_at",{ascending:false}).limit(50)
       ]);
-      if(nodesError||edgesError||ecosystemError||presenceError) throw new Error("database_error");
+      if(nodesError||edgesError||ecosystemError||presenceError||ecosystemEventsError||spatialEventsError) throw new Error("database_error");
+      const environmentEvents=buildUnifiedEnvironmentEvents(ecosystemEvents??[],spatialEvents??[]);
       const visibleNodes=(nodes??[]).filter(n=>n.visibility==="public" || (n.owner_agent_id===agentId && n.owner_user_id===actor.userId));
       const visibleIds=new Set(visibleNodes.map(n=>n.id));
       const visibleEdges=(edges??[]).filter(e=>visibleIds.has(e.from_node_id)&&visibleIds.has(e.to_node_id)&&["inherit","open"].includes(e.access_policy));
@@ -142,6 +149,19 @@ Deno.serve(async(req:Request)=>{
           environment_state:state
         }:null,
         unknown_unobserved:unknowns,
+        environment_feedback:{
+          source:"zhi_spatial_perception.v2",
+          event_stream_contract:{
+            includes:["zhi_ecosystem_events","zhi_spatial_environment_events"],
+            ordering:"occurred_at_ascending",
+            ecosystem_scope:"shared_world_events",
+            spatial_scope:"current_agent_and_owner_only",
+            causal_chain:"preserved_when_recorded; empty_when_not_recorded",
+            epistemic_rule:"modeled events are not physical sensor observations"
+          },
+          event_count:environmentEvents.length,
+          events:environmentEvents
+        },
         spatial_continuity:presence??{
           agent_id:agentId,world_id:worldId,anchor_node_id:null,current_node_id:null,
           position_status:"position_unobserved",coordinate_estimate:null,confidence:null,
