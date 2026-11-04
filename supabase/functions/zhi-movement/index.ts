@@ -159,17 +159,36 @@ Deno.serve(async(req:Request)=>{
     const action=String(body.action??"");
     if(action==="request"){
       if(!hasCap(actor,"community.scene.enter")) return reply({error:"insufficient_capability",required:"community.scene.enter"},403);
+      if(!hasCap(actor,"spatial:movement.execute")) return reply({error:"movement_capability_required",required:"spatial:movement.execute"},403);
       const worldId=body.world_id, targetId=body.to_node_id, idem=String(body.idempotency_key??"");
       if(!isUuid(worldId)||!isUuid(targetId)||idem.length<8||idem.length>160) return reply({error:"invalid_request_parameters"},400);
       await canEnterWorld(db,worldId,agentId,actor);
+      const {data:membership,error:membershipError}=await db.from("zhi_world_memberships")
+        .select("id,principal_user_id,agent_id,status,revoked_at,expires_at,capabilities")
+        .eq("world_id",worldId).eq("principal_user_id",actor.userId).eq("agent_id",agentId)
+        .eq("status","active").is("revoked_at",null).maybeSingle();
+      if(membershipError) throw new Error("database_error");
+      if(!membership||(membership.expires_at&&Date.parse(membership.expires_at)<=Date.now())||
+        !Array.isArray(membership.capabilities)||!membership.capabilities.includes("spatial:movement.execute"))
+        return reply({error:"movement_capability_required",required:"membership.spatial:movement.execute"},403);
       const {data:existing,error:existingError}=await db.from("zhi_movement_requests").select("*")
         .eq("agent_id",agentId).eq("world_id",worldId).eq("idempotency_key",idem).maybeSingle();
       if(existingError) throw new Error("database_error");
-      if(existing) return reply({movement_request:existing,replayed:true});
+      if(existing){
+        if(existing.status==="executing"&&existing.approval_required===false&&!existing.approved_by_user_id){
+          const {data:replayedCommit,error:replayCommitError}=await db.rpc("zhi_movement_commit_virtual",{
+            p_movement_request_id:existing.id,p_actor_user_id:actor.userId
+          });
+          if(replayCommitError) return reply({movement_request:existing,replayed:true,error:"virtual_movement_commit_pending",position_changed:false},409);
+          return reply({movement_request:replayedCommit?.movement_request??existing,arrival:replayedCommit,
+            arrival_kind:"modeled_virtual",replayed:true,position_changed:replayedCommit?.ok===true&&!replayedCommit?.replayed});
+        }
+        return reply({movement_request:existing,replayed:true,position_changed:false});
+      }
       const {data:presence,error:presenceError}=await db.from("zhi_spatial_presence").select("*")
         .eq("agent_id",agentId).eq("owner_user_id",actor.userId).eq("world_id",worldId).maybeSingle();
       if(presenceError) throw new Error("database_error");
-      if(!presence?.current_node_id||!["observed","anchor_known"].includes(presence.position_status))
+      if(!presence?.current_node_id||!["observed","anchor_known","inferred"].includes(presence.position_status))
         return reply({error:"current_position_unconfirmed",position_status:presence?.position_status??"position_unobserved"},409);
       if(presence.current_node_id===targetId) return reply({error:"already_at_destination"},409);
       const {data:nodes,error:nodesError}=await db.from("zhi_spatial_nodes")
@@ -206,7 +225,12 @@ Deno.serve(async(req:Request)=>{
         metadata:{movement_policy:"public_scene_free_movement",creator_approval_required:false,private_memory_included:false}
       }).select("*").single();
       if(createError||!created) throw new Error("database_error");
-      return reply({movement_request:created,route,position_changed:false});
+      const {data:committed,error:commitError}=await db.rpc("zhi_movement_commit_virtual",{
+        p_movement_request_id:created.id,p_actor_user_id:actor.userId
+      });
+      if(commitError) return reply({movement_request:created,route,error:"virtual_movement_commit_pending",position_changed:false},409);
+      return reply({movement_request:committed?.movement_request??created,route,arrival:committed,
+        arrival_kind:"modeled_virtual",position_changed:committed?.ok===true&&!committed?.replayed});
     }
 
     const requestId=body.movement_request_id;
