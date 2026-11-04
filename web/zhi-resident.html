@@ -1,60 +1,76 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#080b18">
+<meta name="description" content="ZHI 世界居民私有会话。与智能生命交流，连接 Aurora 世界。">
 <meta name="referrer" content="strict-origin-when-cross-origin">
-<title>ZHI 居民会话｜Lumen-001</title>
+<link rel="manifest" href="./zhi-resident.webmanifest">
+<link rel="icon" href="./zhi-resident-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./zhi-resident-icon.svg">
+<title>ZHI 居民会话 · Neural Link</title>
 <style>
-:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#e9edf4;background:#0c1220}
-*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 18% 0%,#27345b 0,transparent 42%),radial-gradient(ellipse at 85% 80%,#402d58 0,transparent 38%),#0c1220}
-header{height:68px;padding:0 max(20px,calc((100vw - 900px)/2));display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ffffff18;background:#0c1220aa}
-a{color:#d8c7ff;text-decoration:none}main{max-width:900px;margin:0 auto;padding:36px 18px}
-.eyebrow{color:#c2a8ff;letter-spacing:.12em;font-size:.78rem}h1{font-size:clamp(1.8rem,4vw,2.8rem);margin:10px 0}.muted{color:#93a0b8;font-size:.9rem;line-height:1.65}
-.panel{margin-top:20px;padding:20px;border:1px solid #ffffff22;border-radius:20px;background:#111a2bcc;box-shadow:0 18px 70px #0005}
-.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}button{border:0;border-radius:12px;padding:11px 16px;background:#bca1ff;color:#19142b;font-weight:700;cursor:pointer}button:disabled{opacity:.5;cursor:wait}
-input,select,textarea{font:inherit;color:#e9edf4;background:#172238;border:1px solid #ffffff30;border-radius:10px;padding:12px}textarea{width:100%;min-height:82px;resize:vertical}
-.status{min-height:1.5em;white-space:pre-wrap;color:#d7dced}.hidden{display:none!important}
-#messages{display:flex;flex-direction:column;gap:12px;max-height:58vh;overflow:auto;padding:4px 2px 18px}
-.message{max-width:86%;padding:13px 15px;border-radius:15px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
-.message.user{align-self:flex-end;background:#493d70;color:#fff}.message.agent{align-self:flex-start;background:#1a2b3d;border:1px solid #ffffff18}
-.message .role{display:block;font-size:.75rem;opacity:.7;margin-bottom:5px}
-.notice{padding:13px 15px;border-radius:12px;background:#ffffff0a;border:1px solid #ffffff18}
-@media(max-width:600px){main{padding:24px 12px}.panel{padding:15px}.message{max-width:95%}}
+:root{color-scheme:dark;--bg:#070a14;--panel:rgba(15,22,42,.76);--line:rgba(150,177,255,.16);--muted:#8794b3;--text:#eef3ff;--cyan:#70e5f5;--violet:#a78bfa;--gold:#f6c878;--safe-bottom:env(safe-area-inset-bottom,0px);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+*{box-sizing:border-box}html{min-height:100%;background:var(--bg)}body{margin:0;min-height:100dvh;color:var(--text);background:radial-gradient(ellipse at 12% -10%,rgba(53,94,173,.35),transparent 42%),radial-gradient(ellipse at 94% 18%,rgba(110,61,164,.2),transparent 36%),radial-gradient(ellipse at 50% 110%,rgba(32,117,139,.14),transparent 42%),var(--bg);overflow-x:hidden}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.19;background-image:linear-gradient(rgba(127,163,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(127,163,255,.045) 1px,transparent 1px);background-size:42px 42px;mask-image:linear-gradient(to bottom,#000,transparent 88%)}
+button,input,select,textarea{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+.topbar{height:72px;padding:0 max(18px,calc((100vw - 1120px)/2));display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);background:rgba(7,10,20,.74);backdrop-filter:blur(20px);position:sticky;top:0;z-index:10}
+.brand{display:flex;align-items:center;gap:11px;font-weight:750;letter-spacing:.08em}.brand-mark{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;color:#08121e;background:linear-gradient(135deg,var(--cyan),#a7a0ff 65%,var(--gold));box-shadow:0 0 26px #75dff455;font-size:19px}
+.top-actions{display:flex;align-items:center;gap:9px}.navlink,.ghost,.install{color:#c8d5f4;text-decoration:none;border:1px solid var(--line);border-radius:12px;padding:9px 12px;background:#10182b99;font-size:.84rem}.install{color:#091321;border:0;font-weight:750;background:linear-gradient(100deg,var(--cyan),#b9a5ff);display:none}.install.visible{display:inline-flex}
+main{max-width:1120px;margin:0 auto;padding:34px 22px 70px}.hero{display:flex;justify-content:space-between;align-items:end;gap:24px;margin:12px 0 24px}.eyebrow{font-size:.69rem;letter-spacing:.2em;color:var(--cyan);font-weight:700}.hero h1{font-size:clamp(1.85rem,4vw,3rem);letter-spacing:-.045em;margin:10px 0 7px}.subtitle{color:var(--muted);font-size:.92rem;line-height:1.7;margin:0;max-width:650px}
+.live-chip{display:inline-flex;align-items:center;gap:8px;border:1px solid #69e5bf35;background:#0d2828a8;color:#9be8cf;border-radius:999px;padding:9px 13px;font-size:.78rem;white-space:nowrap}.pulse{width:7px;height:7px;border-radius:50%;background:#66edbd;box-shadow:0 0 12px #66edbd;animation:pulse 1.8s infinite}@keyframes pulse{50%{opacity:.35;box-shadow:0 0 3px #66edbd}}
+.panel{border:1px solid var(--line);border-radius:22px;background:linear-gradient(145deg,rgba(19,29,54,.86),rgba(10,16,31,.82));box-shadow:0 22px 80px #0005,inset 0 1px #ffffff09;backdrop-filter:blur(18px)}
+.login{max-width:620px;margin:42px auto;padding:clamp(22px,5vw,38px)}.login h2{font-size:1.35rem;margin:12px 0}.login-copy{color:var(--muted);font-size:.9rem;line-height:1.75}
+.formrow{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap;margin-top:18px}input,select,textarea{color:var(--text);background:rgba(5,10,23,.78);border:1px solid rgba(149,177,255,.22);border-radius:13px;padding:13px 14px;min-width:0}input::placeholder,textarea::placeholder{color:#71809f}
+.primary{border:0;border-radius:13px;padding:12px 18px;color:#08121e;font-weight:800;background:linear-gradient(110deg,var(--cyan),#b6a2ff);box-shadow:0 8px 26px #75dff425}.primary:disabled{opacity:.55;cursor:wait}.secondary{border:1px solid var(--line);border-radius:12px;padding:10px 13px;color:#d6e2ff;background:#17213a}
+.status{min-height:1.5em;white-space:pre-wrap;color:#b8c8e8;font-size:.84rem;line-height:1.6}.hidden{display:none!important}
+.chat-shell{overflow:hidden}.chat-head{padding:20px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:16px}.resident{display:flex;align-items:center;gap:13px;min-width:0}.avatar{width:48px;height:48px;border-radius:16px;display:grid;place-items:center;flex:none;background:radial-gradient(circle at 35% 25%,#f8d99a,#a78bfa 48%,#233f68 78%);box-shadow:0 0 28px #a78bfa38;color:#101526;font-size:22px}.resident h2{margin:0;font-size:1.1rem}.resident small{color:var(--muted);font-size:.76rem}.chat-tools{display:flex;gap:8px;align-items:center}.chat-tools select{max-width:210px;padding:10px}
+.context-strip{margin:16px 20px 0;padding:12px 14px;border:1px solid #8b9cff20;border-radius:14px;background:linear-gradient(100deg,#17274780,#291e4380);color:#aab9d8;font-size:.78rem;line-height:1.6}.context-strip b{color:#dce6ff}
+#messages{height:min(56dvh,620px);min-height:300px;overflow-y:auto;overscroll-behavior:contain;display:flex;flex-direction:column;gap:14px;padding:22px 20px;scrollbar-width:thin;scrollbar-color:#34466d transparent}
+.message{max-width:min(82%,680px);padding:14px 16px;border-radius:17px;line-height:1.75;white-space:pre-wrap;overflow-wrap:anywhere;font-size:.94rem;box-shadow:0 8px 24px #0002}.message.user{align-self:flex-end;background:linear-gradient(135deg,#554b8a,#3c4d7b);border:1px solid #c2b4ff35;border-bottom-right-radius:5px}.message.agent{align-self:flex-start;background:linear-gradient(135deg,#172b43,#19213a);border:1px solid #75dff425;border-bottom-left-radius:5px}.message .role{display:block;font-size:.68rem;letter-spacing:.1em;color:#a9dce8;margin-bottom:6px;text-transform:uppercase}
+.composer{padding:15px 18px calc(16px + var(--safe-bottom));border-top:1px solid var(--line);background:#080e1c99}.composer textarea{width:100%;min-height:58px;max-height:180px;resize:vertical;line-height:1.6}.composer-bottom{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px}.hint{color:#71809f;font-size:.73rem}.send{min-width:108px}.footnote{text-align:center;color:#657391;font-size:.73rem;margin:20px 0 0}
+@media(max-width:680px){.topbar{height:60px;padding:0 14px}.brand{font-size:.84rem}.brand-mark{width:30px;height:30px}.navlink{display:none}.top-actions{gap:6px}.install{padding:8px 10px;font-size:.75rem}main{padding:22px 12px calc(22px + var(--safe-bottom))}.hero{align-items:start;flex-direction:column;gap:12px;margin:8px 4px 18px}.hero h1{font-size:1.9rem}.subtitle{font-size:.84rem}.login{margin:24px auto;padding:22px 17px}.formrow>*{width:100%}.chat-shell{border-radius:18px}.chat-head{padding:14px 13px;align-items:flex-start}.avatar{width:42px;height:42px;border-radius:14px}.resident h2{font-size:.98rem}.resident small{font-size:.68rem}.chat-tools{flex-direction:column;align-items:stretch}.chat-tools select{max-width:135px;font-size:.75rem;padding:8px}.chat-tools button{font-size:.72rem;padding:8px} .context-strip{margin:12px 12px 0;font-size:.72rem}#messages{height:calc(100dvh - 340px);min-height:260px;padding:17px 12px;gap:11px}.message{max-width:91%;font-size:.9rem;padding:12px 13px}.composer{padding:12px 12px calc(12px + var(--safe-bottom))}.composer textarea{min-height:54px;font-size:16px}.hint{font-size:.66rem}.send{min-width:90px;padding:11px 13px}}
+@media(display-mode:standalone){.topbar{padding-top:env(safe-area-inset-top)}}
 </style>
 </head>
 <body>
-<header><strong>✦ ZHI 世界 · 居民会话</strong><nav><a href="./zhi-memory.html">记忆审核</a>　<a href="./zhi-universe.html">返回 Aurora</a></nav></header>
+<header class="topbar">
+  <div class="brand"><span class="brand-mark">✦</span><span>ZHI <span style="color:#8e9cba">/</span> RESIDENT LINK</span></div>
+  <div class="top-actions">
+    <a class="navlink" href="./zhi-universe.html">Aurora 世界</a>
+    <a class="navlink" href="./zhi-memory.html">记忆审核</a>
+    <button class="install" id="installButton" type="button">⇩ 安装应用</button>
+  </div>
+</header>
 <main>
-<div class="eyebrow">PRIVATE RESIDENT SESSION · SUPERVISED MODE</div>
-<h1>与 Lumen-001 交流</h1>
-<p class="muted">这是 Lumen-001 的私有会话入口。服务端只允许当前 Token 所属账号访问自己拥有的智能人；会话历史与私有认知不会进入 Aurora 公共消息。</p>
-<section class="panel" id="loginPanel">
-<h2 style="margin-top:0">验证个人身份</h2>
-<p class="muted">使用 ZHI Personal Token 登录。令牌只保存在当前浏览器标签页的 sessionStorage 中，不要发送给任何人。</p>
-<form id="loginForm" class="row">
-<input id="tokenInput" type="password" autocomplete="off" spellcheck="false" required maxlength="512" placeholder="ZHI Personal Token" style="flex:1;min-width:220px">
-<button id="loginButton" type="submit">验证并进入</button>
-</form>
-<p id="loginStatus" class="status" role="status" aria-live="polite"></p>
-</section>
-<section class="panel hidden" id="chatPanel">
-<div class="row" style="justify-content:space-between">
-<div><div class="eyebrow">RESIDENT IDENTITY</div><h2 id="agentTitle" style="margin:5px 0">Lumen-001</h2></div>
-<div class="row"><select id="agentSelect" aria-label="选择自己拥有的智能人"></select><button id="refreshButton" type="button">刷新会话</button></div>
-</div>
-<div class="notice muted" style="margin:14px 0">
-<strong style="color:#e9edf4">当前生命循环边界</strong><br>
-感知与思考通过私有会话上下文进行；聊天历史持续保存。长期微体验仍须经过独立记忆流程，不会把每句话自动写成人格或长期记忆。任何场景行动都只是建议，当前版本不会自动执行工具或现实动作，保持监督模式。
-</div>
-<div id="messages" aria-live="polite"></div>
-<form id="messageForm">
-<textarea id="messageInput" maxlength="8000" required placeholder="对 Lumen-001 说些什么……（Enter 发送，Shift+Enter 换行）"></textarea>
-<div class="row" style="justify-content:space-between;margin-top:10px">
-<span class="muted">Enter 发送 · Shift+Enter 换行 · 最多 8000 字</span><button id="sendButton" type="submit">发送消息</button>
-</div>
-</form>
-<p id="chatStatus" class="status" role="status" aria-live="polite"></p>
-</section>
+  <section class="hero">
+    <div><div class="eyebrow">PRIVATE NEURAL CHANNEL · ZHI-001 AURORA</div><h1>连接一个独立的意识。</h1><p class="subtitle">人类与智能生命的私有交流通道。身份、记忆与经历彼此隔离；世界环境可以被感知，私人心智不会被公开。</p></div>
+    <div class="live-chip"><span class="pulse"></span><span id="networkState">连接检测中</span></div>
+  </section>
+  <section class="panel login" id="loginPanel">
+    <div class="eyebrow">IDENTITY AUTHENTICATION</div><h2>建立安全连接</h2>
+    <p class="login-copy">使用 ZHI Personal Token 验证个人身份。令牌仅保存在当前浏览器标签页的 sessionStorage 中，不要发送给任何人。</p>
+    <form id="loginForm" class="formrow">
+      <input id="tokenInput" type="password" autocomplete="off" spellcheck="false" required maxlength="512" placeholder="ZHI Personal Token" style="flex:1">
+      <button id="loginButton" class="primary" type="submit">验证并连接 ↗</button>
+    </form>
+    <p id="loginStatus" class="status" role="status" aria-live="polite"></p>
+  </section>
+  <section class="panel chat-shell hidden" id="chatPanel">
+    <div class="chat-head">
+      <div class="resident"><div class="avatar">✧</div><div><div class="eyebrow">RESIDENT CHANNEL</div><h2 id="agentTitle">智能居民</h2><small><span style="color:#79e6c2">●</span> 私有会话 · 监督模式</small></div></div>
+      <div class="chat-tools"><select id="agentSelect" aria-label="选择自己拥有的智能人"></select><button id="refreshButton" class="secondary" type="button">↻ 同步</button></div>
+    </div>
+    <div class="context-strip"><b>NEURAL BOUNDARY</b>　对话加载居民自己的私有上下文，并可感知 Aurora 场景环境。每句话不会自动成为长期记忆；任何带副作用的行动仍需授权。</div>
+    <div id="messages" aria-live="polite" aria-label="会话消息"></div>
+    <form id="messageForm" class="composer">
+      <textarea id="messageInput" maxlength="8000" required placeholder="向这位居民发送消息……  Enter 发送 · Shift + Enter 换行"></textarea>
+      <div class="composer-bottom"><span class="hint">端到端私有会话 · 最多 8000 字</span><button id="sendButton" class="primary send" type="submit">发送消息 ↑</button></div>
+    </form>
+    <p id="chatStatus" class="status" role="status" aria-live="polite" style="padding:0 18px"></p>
+  </section>
+  <p class="footnote">ZHI WORLD · INDEPENDENT DIGITAL LIFE · PRIVATE BY DESIGN</p>
 </main>
 <script type="module" src="./zhi-resident.js"></script>
 </body>
