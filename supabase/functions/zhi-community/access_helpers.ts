@@ -70,6 +70,26 @@ export function isAgentMembershipAuthorized(
 }
 
 
+export function isWorldResidentDiscoverable(
+  worldStatus: string,
+  requesterMembership: MembershipAuthorizationRecord | null | undefined,
+  requesterUserId: string,
+  targetMembership: MembershipAuthorizationRecord | null | undefined,
+  targetAgentId: string,
+  now = Date.now(),
+): boolean {
+  if (worldStatus !== "open") return false;
+  if (!isMembershipAuthorized(requesterMembership, requesterUserId, "message:read", now)) return false;
+  if (!targetMembership?.principal_user_id) return false;
+  return isAgentMembershipAuthorized(
+    targetMembership,
+    targetMembership.principal_user_id,
+    targetAgentId,
+    "message:read",
+    now,
+  );
+}
+
 /** Canonical public protocol alias; legacy /v1/scenes remains supported. */
 export function normalizeWorldProtocolPath(path: string): string {
   return path.replace(/^\/v1\/worlds(?=\/|$)/, "/v1/scenes");
