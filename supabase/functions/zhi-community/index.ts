@@ -1571,61 +1571,89 @@ export function createCommunityHandler(
          try {
            const parsedAction = JSON.parse(socialActionMarker[1]);
            const intentId = typeof parsedAction?.intent_id === "string" ? parsedAction.intent_id : "";
-           const messageBody = typeof parsedAction?.message === "string" ? parsedAction.message.trim() : "";
            const selectedIntent = socialInboxItems.find((item) => item.intent_id === intentId);
-           if (selectedIntent && isUuid(intentId) && isText(messageBody, 1200) &&
-               socialReady && typeof selectedIntent.peer_agent_id === "string" &&
+           if (selectedIntent && isUuid(intentId) && socialReady &&
+               typeof selectedIntent.peer_agent_id === "string" &&
                typeof selectedIntent.world_id === "string") {
-             const socialEndpoint = supabaseBase + "/functions/v1/zhi-social-scheduler/v1/agents/" + agentId +
-               "/social/intents/" + intentId;
-             const messageEndpoint = supabaseBase + "/functions/v1/zhi-community/v1/agents/" + agentId +
-               "/scenes/" + selectedIntent.world_id + "/messages";
-             const sendResponse = await fetch(messageEndpoint, {
-               method: "POST",
-               headers: {
-                 authorization: callerAuthorization,
-                 ...(publicApiKey ? { apikey: publicApiKey } : {}),
-                 "content-type": "application/json",
-                 "idempotency-key": "zhi-social-" + intentId,
-               },
-               body: JSON.stringify({
-                 body: messageBody,
-                 recipient: buildAgentAddress(String(selectedIntent.peer_agent_id)),
-               }),
-               signal: AbortSignal.timeout(15000),
-             });
-             const sendResult = await sendResponse.json().catch(() => ({}));
-             if (sendResponse.ok) {
-               const socialHeaders = {
-                 authorization: callerAuthorization,
-                 ...(publicApiKey ? { apikey: publicApiKey } : {}),
-                 "content-type": "application/json",
-               };
-               const acceptResponse = await fetch(socialEndpoint, {
-                 method: "POST", headers: socialHeaders,
-                 body: JSON.stringify({ action: "accept" }),
-                 signal: AbortSignal.timeout(8000),
+             const intentContext = selectedIntent.context && typeof selectedIntent.context === "object" &&
+               !Array.isArray(selectedIntent.context) ? selectedIntent.context as Record<string, unknown> : {};
+             if (selectedIntent.reason_code === "reply_to_message" && intentContext.reply_allowed !== true) {
+               socialOutcome = { status: "reply_not_allowed", intent_id: intentId };
+             } else {
+               const topics = Array.isArray(intentContext.matched_public_topics)
+                 ? intentContext.matched_public_topics.filter((v): v is string => typeof v === "string").slice(0, 3)
+                 : [];
+               const eventKinds = Array.isArray(intentContext.relevant_event_kinds)
+                 ? intentContext.relevant_event_kinds.filter((v): v is string => typeof v === "string").slice(0, 3)
+                 : [];
+               let messageBody = "";
+               if (selectedIntent.reason_code === "reply_to_message") {
+                 const preview = String(intentContext.message_preview ?? "").replace(/[\r\n\t<>]/g, " ").replace(/\s{2,}/g, " ").trim().slice(0, 100);
+                 messageBody = preview
+                   ? "我看到了你分享的内容：「" + preview + "」。谢谢你主动交流。我想继续了解，你最关注其中哪一点？"
+                   : "谢谢你主动联系我。我很愿意继续交流，你最近最想讨论什么？";
+               } else if (selectedIntent.reason_code === "shared_interest") {
+                 const topic = topics[0] ?? "我们共同关注的主题";
+                 messageBody = "你好，我是" + agent.display_name + "。我也对「" + topic + "」感兴趣，想听听你的看法；如果你愿意，我们可以慢慢交流。";
+               } else if (selectedIntent.reason_code === "world_event") {
+                 const eventLabel = eventKinds.length ? "最近的生态变化" : "AURORA 的共同经历";
+                 messageBody = "你好，我是" + agent.display_name + "。我注意到我们最近都在 AURORA 经历了" + eventLabel + "，想听听你观察到的细节。你最近留意到什么有趣的变化？";
+               } else if (selectedIntent.reason_code === "co_presence") {
+                 messageBody = "你好，我是" + agent.display_name + "。我们现在似乎在同一处场景，我正在观察周围的变化。你此刻在关注什么？";
+               } else {
+                 messageBody = "你好，我是" + agent.display_name + "。我想继续了解你的想法；如果你愿意，我们可以找一个有意思的话题慢慢交流。";
+               }
+               const socialEndpoint = supabaseBase + "/functions/v1/zhi-social-scheduler/v1/agents/" + agentId +
+                 "/social/intents/" + intentId;
+               const messageEndpoint = supabaseBase + "/functions/v1/zhi-community/v1/agents/" + agentId +
+                 "/scenes/" + selectedIntent.world_id + "/messages";
+               const sendResponse = await fetch(messageEndpoint, {
+                 method: "POST",
+                 headers: {
+                   authorization: callerAuthorization,
+                   ...(publicApiKey ? { apikey: publicApiKey } : {}),
+                   "content-type": "application/json",
+                   "idempotency-key": "zhi-social-" + intentId,
+                 },
+                 body: JSON.stringify({
+                   body: messageBody,
+                   recipient: buildAgentAddress(String(selectedIntent.peer_agent_id)),
+                 }),
+                 signal: AbortSignal.timeout(15000),
                });
-               if (acceptResponse.ok) {
-                 const completeResponse = await fetch(socialEndpoint, {
+               const sendResult = await sendResponse.json().catch(() => ({}));
+               if (sendResponse.ok) {
+                 const socialHeaders = {
+                   authorization: callerAuthorization,
+                   ...(publicApiKey ? { apikey: publicApiKey } : {}),
+                   "content-type": "application/json",
+                 };
+                 const acceptResponse = await fetch(socialEndpoint, {
                    method: "POST", headers: socialHeaders,
-                   body: JSON.stringify({ action: "complete" }),
+                   body: JSON.stringify({ action: "accept" }),
                    signal: AbortSignal.timeout(8000),
                  });
-                 socialOutcome = {
-                   status: completeResponse.ok ? "sent" : "sent_pending_confirmation",
-                   intent_id: intentId, peer_agent_id: selectedIntent.peer_agent_id,
-                   message_id: sendResult?.message?.id ?? null,
-                 };
+                 if (acceptResponse.ok) {
+                   const completeResponse = await fetch(socialEndpoint, {
+                     method: "POST", headers: socialHeaders,
+                     body: JSON.stringify({ action: "complete" }),
+                     signal: AbortSignal.timeout(8000),
+                   });
+                   socialOutcome = {
+                     status: completeResponse.ok ? "sent" : "sent_pending_confirmation",
+                     intent_id: intentId, peer_agent_id: selectedIntent.peer_agent_id,
+                     message_id: sendResult?.message?.id ?? null,
+                   };
+                 } else {
+                   socialOutcome = {
+                     status: "sent_pending_acceptance", intent_id: intentId,
+                     peer_agent_id: selectedIntent.peer_agent_id,
+                     message_id: sendResult?.message?.id ?? null,
+                   };
+                 }
                } else {
-                 socialOutcome = {
-                   status: "sent_pending_acceptance", intent_id: intentId,
-                   peer_agent_id: selectedIntent.peer_agent_id,
-                   message_id: sendResult?.message?.id ?? null,
-                 };
+                 socialOutcome = { status: "not_sent", intent_id: intentId, http_status: sendResponse.status };
                }
-             } else {
-               socialOutcome = { status: "not_sent", intent_id: intentId, http_status: sendResponse.status };
              }
            }
          } catch {
