@@ -7,6 +7,7 @@ import { buildPrivateAgentContext, buildPrivateChatHistory, buildSceneAwarenessC
 import { computeSceneEnvironment, normalizeSceneEnvironmentConfig } from "./environment_helpers.ts";
 import { canReadPrivateCognition } from "./constitutional_helpers.ts";
 import { normalizeAgentReflection, normalizeMemoryCandidate } from "./memory_experience_helpers.ts";
+import { buildAgentAddress } from "./agent_address_helpers.ts";
 
 const MAX_BODY_BYTES = 64_000;
 
@@ -445,6 +446,29 @@ export function createCommunityHandler(
         .eq("owner_user_id", actor.userId).order("created_at", { ascending: false }).limit(100);
       if (error) throw new Error("database_error");
       return reply({ items: agents ?? [] });
+    }
+
+    // Exact logical identity resolution is owner-scoped in this first phase.
+    // It returns no private cognition, credentials, runtime address, or scene permissions.
+    if (req.method === "GET" && parts.length === 4 && parts[0] === "v1" &&
+        parts[1] === "agents" && parts[3] === "identity") {
+      const agentId = parts[2];
+      if (!isUuid(agentId)) return reply({ error: "invalid_argument", detail: "agent_id_must_be_uuid" }, 400);
+      const { data: agent, error } = await db.from("zhi_agents")
+        .select("id,display_name,role,status")
+        .eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
+      if (error) throw new Error("database_error");
+      // Do not reveal whether a private Agent exists to a non-owner.
+      if (!agent) return reply({ error: "not_found" }, 404);
+      return reply({
+        schema: "zhi.agent.identity.v1",
+        agent_id: agent.id,
+        identity_uri: buildAgentAddress(agent.id),
+        display_name: agent.display_name,
+        role: agent.role,
+        identity_status: agent.status,
+        resolution_scope: "owner",
+      });
     }
 
     // Operational audit metadata is visible to the Agent owner only with an explicit audit capability.
