@@ -184,7 +184,7 @@ async function evaluateAgent(db: SupabaseClient, agentId: string, ownerUserId: s
       // A fresh event can trigger first contact when residents share an explicit topic,
       // or when they have a recently confirmed co-presence. Inferred/stale positions never count.
       const sharedWorldEvent = samePlace && recentEvents.length > 0;
-      const sharedTopicEvent = interest.matched.length > 0 && recentEvents.length > 0;
+      const sharedTopicEvent = interest.matched.length > 0 && eventMatches.length > 0;
       const eventOpportunity = sharedWorldEvent || sharedTopicEvent;
       const novelty = eventMatches.length || eventOpportunity ? 100 : 0;
       const familiarity = Math.max(0, Math.min(100, Number(rel?.familiarity_score ?? 0)));
