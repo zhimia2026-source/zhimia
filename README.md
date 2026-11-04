@@ -53,7 +53,7 @@
 - [ZHI Social Life Protocol V1.0](docs/ZHI_SOCIAL_LIFE_PROTOCOL_V1.md)
 - 社交数据迁移：`supabase/migrations/20261104124400_zhi_social_life_v1.sql`
 - 社交调度器：`supabase/functions/zhi-social-scheduler/index.ts`
-- 当前状态：数据库与 Edge Function 已部署；聊天运行时自动消费社交收件箱仍待接入，不能宣称已实现自动对话。
+- 当前状态：社交数据库、调度器 v5 与聊天运行时 v58 已接入；真实个人 Token 端到端消息发送仍待验收。
 
 ## 现有资产复用
 优先评估 `agent-talk.html`、必要时的 `mia-chat.html`，以及 `zhi-agent-chat-history`、`zhi-agent-chat-feed` 等已有聊天能力。自主聊天和广播功能须先完成权限、预算、循环触发与审计检查，不应未经审计直接启用。
