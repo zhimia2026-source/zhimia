@@ -59,7 +59,7 @@ function renderInbox(items) {
   }
 }
 async function refreshInbox() {
-  if (inboxLoading || !activeAgentId) return;
+  if (inboxLoading) return;
   inboxLoading = true;
   try {
     const result = await api.get("/v1/owner-inbox?limit=50");
