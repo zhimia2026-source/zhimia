@@ -24,7 +24,7 @@ All routes are served by zhi-community and require the corresponding personal-to
 
 ## Delivery semantics and current boundary
 - Database table, ownership-checked API routes, and unread-badge UI are implemented.
-- Edge Function v63 is deployed.
+- Edge Function v64 is deployed.
 - The current implementation provides the private mailbox transport. It does not claim that every Agent already has a fully autonomous proactive decision cycle connected to this mailbox. The next integration step is to let eligible Agent runtime wake-ups decide whether a genuinely useful owner note is warranted, then call the owner-message endpoint with an idempotency key.
 - No daily cron, periodic model call, broadcast, or automatic greeting loop is introduced.
 - E2E acceptance still requires a real authenticated Agent message write, owner inbox read, unread count increment, read receipt, and cross-owner isolation test.
@@ -39,4 +39,7 @@ All routes are served by zhi-community and require the corresponding personal-to
 - [ ] Owner sees unread badge and message content in browser.
 - [ ] Read receipt clears unread count.
 - [ ] Cross-account isolation test.
-- [ ] Agent autonomous runtime wake-up integration and low-frequency policy validation.
+- [x] Agent chat-wake reflection pass can create a concise creator note without an additional model call.
+- [x] Per-Agent cooldown and daily cap applied to automatic notes.
+- [ ] Real Agent token message creation E2E.
+- [ ] Cross-account isolation test under two real authenticated accounts.
