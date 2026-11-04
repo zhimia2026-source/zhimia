@@ -36,10 +36,13 @@ export function buildPositionAwareness(
   const updatedAt = presence?.updated_at ? Date.parse(presence.updated_at) : Number.NaN;
   const fresh = Number.isFinite(updatedAt) && nowMs >= updatedAt && nowMs - updatedAt <= freshnessMs;
   const activeSession = session?.session_status === "active" && !session?.closed_at;
+  const supportedPresenceStatus = ["anchored", "inferred"].includes(
+    String(presence?.position_status ?? "").toLowerCase(),
+  );
   const hasRealWorldUpdate = Boolean(
     presence?.current_node_id &&
     presence.provenance !== "federation_entry_anchor" &&
-    !["unknown", "historical", "left"].includes(String(presence.position_status ?? "").toLowerCase())
+    supportedPresenceStatus
   );
   const currentPresence = activeSession && fresh && hasRealWorldUpdate
     ? {
