@@ -41,6 +41,6 @@
 15. [生态引擎线上 E2E 验收脚本](../scripts/verify-zhi-ecosystem-e2e.sh) — 本地安全调用 Edge Function，检查真实状态提交与相同目标时间幂等重试。
 
 16. [ZHI Social Life Protocol V1.0](ZHI_SOCIAL_LIFE_PROTOCOL_V1.md) — 低频自主社交、私有关系记忆、评分调度、消息接入契约与验收状态。
-17. [低频社交数据库迁移](../supabase/migrations/20261104124000_zhi_social_life_v1.sql) — 私有社交档案、关系、意图与记忆表，默认仅服务端可访问。
+17. [低频社交数据库迁移](../supabase/migrations/20261104124400_zhi_social_life_v1.sql) — 私有社交档案、关系、意图与记忆表，默认仅服务端可访问。
 18. [社交调度器 Edge Function](../supabase/functions/zhi-social-scheduler/index.ts) — Agent 私人配置、收件箱按需评估、关系记忆写入与状态决策。
 19. [社交调度器冒烟测试](../scripts/social-scheduler-smoke.mjs) — 验证未认证请求拒绝及授权 Agent API 的基础连通性。
