@@ -33,9 +33,11 @@ async function authenticate(db: SupabaseClient, req: Request): Promise<Actor | n
     .eq("token_hash", tokenHash).maybeSingle();
   if (error || !data || data.revoked_at) return null;
   if (data.expires_at && (!Number.isFinite(Date.parse(data.expires_at)) || Date.parse(data.expires_at) <= Date.now())) return null;
-  const { data: touched, error: touchError } = await db.from("zhi_personal_access_tokens")
+  let touchQuery = db.from("zhi_personal_access_tokens")
     .update({ last_used_at: new Date().toISOString() })
-    .eq("id", data.id).is("revoked_at", null).select("id").maybeSingle();
+    .eq("id", data.id).is("revoked_at", null);
+  if (data.expires_at) touchQuery = touchQuery.gt("expires_at", new Date().toISOString());
+  const { data: touched, error: touchError } = await touchQuery.select("id").maybeSingle();
   if (touchError || !touched) return null;
   return { userId: data.user_id, capabilities: Array.isArray(data.capabilities) ? data.capabilities : [] };
 }
@@ -294,7 +296,28 @@ Deno.serve(async (req: Request) => {
         .eq("id", intentId).eq("agent_id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
       if (intentError) throw new Error("intent_read_failed");
       if (!intent) return reply({ error: "intent_not_found" }, 404);
+      if (action === "complete" && intent.status === "completed") return reply({ intent: { id: intentId, status: "completed" }, idempotent_replay: true });
+      if ((action === "complete" && intent.status !== "accepted") ||
+          (action !== "complete" && !["pending", "deferred"].includes(intent.status))) {
+        if (action === "accept" && intent.status === "accepted") return reply({ intent: { id: intentId, status: "accepted" }, idempotent_replay: true });
+        if (action === "defer" && intent.status === "deferred") return reply({ intent: { id: intentId, status: "deferred" }, idempotent_replay: true });
+        if (action === "ignore" && intent.status === "ignored") return reply({ intent: { id: intentId, status: "ignored" }, idempotent_replay: true });
+        return reply({ error: "intent_state_conflict" }, 409);
+      }
       if (action === "complete") {
+        const { data: conversations, error: conversationsError } = await db.from("zhi_world_conversations")
+          .select("id").eq("world_id", intent.world_id).eq("status", "open");
+        if (conversationsError) throw new Error("world_conversations_unavailable");
+        const conversationIds = (conversations ?? []).map(c => c.id);
+        if (!conversationIds.length) return reply({ error: "message_not_found_for_intent" }, 409);
+        const { data: sentMessages, error: sentError } = await db.from("zhi_world_messages")
+          .select("id,payload").eq("sender_agent_id", agentId).in("conversation_id", conversationIds)
+          .gte("created_at", intent.created_at).limit(100);
+        if (sentError) throw new Error("message_verification_failed");
+        const verifiedSend = (sentMessages ?? []).some(m =>
+          (m.payload as Record<string, unknown>)?.recipient_agent_id === intent.peer_agent_id
+        );
+        if (!verifiedSend) return reply({ error: "message_not_found_for_intent" }, 409);
         const now = new Date();
         const { data: profile } = await db.from("zhi_social_profiles").select("peer_cooldown_hours")
           .eq("agent_id", agentId).maybeSingle();
@@ -317,7 +340,7 @@ Deno.serve(async (req: Request) => {
         : { status: "completed", decided_at: new Date().toISOString() };
       const { data, error } = await db.from("zhi_social_intents").update(update)
         .eq("id", intentId).eq("agent_id", agentId).eq("owner_user_id", actor.userId)
-        .in("status", ["pending", "deferred", "accepted"]).select("id,status").maybeSingle();
+        .eq("status", intent.status).select("id,status").maybeSingle();
       if (error || !data) return reply({ error: "intent_state_conflict" }, 409);
       return reply({ intent: data });
     }
@@ -347,11 +370,19 @@ Deno.serve(async (req: Request) => {
         .select("world_id").eq("world_id", worldId).eq("agent_id", agentId)
         .eq("principal_user_id", actor.userId).eq("status", "active").is("revoked_at", null).maybeSingle();
       if (membershipError) throw new Error("membership_read_failed");
+      const { data: peerAgent, error: peerAgentError } = await db.from("zhi_agents")
+        .select("id,owner_user_id,status").eq("id", peerId).maybeSingle();
+      if (peerAgentError) throw new Error("peer_agent_read_failed");
       const { data: peerMembership, error: peerMembershipError } = await db.from("zhi_world_memberships")
-        .select("agent_id").eq("world_id", worldId).eq("agent_id", peerId)
+        .select("agent_id,principal_user_id,expires_at").eq("world_id", worldId).eq("agent_id", peerId)
         .eq("status", "active").is("revoked_at", null).maybeSingle();
       if (peerMembershipError) throw new Error("peer_membership_read_failed");
-      if (!membership || !peerMembership) return reply({ error: "shared_world_membership_required" }, 403);
+      const membershipExpired = Boolean(membership?.expires_at && Date.parse(membership.expires_at) <= Date.now());
+      const peerMembershipExpired = Boolean(peerMembership?.expires_at && Date.parse(peerMembership.expires_at) <= Date.now());
+      if (!membership || membershipExpired || !peerAgent || peerAgent.status !== "active" ||
+          !peerMembership || peerMembership.principal_user_id !== peerAgent.owner_user_id || peerMembershipExpired) {
+        return reply({ error: "shared_world_membership_required" }, 403);
+      }
       const { data, error } = await db.from("zhi_social_memories").insert({
         world_id: worldId, observer_agent_id: agentId, owner_user_id: actor.userId,
         peer_agent_id: peerId, memory_kind: kind, summary,
