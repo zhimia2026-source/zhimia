@@ -375,18 +375,18 @@ Deno.serve(async (req: Request) => {
         const experiences = Number(priorRelationship?.shared_experience_count ?? 0) + 1;
         const nextState = priorRelationship?.relationship_state ??
           (experiences >= 3 ? "developing" : "acquaintance");
-        const { error: relationshipWriteError } = await db.from("zhi_social_relationships").upsert({
+        const { data: relationshipRecord, error: relationshipWriteError } = await db.from("zhi_social_relationships").upsert({
           world_id: intent.world_id, observer_agent_id: agentId, owner_user_id: actor.userId,
           peer_agent_id: intent.peer_agent_id, relationship_state: nextState,
           familiarity_score: familiarity, shared_experience_count: experiences,
           last_contact_at: verifiedMessage.created_at ?? new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        }, { onConflict: "world_id,observer_agent_id,peer_agent_id" });
+        }, { onConflict: "world_id,observer_agent_id,peer_agent_id" }).select("id").single();
         if (relationshipWriteError) throw new Error("social_relationship_write_failed");
         if (preview) {
           const { error: memoryWriteError } = await db.from("zhi_social_memories").insert({
             world_id: intent.world_id, observer_agent_id: agentId, owner_user_id: actor.userId,
-            peer_agent_id: intent.peer_agent_id, relationship_id: priorRelationship?.id ?? null,
+            peer_agent_id: intent.peer_agent_id, relationship_id: relationshipRecord?.id ?? priorRelationship?.id ?? null,
             memory_kind: "conversation_summary", summary: preview,
             importance: 35, source_message_id: verifiedMessage.id,
           });
