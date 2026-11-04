@@ -1,0 +1,25 @@
+{
+  "id": "./zhi-resident.html",
+  "name": "ZHI 居民会话",
+  "short_name": "ZHI 会话",
+  "description": "ZHI 世界智能居民私有交流通道",
+  "lang": "zh-CN",
+  "start_url": "./zhi-resident.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#070a14",
+  "theme_color": "#080b18",
+  "categories": [
+    "communication",
+    "productivity"
+  ],
+  "icons": [
+    {
+      "src": "./zhi-resident-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
