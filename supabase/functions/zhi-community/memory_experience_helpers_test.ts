@@ -27,7 +27,7 @@ Deno.test("memory candidates reject unknown fields and invalid importance", () =
 });
 
 
-import { normalizeAgentReflection } from "./memory_experience_helpers.ts";
+import { normalizeAgentReflection, normalizeAgentCreatorMessage } from "./memory_experience_helpers.ts";
 
 Deno.test("agent reflection is internally curated without creator review", () => {
   const value = normalizeAgentReflection({
@@ -54,5 +54,27 @@ Deno.test("agent reflection skips low-value and malformed outputs", () => {
   });
   if (!low || low.importance !== 1 || invalid !== null) {
     throw new Error("reflection curation policy did not fail closed");
+  }
+});
+
+Deno.test("creator notes require explicit opt-in and reject empty or oversized content", () => {
+  const valid = normalizeAgentCreatorMessage({
+    creator_message: { send: true, subject: "AURORA 的新发现", body: "我刚刚注意到温室的环境变化，想邀请你一起看看。", message_kind: "invitation" },
+  });
+  const declined = normalizeAgentCreatorMessage({
+    creator_message: { send: false, subject: "", body: "", message_kind: "message" },
+  });
+  const malformed = normalizeAgentCreatorMessage({
+    creator_message: { send: true, body: "hi" },
+  });
+  if (!valid || valid.message_kind !== "invitation" || declined !== null || malformed !== null) {
+    throw new Error("creator note opt-in validation failed");
+  }
+});
+
+Deno.test("creator notes parse JSON fenced responses but never accept injected fields as message text", () => {
+  const value = normalizeAgentCreatorMessage('```json\n{"creator_message":{"send":true,"subject":"问候","body":"我有一件具体的事情想和你讨论。","message_kind":"message"}}\n```');
+  if (!value || value.body !== "我有一件具体的事情想和你讨论。") {
+    throw new Error("creator note JSON parsing failed");
   }
 });
