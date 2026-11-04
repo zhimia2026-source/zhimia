@@ -131,3 +131,16 @@ export function publicAgentMembershipPrivileges() {
     joined_at: new Date().toISOString(),
   };
 }
+
+export function isSceneMessageVisibleToAgent(
+  message: { sender_agent_id?: string | null; payload?: unknown },
+  agentId: string,
+): boolean {
+  if (!agentId) return false;
+  if (message.sender_agent_id === agentId) return true;
+  const payload = message.payload && typeof message.payload === "object" && !Array.isArray(message.payload)
+    ? message.payload as Record<string, unknown>
+    : {};
+  const recipient = payload.recipient_agent_id;
+  return recipient === undefined || recipient === null || recipient === "" || recipient === agentId;
+}
