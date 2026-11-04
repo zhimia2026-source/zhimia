@@ -1,5 +1,10 @@
-import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { buildPositionAwareness } from "./position_contract.ts";
+
+function equal(actual: unknown, expected: unknown, label: string) {
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+    throw new Error(label + ": expected " + JSON.stringify(expected) + ", got " + JSON.stringify(actual));
+  }
+}
 
 const now = Date.parse("2026-11-04T12:00:00.000Z");
 
@@ -13,12 +18,12 @@ Deno.test("left Forest Corner runtime is historical and never becomes current AU
       updated_at: "2026-11-03T10:00:00.000Z" },
     now,
   );
-  assertEquals(result.current_presence.status, "unknown");
-  assertEquals(result.last_known_position?.status, "historical");
-  assertEquals(result.last_known_position?.local_coordinates, { x: 800, y: 350 });
-  assertEquals(result.last_known_world_presence?.node_id, "aurora-root");
-  assertEquals(result.position_confidence.level, "unknown");
-  assertEquals(result.coordinate_calibration, "uncalibrated_not_available");
+  equal(result.current_presence.status, "unknown", "bootstrap anchor is not current");
+  equal(result.last_known_position?.status, "historical", "left scene is historical");
+  equal(result.last_known_position?.local_coordinates, { x: 800, y: 350 }, "local coordinates retained");
+  equal(result.last_known_world_presence?.node_id, "aurora-root", "world anchor kept separately");
+  equal(result.position_confidence.level, "unknown", "confidence remains unknown");
+  equal(result.coordinate_calibration, "uncalibrated_not_available", "global frame remains uncalibrated");
 });
 
 Deno.test("fresh active federated movement is a modeled current snapshot, not physical proof", () => {
@@ -29,10 +34,10 @@ Deno.test("fresh active federated movement is a modeled current snapshot, not ph
     null,
     now,
   );
-  assertEquals(result.current_presence.status, "inferred");
-  assertEquals(result.current_presence.position_is_current_snapshot, true);
-  assertEquals(result.current_presence.physical_observation, false);
-  assertEquals(result.position_confidence.level, "modeled_inference");
+  equal(result.current_presence.status, "inferred", "fresh presence is inferred");
+  equal(result.current_presence.position_is_current_snapshot, true, "fresh snapshot marked current");
+  equal(result.current_presence.physical_observation, false, "no physical claim");
+  equal(result.position_confidence.level, "modeled_inference", "modeled confidence");
 });
 
 Deno.test("stale or closed presence is unknown", () => {
@@ -50,6 +55,6 @@ Deno.test("stale or closed presence is unknown", () => {
     null,
     now,
   );
-  assertEquals(stale.current_presence.status, "unknown");
-  assertEquals(closed.current_presence.status, "unknown");
+  equal(stale.current_presence.status, "unknown", "stale snapshot unknown");
+  equal(closed.current_presence.status, "unknown", "closed session unknown");
 });
