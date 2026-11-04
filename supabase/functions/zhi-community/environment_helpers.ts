@@ -93,8 +93,8 @@ function normalizeSensoryProfile(value: unknown): JsonRecord {
 
 
 function normalizeSharedSymbols(value: unknown): JsonRecord[] {
-  if (!Array.isArray(value)) return [];
-  return value.slice(0, 50).flatMap((entry) => {
+  const entries = Array.isArray(value) ? value : Object.values(record(value));
+  return entries.slice(0, 50).flatMap((entry) => {
     const item = record(entry);
     const id = boundedText(item.id, 80);
     const name = boundedText(item.name, 120);
