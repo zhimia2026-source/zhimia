@@ -9,7 +9,6 @@ on:
       - "supabase/functions/zhi-aurora-world-runtime/**"
       - "supabase/functions/zhi-forest-runtime/**"
       - "supabase/functions/zhi-federated-movement/**"
-      - "supabase/functions/zhi-federated-movement/**"
       - ".github/workflows/zhi-community-tests.yml"
   pull_request:
     paths:
