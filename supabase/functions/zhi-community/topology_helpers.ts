@@ -80,12 +80,16 @@ export function validateAuroraTopologyProposal(
       edge.status === "active" &&
       edge.from_node_id === input.root_node_id &&
       edge.to_node_id === regionId &&
-      edge.relation === "entrance_to" &&
-      edge.directed === false &&
-      OPEN_TOPOLOGY_POLICIES.has(edge.access_policy) &&
-      edge.source_kind === "modeled_inference"
+      edge.relation === "entrance_to"
     );
-    if (entrances.length !== 1) {
+    if (
+      entrances.length !== 1 ||
+      entrances[0].directed !== false ||
+      !OPEN_TOPOLOGY_POLICIES.has(entrances[0].access_policy) ||
+      entrances[0].source_kind !== "modeled_inference"
+    ) {
+      issues.push(`exactly_one_modeled_open_entrance_required:${regionId}`);
+    }
       issues.push(`exactly_one_modeled_open_entrance_required:${regionId}`);
     }
   }
