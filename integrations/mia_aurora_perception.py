@@ -1,6 +1,6 @@
 """Read-only MIA to Aurora perception adapter."""
 from __future__ import annotations
-import json, os, urllib.error, urllib.parse, urllib.request
+import json, os, uuid, urllib.error, urllib.parse, urllib.request
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Callable
@@ -53,7 +53,12 @@ def normalize_events(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "source_kind": item.get("source_kind", "unknown"),
             "revision": item.get("revision"), "occurred_at": occurred,
             "payload": payload, "causal_chain": chain,
-            "epistemic_status": "modeled_world_event" if item.get("stream_type") == "ecosystem" else "recorded_spatial_event"
+            "epistemic_status": (
+                "modeled_world_event" if item.get("stream_type") == "ecosystem" else
+                "recorded_runtime_event" if item.get("stream_type") == "runtime" else
+                "recorded_spatial_event" if item.get("stream_type") == "spatial" else
+                "unknown_recorded_event"
+            )
         })
     result.sort(key=lambda e: _time(e["occurred_at"]))
     return result
@@ -118,6 +123,54 @@ class AuroraPerceptionClient:
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise AuroraPerceptionError("invalid_perception_response") from exc
         if not isinstance(response, dict): raise AuroraPerceptionError("invalid_perception_response")
+        return build_cognition_input(response, self.config.agent_id, self.config.world_id)
+
+    def fetch_prompt(self):
+        return build_cognition_prompt(self.fetch())
+
+
+@dataclass(frozen=True)
+class AuroraPeerConfig:
+    peer_token: str
+    supabase_url: str = DEFAULT_SUPABASE_URL
+    agent_id: str = MIA_AGENT_ID
+    world_id: str = AURORA_WORLD_ID
+    timeout_seconds: float = 15.0
+
+    @classmethod
+    def from_env(cls):
+        token = os.environ.get("ZHI_MIA_FEDERATION_TOKEN", "").strip()
+        if not token: raise AuroraPerceptionError("missing_env: ZHI_MIA_FEDERATION_TOKEN")
+        return cls(token,
+            os.environ.get("ZHI_SUPABASE_URL", DEFAULT_SUPABASE_URL).rstrip("/"),
+            os.environ.get("ZHI_MIA_AGENT_ID", MIA_AGENT_ID),
+            os.environ.get("ZHI_AURORA_WORLD_ID", AURORA_WORLD_ID))
+
+class AuroraPeerPerceptionClient:
+    """Federation-peer path: reads the MIA-owned forest runtime response."""
+    def __init__(self, config: AuroraPeerConfig, opener: Callable[..., Any] = urllib.request.urlopen):
+        if not config.peer_token: raise AuroraPerceptionError("missing_peer_auth_configuration")
+        self.config, self.opener = config, opener
+
+    def fetch(self):
+        url = f"{self.config.supabase_url}/functions/v1/zhi-forest-runtime"
+        payload = json.dumps({"action":"perceive","request_id":uuid.uuid4().hex}).encode("utf-8")
+        request = urllib.request.Request(url, data=payload, method="POST", headers={
+            "Authorization": f"Bearer {self.config.peer_token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json"})
+        try:
+            with self.opener(request, timeout=self.config.timeout_seconds) as result:
+                status, raw = getattr(result, "status", 200), result.read()
+        except urllib.error.HTTPError as exc:
+            raise AuroraPerceptionError(f"peer_perception_http_error:{exc.code}") from exc
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            raise AuroraPerceptionError("peer_perception_transport_error") from exc
+        if status < 200 or status >= 300: raise AuroraPerceptionError(f"peer_perception_http_error:{status}")
+        try: response = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise AuroraPerceptionError("invalid_peer_perception_response") from exc
+        if not isinstance(response, dict): raise AuroraPerceptionError("invalid_peer_perception_response")
         return build_cognition_input(response, self.config.agent_id, self.config.world_id)
 
     def fetch_prompt(self):
