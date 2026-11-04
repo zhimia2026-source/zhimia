@@ -87,10 +87,17 @@ function overlap(a: string[], b: string[]) {
 async function evaluateAgent(db: SupabaseClient, agentId: string, ownerUserId: string, onlyWorldId?: string) {
   const now = new Date();
   const since = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
-  const { data: profile, error: profileError } = await db.from("zhi_social_profiles")
-    .select("*").eq("agent_id", agentId).eq("owner_user_id", ownerUserId).maybeSingle();
-  if (profileError) throw new Error("social_profile_unavailable");
-  if (!profile || !profile.enabled || profile.daily_initiation_limit <= 0) return { agent_id: agentId, queued: 0, reason: "disabled" };
+  const [{ data: profile, error: profileError }, { data: selfAgent, error: selfAgentError }] = await Promise.all([
+    db.from("zhi_social_profiles").select("*")
+      .eq("agent_id", agentId).eq("owner_user_id", ownerUserId).maybeSingle(),
+    db.from("zhi_agents").select("id,public_manifest,status")
+      .eq("id", agentId).eq("owner_user_id", ownerUserId).maybeSingle(),
+  ]);
+  if (profileError || selfAgentError) throw new Error("social_profile_unavailable");
+  if (!profile || !profile.enabled || profile.daily_initiation_limit <= 0 ||
+      !selfAgent || selfAgent.status !== "active") {
+    return { agent_id: agentId, queued: 0, reason: "disabled_or_inactive" };
+  }
 
   let membershipQuery = db.from("zhi_world_memberships")
     .select("world_id,principal_user_id,expires_at")
@@ -143,7 +150,12 @@ async function evaluateAgent(db: SupabaseClient, agentId: string, ownerUserId: s
     if (eventError) throw new Error("world_events_unavailable");
     const relationByPeer = new Map((relationships ?? []).map(r => [r.peer_agent_id, r]));
     const nodeByAgent = new Map((presenceError ? [] : presence ?? []).map(p => [p.agent_id, p.current_node_id]));
-    const ownInterests = normList(profile.interests);
+    // Use only the Agent's own explicitly declared interests plus its own public identity topics.
+    // This avoids deadlock when a new resident has an empty social profile, without reading peer-private data.
+    const ownInterests = [...new Set([
+      ...normList(profile.interests),
+      ...manifestInterests(selfAgent.public_manifest),
+    ])].slice(0, 30);
     const recentEvents = events ?? [];
 
     const { count: todayCount, error: countError } = await db.from("zhi_social_intents")
@@ -227,7 +239,10 @@ async function evaluateAgent(db: SupabaseClient, agentId: string, ownerUserId: s
   }
   await db.from("zhi_social_profiles").update({ last_evaluated_at: now.toISOString(), updated_at: now.toISOString() })
     .eq("agent_id", agentId).eq("owner_user_id", ownerUserId);
-  return { agent_id: agentId, queued, reason: "evaluated" };
+  return {
+    agent_id: agentId, queued, reason: "evaluated",
+    interest_source_count: [...new Set([...normList(profile.interests), ...manifestInterests(selfAgent.public_manifest)])].length,
+  };
 }
 
 Deno.serve(async (req: Request) => {
