@@ -1864,9 +1864,8 @@ export function createCommunityHandler(
         ? (agent.public_manifest as Record<string, unknown>).privacy as Record<string, unknown>
         : {};
       const longTermMemoryRequiresConsent = privacyPolicy.long_term_memory_default === "consent_required";
-      if (longTermMemoryRequiresConsent) {
-        growth = { reflection: "not_persisted", memory: "consent_required" };
-      } else {
+      // Creator notes are a separate communication channel from long-term memory.
+      // A memory-consent restriction must never suppress an Agent's voluntary note.
       try {
         const reflectionPrompt = [
           "你现在是 " + agent.display_name + " 的私有自我反思模块。只分析本轮对话，不执行任何工具或外部行动。",
@@ -1925,9 +1924,20 @@ export function createCommunityHandler(
             });
             if (noteError && noteError.code !== "23505") {
               console.warn(JSON.stringify({ event: "creator_inbox_note_write_failed", agent_id: agentId, turn_id: completed.id, code: noteError.code }));
+            } else if (!noteError) {
+              console.info(JSON.stringify({ event: "creator_inbox_note_created", agent_id: agentId, turn_id: completed.id, message_kind: creatorMessage.message_kind }));
             }
+          } else if (dailyError || recentError) {
+            console.warn(JSON.stringify({ event: "creator_inbox_note_rate_check_failed", agent_id: agentId, turn_id: completed.id }));
+          } else {
+            console.info(JSON.stringify({ event: "creator_inbox_note_throttled", agent_id: agentId, turn_id: completed.id }));
           }
+        } else {
+          console.info(JSON.stringify({ event: "creator_inbox_note_not_proposed", agent_id: agentId, turn_id: completed.id }));
         }
+        if (longTermMemoryRequiresConsent) {
+          growth = { reflection: "completed", memory: "consent_required" };
+        } else {
         const reflection = normalizeAgentReflection(rawReflectionContent);
         if (!reflection) {
           growth = { reflection: "completed", memory: "not_selected" };
@@ -1980,9 +1990,9 @@ export function createCommunityHandler(
             growth = { reflection: "completed", memory: "save_failed" };
           }
         }
+        }
       } catch {
         growth = { reflection: "unavailable", memory: "not_saved" };
-      }
       }
       return reply({ turn: completed, growth, social_activity: socialOutcome, idempotent_replay: false }, 201);
     }
