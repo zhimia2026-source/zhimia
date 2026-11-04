@@ -3,3 +3,7 @@
 # (token hash, expiry, revocation, and capability checks). These are not Supabase Auth JWTs.
 [functions.zhi-community]
 verify_jwt = false
+
+# zhi-movement authenticates owner-bound ZHI Personal Tokens inside its handler.
+[functions.zhi-movement]
+verify_jwt = false
