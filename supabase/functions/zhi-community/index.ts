@@ -317,6 +317,7 @@ async function loadSpatialPerceptionContext(
     modeled_inference:simulation?{source:"zhi_ecosystem_states",source_kind:"world_generated_model",simulation,environment:{
       temporal_state:environment.temporal_state??null,scene_time:environment.scene_time??null,weather:environment.weather??null,
       lighting:environment.lighting??null,sensory_profile:environment.sensory_profile??null,
+      shared_symbols:Array.isArray(environment.shared_symbols)?environment.shared_symbols.slice(0,50):[],
       active_events:Array.isArray(environment.active_events)?environment.active_events.slice(0,12):[],
       environment_feedback:environment.environment_feedback??null,
       objects:Array.isArray(environment.objects)?environment.objects.slice(0,40):[],
