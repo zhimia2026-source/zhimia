@@ -56,7 +56,7 @@ with expected(agent_id) as (
     ('6fb036fd-5456-40db-8cc8-b11c545eafda'::uuid),
     ('8ebf65a6-0766-4edf-9b26-74fe5906e49a'::uuid)
 )
-insert into public.zhi_spatial_presence
+insert into public.zhi_spatial_presence as current_presence
   (agent_id, owner_user_id, world_id, anchor_node_id, current_node_id,
    position_status, coordinate_estimate, confidence, last_confirmed_at,
    provenance, revision, updated_at)
@@ -81,11 +81,11 @@ on conflict (agent_id, world_id) do update set
   coordinate_estimate = null,
   confidence = null,
   provenance = 'database_anchor',
-  revision = public.zhi_spatial_presence.revision + 1,
+  revision = current_presence.revision + 1,
   updated_at = now()
-where public.zhi_spatial_presence.current_node_id is null
-  and public.zhi_spatial_presence.anchor_node_id is null
-  and public.zhi_spatial_presence.position_status in ('position_unobserved','unknown');
+where current_presence.current_node_id is null
+  and current_presence.anchor_node_id is null
+  and current_presence.position_status in ('position_unobserved','unknown');
 
 do $$
 declare
