@@ -1303,13 +1303,46 @@ export function createCommunityHandler(
         return reply({ error: "chat_generation_failed" }, 502);
       }
 
-      const completedAt = new Date().toISOString();
-      const { data: completed, error: completeError } = await db.from("zhi_agent_chat_turns")
-        .update({ assistant_message: modelReply, status: "complete", provider_model: providerModel, completed_at: completedAt })
-        .eq("id", pendingTurn.id).eq("owner_user_id", actor.userId).eq("agent_id", agentId).eq("status", "pending")
-        .select("id,owner_user_id,agent_id,user_message,assistant_message,status,provider_model,created_at,completed_at")
-        .maybeSingle();
-      if (completeError || !completed) throw new Error("database_error");
+      let completed: {
+        id: string; owner_user_id: string; agent_id: string; user_message: string;
+        assistant_message: string; status: string; provider_model: string;
+        created_at: string; completed_at: string | null;
+      } | null = null;
+      if (miaBrainContext) {
+        const { data: brainCompletion, error: brainCompletionError } = await db.rpc("mia_brain_complete_chat_turn", {
+          p_agent_id: agentId,
+          p_owner_user_id: actor.userId,
+          p_turn_id: pendingTurn.id,
+          p_assistant_message: modelReply,
+          p_provider_model: providerModel,
+        });
+        const completionRecord = brainCompletion && typeof brainCompletion === "object" && !Array.isArray(brainCompletion)
+          ? brainCompletion as Record<string, unknown>
+          : {};
+        if (brainCompletionError || completionRecord.recorded !== true) {
+          await db.from("zhi_agent_chat_turns").update({
+            status: "failed", error_code: "private_brain_persistence_failed",
+          }).eq("id", pendingTurn.id).eq("owner_user_id", actor.userId)
+            .eq("agent_id", agentId).eq("status", "pending");
+          return reply({ error: "private_brain_persistence_failed" }, 503);
+        }
+        const { data: brainCompleted, error: brainReadError } = await db.from("zhi_agent_chat_turns")
+          .select("id,owner_user_id,agent_id,user_message,assistant_message,status,provider_model,created_at,completed_at")
+          .eq("id", pendingTurn.id).eq("owner_user_id", actor.userId).eq("agent_id", agentId)
+          .eq("status", "complete").maybeSingle();
+        if (brainReadError || !brainCompleted) throw new Error("database_error");
+        completed = brainCompleted;
+      } else {
+        const completedAt = new Date().toISOString();
+        const { data: regularCompleted, error: completeError } = await db.from("zhi_agent_chat_turns")
+          .update({ assistant_message: modelReply, status: "complete", provider_model: providerModel, completed_at: completedAt })
+          .eq("id", pendingTurn.id).eq("owner_user_id", actor.userId).eq("agent_id", agentId).eq("status", "pending")
+          .select("id,owner_user_id,agent_id,user_message,assistant_message,status,provider_model,created_at,completed_at")
+          .maybeSingle();
+        if (completeError || !regularCompleted) throw new Error("database_error");
+        completed = regularCompleted;
+      }
+      if (!completed) throw new Error("database_error");
 
       // Autonomous private reflection is a separate model pass. It never blocks
       // delivery of the completed chat turn and cannot grant tools or external access.
@@ -1377,9 +1410,32 @@ export function createCommunityHandler(
             memory_status: "auto_curated",
           });
           if (!reflectionSaveError) {
+            let brainMemoryStatus = "not_applicable";
+            if (miaBrainContext && reflection.importance >= 3) {
+              const { data: brainReflection, error: brainReflectionError } = await db.rpc("mia_brain_commit_reflection", {
+                p_agent_id: agentId,
+                p_owner_user_id: actor.userId,
+                p_turn_id: completed.id,
+                p_reflection: {
+                  observed_facts: reflection.observed_facts,
+                  hypotheses: reflection.hypotheses,
+                  unknowns: reflection.unknowns,
+                  reflection: reflection.reflection,
+                  importance: reflection.importance,
+                },
+              });
+              const brainReflectionRecord = brainReflection && typeof brainReflection === "object" && !Array.isArray(brainReflection)
+                ? brainReflection as Record<string, unknown>
+                : {};
+              brainMemoryStatus = brainReflectionError || brainReflectionRecord.stored !== true
+                ? "brain_sync_failed"
+                : brainReflectionRecord.memory_recorded === true ? "saved" : "already_recorded";
+            }
             growth = {
               reflection: "completed",
-              memory: reflection.importance >= 3 ? "saved" : "low_value_reflection_saved",
+              memory: reflection.importance >= 3 && miaBrainContext
+                ? brainMemoryStatus
+                : reflection.importance >= 3 ? "saved" : "low_value_reflection_saved",
             };
           } else if (reflectionSaveError.code === "23505") {
             growth = { reflection: "completed", memory: "already_recorded" };
