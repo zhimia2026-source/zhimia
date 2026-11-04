@@ -1,7 +1,8 @@
 import json, unittest
 from integrations.mia_aurora_perception import (
-    AURORA_WORLD_ID, MIA_AGENT_ID, AuroraConfig, AuroraPerceptionClient,
-    AuroraPerceptionError, build_cognition_input)
+    AURORA_WORLD_ID, MIA_AGENT_ID, AuroraConfig, AuroraPeerConfig,
+    AuroraPeerPerceptionClient, AuroraPerceptionClient, AuroraPerceptionError,
+    build_cognition_input)
 
 def sample():
     return {"agent":{"id":MIA_AGENT_ID,"display_name":"MIA"},
@@ -19,6 +20,34 @@ class Tests(unittest.TestCase):
         self.assertEqual(p["revision_range"],{"min":17,"max":24})
         self.assertFalse(p["private_memory"]["included"])
         self.assertEqual(ev[0]["epistemic_status"],"modeled_world_event")
+    def test_runtime_events_keep_their_own_epistemic_type(self):
+        r=sample()
+        r["environment_feedback"]["events"].append({
+            "stream_type":"runtime","event_id":"mia-runtime:7","event_kind":"rest",
+            "source_kind":"zhi_forest_runtime_events","revision":7,
+            "occurred_at":"2026-11-03T16:00:00+00:00","payload":{"duration":3},"causal_chain":[]})
+        packet=build_cognition_input(r)
+        runtime=packet["timeline_oldest_to_newest"][-1]
+        self.assertEqual(runtime["epistemic_status"],"recorded_runtime_event")
+
+    def test_peer_runtime_request_uses_federation_token(self):
+        body=json.dumps(sample()).encode(); captured={}
+        class Response:
+            status=200
+            def __enter__(self): return self
+            def __exit__(self,*a): return False
+            def read(self): return body
+        def opener(req,timeout):
+            captured.update(url=req.full_url,method=req.method,auth=req.get_header("Authorization"),
+                            payload=json.loads(req.data.decode("utf-8")))
+            return Response()
+        client=AuroraPeerPerceptionClient(AuroraPeerConfig("peer-token"),opener)
+        self.assertEqual(client.fetch()["event_count"],2)
+        self.assertEqual(captured["method"],"POST")
+        self.assertEqual(captured["auth"],"Bearer peer-token")
+        self.assertEqual(captured["payload"]["action"],"perceive")
+        self.assertIn("/functions/v1/zhi-forest-runtime",captured["url"])
+
     def test_identity_guard(self):
         r=sample(); r["agent"]["id"]="not-mia"
         with self.assertRaises(AuroraPerceptionError): build_cognition_input(r)

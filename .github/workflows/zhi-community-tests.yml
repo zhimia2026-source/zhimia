@@ -6,11 +6,15 @@ on:
     paths:
       - "supabase/functions/zhi-community/**"
       - "supabase/functions/zhi-spatial/**"
+      - "supabase/functions/zhi-aurora-world-runtime/**"
+      - "supabase/functions/zhi-forest-runtime/**"
       - ".github/workflows/zhi-community-tests.yml"
   pull_request:
     paths:
       - "supabase/functions/zhi-community/**"
       - "supabase/functions/zhi-spatial/**"
+      - "supabase/functions/zhi-aurora-world-runtime/**"
+      - "supabase/functions/zhi-forest-runtime/**"
       - ".github/workflows/zhi-community-tests.yml"
 
 jobs:
@@ -29,3 +33,9 @@ jobs:
         run: deno test supabase/functions/zhi-spatial/perception_events_test.ts
       - name: Type-check ZHI spatial perception Edge Function
         run: deno check supabase/functions/zhi-spatial/index.ts
+      - name: Test MIA peer unified environment event stream
+        run: deno test supabase/functions/zhi-aurora-world-runtime/perception_events_test.ts
+      - name: Type-check MIA peer world runtime
+        run: deno check supabase/functions/zhi-aurora-world-runtime/index.ts
+      - name: Type-check MIA forest runtime
+        run: deno check supabase/functions/zhi-forest-runtime/index.ts
