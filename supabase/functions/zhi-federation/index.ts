@@ -18,7 +18,7 @@ const sha256 = async (value: string) =>
 function validId(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
-function errorCode(error: any) {
+function errorCode(error: any): [number, string] {
   const message = String(error?.message ?? "");
   if (message.includes("governance_forbidden")) return [403, "governance_forbidden"];
   if (message.includes("charter_version_conflict")) return [409, "charter_version_conflict"];
