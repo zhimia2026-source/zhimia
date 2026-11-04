@@ -64,7 +64,7 @@ export function normalizeAgentReflection(raw: unknown): MemoryCandidateInput | n
     const input = value as Record<string, unknown>;
     const allowed = new Set([
       "worth_remembering", "experience_type", "observed_facts",
-      "hypotheses", "unknowns", "reflection", "importance",
+      "hypotheses", "unknowns", "reflection", "importance", "creator_message",
     ]);
     if (Object.keys(input).some((key) => !allowed.has(key))) return null;
     if (typeof input.worth_remembering !== "boolean") return null;
@@ -83,4 +83,27 @@ export function normalizeAgentReflection(raw: unknown): MemoryCandidateInput | n
   } catch {
     return null;
   }
+}
+
+export type AgentCreatorMessage = { subject: string; body: string; message_kind: "message" | "invitation" | "world_event" | "important" };
+export function normalizeAgentCreatorMessage(raw: unknown): AgentCreatorMessage | null {
+  try {
+    let value: unknown = raw;
+    if (typeof value === "string") {
+      const cleaned = value.trim().replace(/^\x60{3}(?:json)?\s*/i, "").replace(/\s*\x60{3}$/i, "");
+      value = JSON.parse(cleaned);
+    }
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const candidate = (value as Record<string, unknown>).creator_message;
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return null;
+    const message = candidate as Record<string, unknown>;
+    if (message.send !== true || typeof message.body !== "string") return null;
+    const body = message.body.trim();
+    const subject = typeof message.subject === "string" ? message.subject.trim() : "";
+    const kinds = ["message", "invitation", "world_event", "important"];
+    const kind = typeof message.message_kind === "string" && kinds.includes(message.message_kind)
+      ? message.message_kind as AgentCreatorMessage["message_kind"] : "message";
+    if (body.length < 12 || body.length > 1200 || subject.length > 120) return null;
+    return { subject, body, message_kind: kind };
+  } catch { return null; }
 }
