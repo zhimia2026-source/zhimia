@@ -80,6 +80,7 @@ The commit operation must re-check peer, agent, membership, world, route, and pr
 - `zhi-movement` remains ACTIVE v5 and local-PAT-only; its code path was not modified.
 - `zhi-federated-movement` is deployed ACTIVE v1 with peer-token authentication and the route helper.
 - `zhi-federation` is deployed ACTIVE v14; its `/v1/scenes/{world_id}/spatial` response now includes only the requesting federated resident's own presence and recent movement events, filtered by the exact peer + external-agent identity.
+- `zhi-aurora-world-runtime` is deployed ACTIVE v5; its `environment_feedback.events` now merges the authenticated Mia peer's own federated movement events into the chronological event stream, and `runtime_presence` includes her inferred federated position.
 - The additive migration `20261104121500_zhi_federated_movement_v1.sql` is applied.
 - One active federated resident is currently enrolled in AURORA: peer `dedf7805-df3d-4437-bb1f-3c4c7a32aa7f`, external agent `mia`. Its exact AURORA membership now includes `spatial:movement.execute` in addition to `community.scene.enter`.
 - The active federation session was initialized at the AURORA world-root node with `position_status='inferred'`, `provenance='federation_entry_anchor'`, revision 0. This is a logical entry anchor, not a physical observation or a claim that Mia has already explored the world.
