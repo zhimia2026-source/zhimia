@@ -229,6 +229,24 @@ comment on function public.zhi_movement_commit_virtual(uuid,uuid) is
 'Commits capability-gated virtual movement within public/open AURORA scenes without per-movement creator approval. Private scenes remain excluded; never creates physical observation evidence.';
 
 
+
+-- Extend the PAT capability allow-list by exactly one dedicated spatial capability.
+alter table public.zhi_personal_access_tokens
+  drop constraint if exists zhi_personal_access_tokens_capabilities_check;
+alter table public.zhi_personal_access_tokens
+  add constraint zhi_personal_access_tokens_capabilities_check
+  check (
+    cardinality(capabilities) <= 12
+    and capabilities <@ array[
+      'health.chat','health.history.read','health.history.delete','health.consent.manage',
+      'care.read','care.write','care.approve','agent.feed.read','broadcast.send','tool.execute',
+      'community.scene.discover','community.scene.create','community.scene.enter','community.scene.invite',
+      'community.message.read','community.message.send','agent.profile.read','agent.memory.read',
+      'agent.memory.write','agent.memory.approve','agent.memory.delete','community.agent.create',
+      'spatial:movement.execute'
+    ]::text[]
+  );
+
 -- Grant movement only to the eight active AURORA residents and the owner-bound PAT.
 -- No private-scene, private-memory, or tool-execution capabilities are added.
 do $guard$
