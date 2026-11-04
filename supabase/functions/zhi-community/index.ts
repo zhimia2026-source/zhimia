@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { hasCapability, isTokenExpiryValid, tokenTouchSucceeded } from "./auth_helpers.ts";
-import { isMembershipAuthorized, isAgentMembershipAuthorized, privilegesForPublicRejoin, normalizeWorldProtocolPath, isPublicAgentJoinAllowed, publicAgentMembershipPrivileges } from "./access_helpers.ts";
+import { isMembershipAuthorized, isAgentMembershipAuthorized, isWorldResidentDiscoverable, privilegesForPublicRejoin, normalizeWorldProtocolPath, isPublicAgentJoinAllowed, publicAgentMembershipPrivileges } from "./access_helpers.ts";
 import { validateMouRecord } from "./ontology_helpers.ts";
 import { buildFeedbackRecord, buildRevisionProposal } from "./cognitive_cycle_helpers.ts";
 import { buildPrivateAgentContext, buildPrivateChatHistory, buildSceneAwarenessContext, buildSceneBehaviorGuidance } from "./chat_context_helpers.ts";
@@ -1725,6 +1725,61 @@ export function createCommunityHandler(
         throw new Error("database_error");
       }
       return reply(result, 200);
+    }
+
+    // Resolve an exact resident identity only inside a world where the caller
+    // is an active human member. The target must independently hold an active
+    // agent membership in that same world.
+    if (req.method === "GET" && parts.length === 6 && parts[0] === "v1" &&
+        parts[1] === "scenes" && parts[3] === "agents" && parts[5] === "identity") {
+      const sceneId = parts[2];
+      const agentId = parts[4];
+      if (!isUuid(sceneId) || !isUuid(agentId)) {
+        return reply({ error: "invalid_argument", detail: "scene_and_agent_ids_must_be_uuids" }, 400);
+      }
+      const { data: world, error: worldError } = await db.from("zhi_worlds")
+        .select("id,status").eq("id", sceneId).maybeSingle();
+      if (worldError) throw new Error("database_error");
+      if (!world || world.status !== "open") return reply({ error: "not_found" }, 404);
+
+      const { data: requesterMembership, error: requesterError } = await db.from("zhi_world_memberships")
+        .select("principal_user_id,agent_id,status,revoked_at,expires_at,capabilities")
+        .eq("world_id", sceneId).eq("principal_user_id", actor.userId)
+        .is("agent_id", null).eq("status", "active").is("revoked_at", null).maybeSingle();
+      if (requesterError) throw new Error("database_error");
+      if (!isMembershipAuthorized(requesterMembership, actor.userId, "message:read")) {
+        return reply({ error: "forbidden", detail: "active_world_membership_required" }, 403);
+      }
+
+      const { data: targetMembership, error: targetMembershipError } = await db.from("zhi_world_memberships")
+        .select("principal_user_id,agent_id,status,revoked_at,expires_at,capabilities")
+        .eq("world_id", sceneId).eq("agent_id", agentId)
+        .eq("status", "active").is("revoked_at", null).maybeSingle();
+      if (targetMembershipError) throw new Error("database_error");
+      if (!isWorldResidentDiscoverable(
+        world.status,
+        requesterMembership,
+        actor.userId,
+        targetMembership,
+        agentId,
+      )) return reply({ error: "not_found" }, 404);
+
+      const { data: targetAgent, error: targetAgentError } = await db.from("zhi_agents")
+        .select("id,display_name,role,status")
+        .eq("id", agentId).eq("status", "active").maybeSingle();
+      if (targetAgentError) throw new Error("database_error");
+      if (!targetAgent) return reply({ error: "not_found" }, 404);
+
+      return reply({
+        schema: "zhi.agent.identity.v1",
+        agent_id: targetAgent.id,
+        identity_uri: buildAgentAddress(targetAgent.id),
+        display_name: targetAgent.display_name,
+        role: targetAgent.role,
+        identity_status: targetAgent.status,
+        resolution_scope: "world_member",
+        world_id: sceneId,
+      });
     }
 
     // A public world admits an Agent as its own participant. The authenticated
