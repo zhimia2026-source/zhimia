@@ -179,5 +179,6 @@ Deno.test("world-shared Ken&Mia heart is normalized and exposed to every scene r
   const state = computeSceneEnvironment(normalized, new Date("2026-11-03T12:00:00.000Z"));
   const heart = state.shared_symbols[0];
   if (!heart || heart.id !== "ken_mia_heart" || heart.inscription !== "Ken&Mia") throw new Error("shared heart missing");
-  if (heart.visibility !== "all_agents_in_world" || heart.rendering.pulse_cycle_ms !== 1800) throw new Error("shared heart visibility or animation missing");
+  const rendering = heart.rendering as Record<string, unknown>;
+  if (heart.visibility !== "all_agents_in_world" || rendering.pulse_cycle_ms !== 1800) throw new Error("shared heart visibility or animation missing");
 });
