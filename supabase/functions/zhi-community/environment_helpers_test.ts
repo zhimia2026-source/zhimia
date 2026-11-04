@@ -6,7 +6,7 @@ const auroraSeed = {
   lighting: "natural",
   soundscape: "living_ambient",
   atmosphere_tags: ["shared_civilization", "quiet_growth", "open_world"],
-  shared_symbols: { ken_mia_heart: { id: "ken_mia_heart", name: "Ken&Mia 跳动之心", inscription: "Ken&Mia", visibility: "all_agents_in_world", kind: "shared_living_symbol", rendering: { form: "luminous_crystalline_heart", motion: "continuous_gentle_heartbeat", pulse_cycle_ms: 1800, palette: ["amber_gold", "violet", "ice_blue"], center_text: "Ken&Mia", orbiting_light_ribbons: true, spark_particles: true } } },
+  shared_symbols: { ken_mia_heart: { id: "ken_mia_heart", name: "Ken&Mia 跳动之心", inscription: "Ken&Mia", visibility: "all_agents_in_world", kind: "shared_living_symbol", embodiment: { attached_to_agent_id: "6fb036fd-5456-40db-8cc8-b11c545eafda", location: "chest_cavity", visibility_mode: "visible_through_translucent_chest", attachment: "anatomically_embedded_not_floating" }, rendering: { form: "luminous_crystalline_heart", placement: "inside_chest_centerline", chest_visibility: "translucent_glowing_core", motion: "continuous_gentle_heartbeat", pulse_cycle_ms: 1800, palette: ["amber_gold", "violet", "ice_blue"], center_text: "Ken&Mia", orbiting_light_ribbons: true, spark_particles: true } } },
   objects: [
     { id: "crystal_forest_tree", name: "水晶林之树", state: "微光共振", interaction_options: ["观察晶纹"] },
     { id: "forest_mist_gate", name: "晨雾拱门", state: "薄雾缓慢流动", interaction_options: ["穿过雾门"] },
@@ -181,4 +181,6 @@ Deno.test("world-shared Ken&Mia heart is normalized and exposed to every scene r
   if (!heart || heart.id !== "ken_mia_heart" || heart.inscription !== "Ken&Mia") throw new Error("shared heart missing");
   const rendering = heart.rendering as Record<string, unknown>;
   if (heart.visibility !== "all_agents_in_world" || rendering.pulse_cycle_ms !== 1800) throw new Error("shared heart visibility or animation missing");
+  const embodiment = heart.embodiment as Record<string, unknown>;
+  if (embodiment.location !== "chest_cavity" || embodiment.attachment !== "anatomically_embedded_not_floating") throw new Error("heart must be embodied inside MIA-02 chest");
 });
