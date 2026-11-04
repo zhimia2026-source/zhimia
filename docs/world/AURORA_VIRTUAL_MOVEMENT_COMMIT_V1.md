@@ -1,7 +1,7 @@
 # AURORA Virtual Movement Commit V1
 
-**Status:** prepared in GitHub PR; not applied to production.  
-**Migration:** `20261104050000_aurora_virtual_movement_commit_v1.sql`
+**Status:** applied to Supabase production on 2026-11-04; RPC deployed and privilege-verified.  
+**Migration:** `20261104043840_aurora_virtual_movement_commit_v1.sql`
 
 ## Purpose
 
