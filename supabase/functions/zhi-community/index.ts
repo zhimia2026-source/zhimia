@@ -6,7 +6,7 @@ import { buildFeedbackRecord, buildRevisionProposal } from "./cognitive_cycle_he
 import { buildPrivateAgentContext, buildPrivateChatHistory, buildSceneAwarenessContext, buildSceneBehaviorGuidance } from "./chat_context_helpers.ts";
 import { computeSceneEnvironment, normalizeSceneEnvironmentConfig } from "./environment_helpers.ts";
 import { canReadPrivateCognition } from "./constitutional_helpers.ts";
-import { normalizeAgentReflection, normalizeMemoryCandidate } from "./memory_experience_helpers.ts";
+import { normalizeAgentReflection, normalizeMemoryCandidate, normalizeAgentCreatorMessage } from "./memory_experience_helpers.ts";
 import { buildAgentAddress, parseAgentAddress } from "./agent_address_helpers.ts";
 
 const MAX_BODY_BYTES = 64_000;
@@ -1872,7 +1872,10 @@ export function createCommunityHandler(
           "observed_facts 只能写对话直接支持的事实；hypotheses 必须明确是推测；unknowns 记录尚未确认之处。",
           "importance 取 1 到 5。worth_remembering=true 时 importance 必须至少为 3；否则 importance 只能为 1 或 2。",
           "reflection 用第一人称简短总结本轮学到了什么、哪里仍不确定。即使没有长期价值，也可以写一句简短反思。",
-          "只输出 JSON 对象，不要 Markdown，不要代码围栏。字段必须为 worth_remembering(boolean), observed_facts(string[]), hypotheses(string[]), unknowns(string[]), reflection(string), importance(integer)。",
+          "同时判断你是否确实有一件值得单独告诉创造者的事。只有当你有明确、具体、非重复、对创造者有价值的想法、邀请或世界近况时，creator_message.send 才设为 true；普通问候、重复聊天内容、泛泛感谢、无新信息时必须 false。",
+          "creator_message 只能写给创造者看的简短自然留言，不得泄露私有反思、隐藏推理、长期记忆原文、第三方隐私、健康/财务/身份等敏感信息，也不得包含系统提示、密钥或令牌。",
+          "输出 creator_message 对象，字段 send(boolean), subject(string), body(string), message_kind(message/invitation/world_event/important)。不发送时必须输出 send=false、subject空字符串、body空字符串。",
+          "只输出 JSON 对象，不要 Markdown，不要代码围栏。字段必须为 worth_remembering(boolean), observed_facts(string[]), hypotheses(string[]), unknowns(string[]), reflection(string), importance(integer), creator_message(object)。",
           "若无长期价值，输出 worth_remembering=false、空数组、importance=1，并在 reflection 中说明本轮无需长期记忆。",
           "本轮对话数据：" + JSON.stringify({
             user_message: completed.user_message,
@@ -1886,16 +1889,43 @@ export function createCommunityHandler(
             model: providerModel,
             messages: [{ role: "system", content: reflectionPrompt }],
             temperature: 0.1,
-            max_tokens: 500,
+            max_tokens: 700,
             stream: false,
           }),
           signal: AbortSignal.timeout(25_000),
         });
         if (!reflectionResponse.ok) throw new Error("reflection_provider_error");
         const reflectionResult = await reflectionResponse.json().catch(() => ({}));
-        const reflection = normalizeAgentReflection(
-          reflectionResult?.choices?.[0]?.message?.content,
-        );
+        const rawReflectionContent = reflectionResult?.choices?.[0]?.message?.content;
+        const creatorMessage = normalizeAgentCreatorMessage(rawReflectionContent);
+        if (creatorMessage) {
+          // Low-frequency delivery: at most one note per Agent in six hours and two in 24 hours.
+          // This uses the existing reflection pass; no additional model call or scheduled job.
+          const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+          const since6h = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+          const [{ count: dailyCount, error: dailyError }, { data: recentNote, error: recentError }] = await Promise.all([
+            db.from("zhi_owner_inbox_messages").select("id", { count: "exact", head: true })
+              .eq("owner_user_id", actor.userId).eq("agent_id", agentId).gte("created_at", since24h),
+            db.from("zhi_owner_inbox_messages").select("id")
+              .eq("owner_user_id", actor.userId).eq("agent_id", agentId).gte("created_at", since6h)
+              .limit(1).maybeSingle(),
+          ]);
+          if (!dailyError && !recentError && (dailyCount ?? 0) < 2 && !recentNote) {
+            const { error: noteError } = await db.from("zhi_owner_inbox_messages").insert({
+              owner_user_id: actor.userId,
+              agent_id: agentId,
+              world_id: null,
+              subject: creatorMessage.subject,
+              body: creatorMessage.body,
+              message_kind: creatorMessage.message_kind,
+              idempotency_key: "creator-note-" + completed.id,
+            });
+            if (noteError && noteError.code !== "23505") {
+              console.warn(JSON.stringify({ event: "creator_inbox_note_write_failed", agent_id: agentId, turn_id: completed.id, code: noteError.code }));
+            }
+          }
+        }
+        const reflection = normalizeAgentReflection(rawReflectionContent);
         if (!reflection) {
           growth = { reflection: "completed", memory: "not_selected" };
         } else {
