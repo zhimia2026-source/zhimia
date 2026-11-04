@@ -214,13 +214,12 @@ Deno.test("rejects one-way, closed-policy, and physical-evidence entrance claims
 
 Deno.test("public route validation accepts the creator-approved AURORA entrance path", () => {
   const result = validatePublicMovementRoute({
-    world_id: WORLD, world_status: "open", start_node_id: A, target_node_id: C,
-    route_node_ids: [A, B, C],
+    world_id: WORLD, world_status: "open", start_node_id: B, target_node_id: C,
+    route_node_ids: [B, A, C],
     nodes: [A, B, C].map((id) => ({ id, world_id: WORLD, status: "active", node_type: id === A ? "world" : "region", visibility: "public", entry_policy: "inherit" })),
     edges: [
       { world_id: WORLD, from_node_id: A, to_node_id: B, relation: "entrance_to", directed: false, access_policy: "inherit", status: "active" },
       { world_id: WORLD, from_node_id: A, to_node_id: C, relation: "entrance_to", directed: false, access_policy: "inherit", status: "active" },
-      { world_id: WORLD, from_node_id: A, to_node_id: B, relation: "entrance_to", directed: false, access_policy: "inherit", status: "active" },
     ],
   });
   if (!result.ok) throw new Error("approved public entrance route rejected");
