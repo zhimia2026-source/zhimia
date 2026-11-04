@@ -1662,6 +1662,33 @@ export function createCommunityHandler(
          }
        }
 
+       // A non-replyable incoming note is shown once to the Agent, then closed to prevent repeated prompt noise.
+       for (const item of socialInboxItems) {
+         const context = item.context && typeof item.context === "object" && !Array.isArray(item.context)
+           ? item.context as Record<string, unknown> : {};
+         if (item.reason_code === "reply_to_message" && context.reply_allowed === false &&
+             typeof item.intent_id === "string") {
+           try {
+             await fetch(
+               supabaseBase + "/functions/v1/zhi-social-scheduler/v1/agents/" + agentId +
+                 "/social/intents/" + item.intent_id,
+               {
+                 method: "POST",
+                 headers: {
+                   authorization: callerAuthorization,
+                   ...(publicApiKey ? { apikey: publicApiKey } : {}),
+                   "content-type": "application/json",
+                 },
+                 body: JSON.stringify({ action: "ignore" }),
+                 signal: AbortSignal.timeout(5000),
+               },
+             );
+           } catch {
+             // Best effort; an expired notice is harmless.
+           }
+         }
+       }
+
       // Prefer the model's validated action marker. If it omitted one, resolve only
       // an explicit travel command from this user turn against reachable public nodes.
       const moveMarker = modelReply.match(/\[\[AURORA_MOVE:\s*([0-9a-f-]{36})\s*\|\s*([^\]\r\n]{1,300})\]\]/i);
