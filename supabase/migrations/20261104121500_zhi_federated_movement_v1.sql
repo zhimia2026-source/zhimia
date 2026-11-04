@@ -143,11 +143,21 @@ begin
   if v_presence.membership_id<>v_membership.id then raise exception 'federated_presence_membership_mismatch'; end if;
   if v_presence.revision<>p_expected_presence_revision then raise exception 'federated_presence_revision_conflict'; end if;
 
+  -- Re-check idempotency after acquiring the presence row lock so concurrent
+  -- retries of the same key return the original result instead of racing.
+  select * into v_existing from public.zhi_federated_movement_requests
+   where world_id=p_world_id and peer_id=p_peer_id
+     and external_agent_id=p_external_agent_id and idempotency_key=p_idempotency_key;
+  if found then
+    return jsonb_build_object('ok',true,'replayed',true,'movement_request',to_jsonb(v_existing));
+  end if;
+
   select array_agg(value::uuid order by ordinality) into v_route
   from jsonb_array_elements_text(p_route_node_ids) with ordinality as r(value,ordinality);
   v_len:=coalesce(array_length(v_route,1),0);
+  select count(distinct route_node) into v_count from unnest(v_route) as u(route_node);
   if v_len<2 or v_len>32 or v_route[1]<>v_presence.current_node_id or v_route[v_len]<>p_to_node_id
-     or (select count(distinct x) from unnest(v_route) x)<>v_len then
+     or v_count<>v_len then
     raise exception 'federated_movement_route_invalid';
   end if;
 
