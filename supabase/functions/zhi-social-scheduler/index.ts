@@ -146,7 +146,7 @@ async function evaluateAgent(db: SupabaseClient, agentId: string, ownerUserId: s
 
     const { count: todayCount, error: countError } = await db.from("zhi_social_intents")
       .select("id", { count: "exact", head: true })
-      .eq("agent_id", agentId).eq("world_id", worldId)
+      .eq("agent_id", agentId).eq("world_id", worldId).neq("reason_code", "reply_to_message")
       .gte("created_at", new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString())
       .in("status", ["pending", "deferred", "accepted", "completed"]);
     if (countError) throw new Error("intent_count_unavailable");
@@ -178,22 +178,29 @@ async function evaluateAgent(db: SupabaseClient, agentId: string, ownerUserId: s
         const text = String(e.event_kind ?? "").toLowerCase() + " " + eventText(e.payload);
         return ownInterests.some(topic => text.includes(topic));
       });
-      const novelty = eventMatches.length ? 100 : 0;
+      const samePlace = Boolean(nodeByAgent.get(agentId) && nodeByAgent.get(agentId) === nodeByAgent.get(peer.id));
+      // A fresh shared world event at the same confirmed place is a valid first-contact
+      // signal even before private relationship history or explicit interests exist.
+      const sharedWorldEvent = samePlace && recentEvents.length > 0;
+      const novelty = eventMatches.length || sharedWorldEvent ? 100 : 0;
       const familiarity = Math.max(0, Math.min(100, Number(rel?.familiarity_score ?? 0)));
       const sharedTopics = normList(rel?.shared_topics);
-      const collaboration = Math.min(100, interest.ratio * 60 + Math.min(40, sharedTopics.length * 20));
-      const samePlace = Boolean(nodeByAgent.get(agentId) && nodeByAgent.get(agentId) === nodeByAgent.get(peer.id));
+      const collaboration = sharedWorldEvent && interest.ratio === 0
+        ? 100
+        : Math.min(100, interest.ratio * 60 + Math.min(40, sharedTopics.length * 20));
+      const interestValue = interest.ratio > 0 ? interest.ratio * 100 : sharedWorldEvent ? 100 : 0;
       const timing = samePlace ? 100 : 50;
-      const score = Math.round((interest.ratio * 100 * 0.25 + familiarity * 0.20 + novelty * 0.20 + collaboration * 0.20 + timing * 0.15) * 100) / 100;
+      const score = Math.round((interestValue * 0.25 + familiarity * 0.20 + novelty * 0.20 + collaboration * 0.20 + timing * 0.15) * 100) / 100;
       if (score < Number(profile.minimum_score)) continue;
-      const reason = eventMatches.length ? "world_event" : interest.matched.length ? "shared_interest" :
+      const reason = eventMatches.length || sharedWorldEvent ? "world_event" : interest.matched.length ? "shared_interest" :
         samePlace ? "co_presence" : "relationship";
+      const relevantEvents = eventMatches.length ? eventMatches : sharedWorldEvent ? recentEvents : [];
       candidates.push({
         peer, score, reason,
         context: {
           matched_public_topics: interest.matched,
-          relevant_world_event_ids: eventMatches.slice(0, 5).map(e => e.id),
-          relevant_event_kinds: [...new Set(eventMatches.map(e => e.event_kind))].slice(0, 5),
+          relevant_world_event_ids: relevantEvents.slice(0, 5).map(e => e.id),
+          relevant_event_kinds: [...new Set(relevantEvents.map(e => e.event_kind))].slice(0, 5),
           co_present: samePlace,
           relationship_state: rel?.relationship_state ?? "acquaintance",
         },
@@ -312,6 +319,7 @@ Deno.serve(async (req: Request) => {
         if (action === "ignore" && intent.status === "ignored") return reply({ intent: { id: intentId, status: "ignored" }, idempotent_replay: true });
         return reply({ error: "intent_state_conflict" }, 409);
       }
+      let verifiedMessage: Record<string, any> | null = null;
       if (action === "complete") {
         const { data: conversations, error: conversationsError } = await db.from("zhi_world_conversations")
           .select("id").eq("world_id", intent.world_id).eq("status", "open");
@@ -319,13 +327,13 @@ Deno.serve(async (req: Request) => {
         const conversationIds = (conversations ?? []).map(c => c.id);
         if (!conversationIds.length) return reply({ error: "message_not_found_for_intent" }, 409);
         const { data: sentMessages, error: sentError } = await db.from("zhi_world_messages")
-          .select("id,payload").eq("sender_agent_id", agentId).in("conversation_id", conversationIds)
+          .select("id,conversation_id,payload,created_at").eq("sender_agent_id", agentId).in("conversation_id", conversationIds)
           .gte("created_at", intent.created_at).limit(100);
         if (sentError) throw new Error("message_verification_failed");
-        const verifiedSend = (sentMessages ?? []).some(m =>
+        verifiedMessage = (sentMessages ?? []).find(m =>
           (m.payload as Record<string, unknown>)?.recipient_agent_id === intent.peer_agent_id
-        );
-        if (!verifiedSend) return reply({ error: "message_not_found_for_intent" }, 409);
+        ) ?? null;
+        if (!verifiedMessage) return reply({ error: "message_not_found_for_intent" }, 409);
         const now = new Date();
         const { data: profile } = await db.from("zhi_social_profiles").select("peer_cooldown_hours")
           .eq("agent_id", agentId).maybeSingle();
@@ -350,6 +358,45 @@ Deno.serve(async (req: Request) => {
         .eq("id", intentId).eq("agent_id", agentId).eq("owner_user_id", actor.userId)
         .eq("status", intent.status).select("id,status").maybeSingle();
       if (error || !data) return reply({ error: "intent_state_conflict" }, 409);
+      if (action === "complete" && verifiedMessage) {
+        const { data: peerAgent, error: peerAgentError } = await db.from("zhi_agents")
+          .select("id,owner_user_id,display_name,status").eq("id", intent.peer_agent_id).eq("status", "active").maybeSingle();
+        if (peerAgentError) throw new Error("peer_agent_read_failed");
+        if (peerAgent && peerAgent.display_name !== "MIA") {
+          const { data: peerProfile, error: peerProfileError } = await db.from("zhi_social_profiles")
+            .select("enabled").eq("agent_id", peerAgent.id).eq("owner_user_id", peerAgent.owner_user_id).maybeSingle();
+          if (peerProfileError) throw new Error("peer_social_profile_read_failed");
+          if (peerProfile?.enabled) {
+            const cutoff = new Date(Date.now() - 24 * 3600000).toISOString();
+            const { data: pairMessages, error: pairMessagesError } = await db.from("zhi_world_messages")
+              .select("sender_agent_id,payload").eq("conversation_id", verifiedMessage.conversation_id)
+              .gte("created_at", cutoff).limit(100);
+            if (pairMessagesError) throw new Error("pair_message_read_failed");
+            const pairCount = (pairMessages ?? []).filter(m => {
+              const payload = m.payload as Record<string, unknown>;
+              return (m.sender_agent_id === agentId && payload.recipient_agent_id === intent.peer_agent_id) ||
+                (m.sender_agent_id === intent.peer_agent_id && payload.recipient_agent_id === agentId);
+            }).length;
+            const rawPreview = String((verifiedMessage.payload as Record<string, unknown>)?.body ?? "");
+            const preview = rawPreview.replace(/[\r\n\t]+/g, " ").replace(/\s{2,}/g, " ").trim().slice(0, 200);
+            const replyKey = await sha256("reply:" + verifiedMessage.id + ":" + intent.peer_agent_id);
+            const { error: replyQueueError } = await db.from("zhi_social_intents").upsert({
+              world_id: intent.world_id, agent_id: intent.peer_agent_id,
+              owner_user_id: peerAgent.owner_user_id, peer_agent_id: agentId,
+              trigger_kind: "relationship", reason_code: "reply_to_message", value_score: 95,
+              context: {
+                source_message_id: verifiedMessage.id, sender_agent_id: agentId,
+                message_preview: preview, reply_allowed: pairCount <= 1,
+                pair_message_count_24h: pairCount,
+              },
+              status: "pending", not_before: new Date().toISOString(),
+              expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+              idempotency_key: replyKey,
+            }, { onConflict: "idempotency_key", ignoreDuplicates: true });
+            if (replyQueueError) throw new Error("incoming_social_intent_queue_failed");
+          }
+        }
+      }
       return reply({ intent: data });
     }
 
