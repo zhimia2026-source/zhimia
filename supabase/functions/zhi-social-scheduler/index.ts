@@ -239,7 +239,7 @@ Deno.serve(async (req: Request) => {
     const actor = await authenticate(db, req);
     if (!actor) return reply({ error: "unauthorized" }, 401);
     const agent = await ownedAgent(db, actor, agentId);
-    if (!agent || agent.status !== "active") return reply({ error: "agent_not_found" }, 404);
+    if (!agent || agent.status !== "active" || agent.display_name === "MIA") return reply({ error: "agent_not_found" }, 404);
 
     if (tail === "profile" && req.method === "GET") {
       if (!has(actor, "agent.memory.read")) return reply({ error: "capability_required" }, 403);
@@ -367,7 +367,7 @@ Deno.serve(async (req: Request) => {
         return reply({ error: "invalid_argument" }, 400);
       }
       const { data: membership, error: membershipError } = await db.from("zhi_world_memberships")
-        .select("world_id").eq("world_id", worldId).eq("agent_id", agentId)
+        .select("world_id,expires_at").eq("world_id", worldId).eq("agent_id", agentId)
         .eq("principal_user_id", actor.userId).eq("status", "active").is("revoked_at", null).maybeSingle();
       if (membershipError) throw new Error("membership_read_failed");
       const { data: peerAgent, error: peerAgentError } = await db.from("zhi_agents")
@@ -379,8 +379,12 @@ Deno.serve(async (req: Request) => {
       if (peerMembershipError) throw new Error("peer_membership_read_failed");
       const membershipExpired = Boolean(membership?.expires_at && Date.parse(membership.expires_at) <= Date.now());
       const peerMembershipExpired = Boolean(peerMembership?.expires_at && Date.parse(peerMembership.expires_at) <= Date.now());
+      const { data: targetWorld, error: targetWorldError } = await db.from("zhi_worlds")
+        .select("id,status").eq("id", worldId).maybeSingle();
+      if (targetWorldError) throw new Error("world_read_failed");
       if (!membership || membershipExpired || !peerAgent || peerAgent.status !== "active" ||
-          !peerMembership || peerMembership.principal_user_id !== peerAgent.owner_user_id || peerMembershipExpired) {
+          !peerMembership || peerMembership.principal_user_id !== peerAgent.owner_user_id || peerMembershipExpired ||
+          !targetWorld || targetWorld.status !== "open") {
         return reply({ error: "shared_world_membership_required" }, 403);
       }
       const { data, error } = await db.from("zhi_social_memories").insert({
