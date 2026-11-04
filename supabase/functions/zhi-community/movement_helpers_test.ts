@@ -138,3 +138,75 @@ Deno.test("rejects closed worlds and foreign-world graph records", () => {
   }));
   if (foreign.ok || foreign.reason !== "node_unavailable") throw new Error("foreign-world node accepted");
 });
+
+
+import { validateAuroraTopologyProposal, type TopologyPreflightInput } from "./topology_helpers.ts";
+
+const TOPOLOGY_ROOT = "11111111-1111-4111-8111-111111111111";
+const TOPOLOGY_FOREST = "22222222-2222-4222-8222-222222222222";
+const TOPOLOGY_CITY = "33333333-3333-4333-8333-333333333333";
+
+function topologyFixture(overrides: Partial<TopologyPreflightInput> = {}): TopologyPreflightInput {
+  return {
+    world_id: WORLD,
+    root_node_id: TOPOLOGY_ROOT,
+    public_region_ids: [TOPOLOGY_FOREST, TOPOLOGY_CITY],
+    nodes: [
+      { id: TOPOLOGY_ROOT, world_id: WORLD, node_type: "world", status: "active", visibility: "public", entry_policy: "open" },
+      { id: TOPOLOGY_FOREST, world_id: WORLD, node_type: "region", status: "active", visibility: "public", entry_policy: "inherit" },
+      { id: TOPOLOGY_CITY, world_id: WORLD, node_type: "region", status: "active", visibility: "public", entry_policy: "open" },
+    ],
+    edges: [TOPOLOGY_FOREST, TOPOLOGY_CITY].map((id) => ({
+      world_id: WORLD, from_node_id: TOPOLOGY_ROOT, to_node_id: id, relation: "entrance_to",
+      directed: false, access_policy: "inherit", status: "active", source_kind: "modeled_inference",
+    })),
+    ...overrides,
+  };
+}
+
+Deno.test("accepts explicit public logical entrances with modeled provenance", () => {
+  const result = validateAuroraTopologyProposal(topologyFixture());
+  if (!result.ok || result.reachable_region_ids.length !== 2) {
+    throw new Error("valid logical entrance topology was rejected");
+  }
+});
+
+Deno.test("rejects containment-only edges as locomotion entrances", () => {
+  const input = topologyFixture({
+    edges: topologyFixture().edges.map((edge) => ({ ...edge, relation: "contains" })),
+  });
+  const result = validateAuroraTopologyProposal(input);
+  if (result.ok || !result.issues.some((issue) => issue.startsWith("exactly_one_modeled_open_entrance_required"))) {
+    throw new Error("containment was incorrectly accepted as an entrance");
+  }
+});
+
+Deno.test("rejects private, closed, and object destinations", () => {
+  const privateRegion = validateAuroraTopologyProposal(topologyFixture({
+    nodes: topologyFixture().nodes.map((node) => node.id === TOPOLOGY_FOREST ? { ...node, visibility: "private" } : node),
+  }));
+  if (privateRegion.ok || !privateRegion.issues.includes(`public_region_not_public:${TOPOLOGY_FOREST}`)) {
+    throw new Error("private region accepted in public topology");
+  }
+
+  const objectTarget = validateAuroraTopologyProposal(topologyFixture({
+    nodes: topologyFixture().nodes.map((node) => node.id === TOPOLOGY_FOREST ? { ...node, node_type: "object" } : node),
+  }));
+  if (objectTarget.ok || !objectTarget.issues.includes(`public_region_unavailable:${TOPOLOGY_FOREST}`)) {
+    throw new Error("object node accepted as a region");
+  }
+});
+
+Deno.test("rejects one-way, closed-policy, and physical-evidence entrance claims", () => {
+  for (const patch of [
+    { directed: true },
+    { access_policy: "approval" },
+    { source_kind: "agent_observation" },
+  ]) {
+    const input = topologyFixture({
+      edges: topologyFixture().edges.map((edge) => edge.to_node_id === TOPOLOGY_FOREST ? { ...edge, ...patch } : edge),
+    });
+    const result = validateAuroraTopologyProposal(input);
+    if (result.ok) throw new Error("unsafe entrance edge accepted");
+  }
+});
