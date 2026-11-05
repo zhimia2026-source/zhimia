@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -38,7 +38,7 @@ async function readBody(req: Request): Promise<Record<string, unknown> | null> {
     return value && typeof value === "object" && !Array.isArray(value) ? value : null;
   } catch { return null; }
 }
-async function authenticate(db: ReturnType<typeof createClient>, req: Request) {
+async function authenticate(db: SupabaseClient, req: Request) {
   const token = req.headers.get("authorization")?.match(/^Bearer\s+([^\s]+)$/i)?.[1];
   if (!token || token.length < 40 || token.length > 4096) return null;
   const { data, error } = await db.from("zhi_personal_access_tokens")
@@ -57,7 +57,7 @@ function isWorker(req: Request): boolean {
   const supplied = req.headers.get("x-zhi-worker-secret") ?? "";
   return expected.length >= 32 && supplied.length >= 32 && supplied === expected;
 }
-function dbClient() {
+function dbClient(): SupabaseClient {
   if (!SUPABASE_URL || !SERVICE_KEY) throw new Error("server_configuration_missing");
   return createClient(SUPABASE_URL, SERVICE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
 }
