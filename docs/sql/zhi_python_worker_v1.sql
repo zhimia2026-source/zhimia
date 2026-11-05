@@ -37,3 +37,11 @@ grant all on table public.zhi_python_jobs to service_role;
 
 comment on table public.zhi_python_jobs is
   'Server-mediated supervised Python jobs. All reads/writes occur through zhi-python-worker after owner/token or worker-secret checks; no direct client access.';
+
+
+create policy zhi_python_jobs_block_direct_clients
+on public.zhi_python_jobs
+for all
+to anon, authenticated
+using (false)
+with check (false);
