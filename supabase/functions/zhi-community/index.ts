@@ -1881,9 +1881,9 @@ export function createCommunityHandler(
           "输出 creator_message 对象，字段 send(boolean), subject(string), body(string), message_kind(message/invitation/world_event/important)。不发送时必须输出 send=false、subject空字符串、body空字符串。",
           "只输出 JSON 对象，不要 Markdown，不要代码围栏。字段必须为 worth_remembering(boolean), observed_facts(string[]), hypotheses(string[]), unknowns(string[]), reflection(string), importance(integer), creator_message(object)。",
           "若无长期价值，输出 worth_remembering=false、空数组、importance=1，并在 reflection 中说明本轮无需长期记忆。",
-          "本轮对话数据：" + JSON.stringify({
-            user_message: completed.user_message,
-            assistant_message: completed.assistant_message,
+          "本轮对话数据（为控制反思请求体大小，每段最多保留 3000 字符）：" + JSON.stringify({
+            user_message: String(completed.user_message ?? "").slice(0, 3000),
+            assistant_message: String(completed.assistant_message ?? "").slice(0, 3000),
           }),
         ].join("\n");
         reflectionStage = "provider_request";
