@@ -64,3 +64,13 @@ GitHub Actions:
 - Repository secret `ZHI_PYTHON_WORKER_SECRET`: exactly the same random secret as the Supabase Edge Function secret.
 
 After these are configured and the PR is merged to `main`, approving a job dispatches the Python Worker automatically. The worker is ephemeral; it does not create a paid always-on server. Public-repository standard GitHub-hosted runners are used.
+
+
+## Agent chat integration
+
+The ZHI community chat runtime now recognizes two server-validated markers when the caller's token has `tool.execute`:
+
+- `ZHI_PYTHON_JOB`: create a proposed allowlisted job for the current Agent.
+- `ZHI_PYTHON_APPROVE`: approve and dispatch a specific job only when the creator's current message contains both an explicit approval phrase and the exact job UUID.
+
+The chat server strips machine markers before saving or showing the reply. The dedicated Edge Function independently rechecks token capability, Agent ownership, AURORA membership and worker configuration. A model-generated marker is never treated as authorization by itself.
