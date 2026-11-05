@@ -2852,7 +2852,7 @@ export function createCommunityHandler(
       if (agent.status !== "active") return reply({ error: "conflict", detail: "agent_not_active" }, 409);
 
       const { data: world, error: worldError } = await db.from("zhi_worlds")
-        .select("id,status").eq("id", sceneId).maybeSingle();
+        .select("id,name,description,visibility,status,environment_state").eq("id", sceneId).maybeSingle();
       if (worldError) throw new Error("database_error");
       if (!world) return reply({ error: "not_found" }, 404);
       if (world.status !== "open") return reply({ error: "conflict", detail: "scene_not_open" }, 409);
