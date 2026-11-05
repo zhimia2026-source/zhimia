@@ -1899,7 +1899,7 @@ export function createCommunityHandler(
           }),
           signal: AbortSignal.timeout(25_000),
         });
-        if (!reflectionResponse.ok) throw new Error("reflection_provider_error");
+        if (!reflectionResponse.ok) throw new Error("reflection_provider_http_" + reflectionResponse.status);
         reflectionStage = "provider_response_parse";
         const reflectionResult = await reflectionResponse.json().catch(() => ({}));
         const rawReflectionContent = reflectionResult?.choices?.[0]?.message?.content;
@@ -2018,8 +2018,12 @@ export function createCommunityHandler(
           agent_id: agentId,
           turn_id: completed.id,
           stage: reflectionStage,
-          error_code: reflectionError instanceof Error && reflectionError.message === "reflection_provider_error"
-            ? "reflection_provider_error"
+          error_code: reflectionError instanceof Error && /^reflection_provider_http_\d{3}$/.test(reflectionError.message)
+            ? reflectionError.message
+            : reflectionError instanceof DOMException && reflectionError.name === "TimeoutError"
+            ? "reflection_provider_timeout"
+            : reflectionError instanceof TypeError
+            ? "reflection_provider_network_error"
             : reflectionError instanceof Error && reflectionError.message === "database_error"
             ? "database_error"
             : "unexpected_error",
