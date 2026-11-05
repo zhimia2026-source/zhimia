@@ -1640,8 +1640,8 @@ export function createCommunityHandler(
          try {
            const requested = JSON.parse(pythonApproveMarker[1]);
            const jobId = typeof requested?.job_id === "string" ? requested.job_id : "";
-           const explicitApproval = /批准|同意执行|确认执行|开始执行|approve|run\s+job/i.test(body.message.trim());
-           if (!hasCapability(actor, "tool.execute") || !isUuid(jobId) || !explicitApproval || !body.message.includes(jobId)) {
+           const currentUserMessage = typeof body.message === "string" ? body.message.trim() : "";\n           const explicitApproval = /批准|同意执行|确认执行|开始执行|approve|run\s+job/i.test(currentUserMessage);
+           if (!hasCapability(actor, "tool.execute") || !isUuid(jobId) || !explicitApproval || !currentUserMessage.includes(jobId)) {
              pythonJobOutcome = { status: "rejected", reason: "explicit_owner_approval_and_job_id_required" };
            } else {
              const workerCall = await invokePythonWorker(req, "approve_job", { job_id: jobId });
