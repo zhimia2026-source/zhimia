@@ -18,7 +18,9 @@ create table if not exists public.zhi_python_jobs (
   updated_at timestamptz not null default now(),
   approved_at timestamptz,
   started_at timestamptz,
-  completed_at timestamptz
+  completed_at timestamptz,
+  check ((task_type = 'healthcheck' and cardinality(permission_scope) = 0) or
+         (task_type = 'aurora_ecosystem_report' and permission_scope = array['aurora.events.read']::text[]))
 );
 
 create index if not exists zhi_python_jobs_owner_created_idx
