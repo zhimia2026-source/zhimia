@@ -19,11 +19,11 @@ V1 task types:
 - `healthcheck`: validates the runner path without external access.
 - `aurora_ecosystem_report`: summarizes caller-supplied `environment_feedback.events`; requires `aurora.events.read`. It reports event kinds, timestamps and presence of causal chains, and never invents missing events.
 
-Limits are capped in code (30 seconds declared budget, 128 KB JSON input, 1,000 events). Per-agent workspaces are separated under the configured workspace root. Results are written atomically to `result.json`.
+Input and event limits are enforced in code (128 KB JSON input, 1,000 events); the timeout value is validated as a declared budget but is not an OS-enforced CPU deadline in this prototype. Per-agent workspaces are separated under the configured workspace root. Results are written atomically to `result.json`.
 
 ## Security boundary
 
-- No direct Supabase client, service-role key, production database write, network access, subprocess, or dynamic code evaluation.
+- No direct Supabase client, service-role key, production database write, network access, subprocess, or dynamic code evaluation. No OS-level CPU/memory sandbox is claimed.
 - No access to another agent's private memory. The task runner receives only the event payload explicitly passed by an authorized caller.
 - Unknown task types, permission scopes, malformed identifiers, oversized input and excessive limits fail closed.
 - The caller must authenticate the agent and authorize the task before invoking this runner. This local module does not itself authenticate HTTP requests or establish production identity.
