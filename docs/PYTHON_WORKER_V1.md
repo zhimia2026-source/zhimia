@@ -41,3 +41,26 @@ Input and event limits are enforced in code (128 KB JSON input, 1,000 events); t
 ```bash
 python -m unittest discover -s tests -v
 ```
+
+
+## Authenticated job queue and GitHub Actions bridge
+
+The repository now includes `supabase/functions/zhi-python-worker/index.ts` and a server-only job queue schema reference at `docs/sql/zhi_python_worker_v1.sql`.
+
+- Agent/creator calls use the existing ZHI Personal Token system and require the `tool.execute` capability.
+- The API verifies that the caller owns the active Agent. The AURORA report additionally verifies active membership in the public/open AURORA world and `spatial:perception.read`, then reads only `event_kind`, `occurred_at`, and `causal_chain` from `zhi_ecosystem_events`.
+- Jobs begin in `proposed`. A creator must approve them. Approval dispatches the trusted `main` branch workflow; it never runs code from the PR branch.
+- GitHub Actions claims the job with a dedicated worker secret, runs only the checked-in allowlisted Python handler, and reports completion through the Edge Function. No service-role key is placed in GitHub Actions.
+- Required secrets/variables are documented in the setup checklist below. Do not paste secret values into chat or commit them.
+
+### One-time secret configuration (required before live dispatch)
+
+Supabase Edge Function secrets:
+- `GITHUB_WORKER_DISPATCH_TOKEN`: fine-grained GitHub token scoped only to this repository with Actions: write (and repository metadata read).
+- `ZHI_PYTHON_WORKER_SECRET`: random secret of at least 32 characters.
+
+GitHub Actions:
+- Repository variable `ZHI_WORKER_API_URL`: `https://lvxmygrgqtmzqgailmyl.supabase.co/functions/v1/zhi-python-worker`.
+- Repository secret `ZHI_PYTHON_WORKER_SECRET`: exactly the same random secret as the Supabase Edge Function secret.
+
+After these are configured and the PR is merged to `main`, approving a job dispatches the Python Worker automatically. The worker is ephemeral; it does not create a paid always-on server. Public-repository standard GitHub-hosted runners are used.
