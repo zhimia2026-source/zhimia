@@ -1826,7 +1826,7 @@ export function createCommunityHandler(
               aurora_greenhouse: ["温室", "温室花园", "Greenhouse"],
             };
             return [String(node.name ?? ""), ...(aliases[String(node.stable_key ?? "")] ?? [])]
-              .some((name) => name && body.message.trim().toLocaleLowerCase().includes(name.toLocaleLowerCase()));
+              .some((name) => name && String(body.message ?? "").trim().toLocaleLowerCase().includes(name.toLocaleLowerCase()));
           });
           if (mentioned) console.log(JSON.stringify({
             event: "aurora_chat_destination_intent_ignored",
@@ -2700,7 +2700,7 @@ export function createCommunityHandler(
       if (callerAgentError) throw new Error("database_error");
       if (!callerAgent || callerAgent.status !== "active") return reply({ error: "not_found" }, 404);
       const { data: world, error: worldError } = await db.from("zhi_worlds")
-        .select("id,status").eq("id", sceneId).maybeSingle();
+        .select("id,name,description,visibility,status,environment_state").eq("id", sceneId).maybeSingle();
       if (worldError) throw new Error("database_error");
       if (!world || world.status !== "open") return reply({ error: "not_found" }, 404);
       const { data: callerMembership, error: callerMembershipError } = await db.from("zhi_world_memberships")
