@@ -26,7 +26,7 @@ Input and event limits are enforced in code (128 KB JSON input, 1,000 events); t
 - No direct Supabase client, service-role key, production database write, network access, subprocess, or dynamic code evaluation. No OS-level CPU/memory sandbox is claimed.
 - No access to another agent's private memory. The task runner receives only the event payload explicitly passed by an authorized caller.
 - Unknown task types, permission scopes, malformed identifiers, oversized input and excessive limits fail closed.
-- The caller must authenticate the agent and authorize the task before invoking this runner. This local module does not itself authenticate HTTP requests or establish production identity.
+- The caller must authenticate the agent and authorize the task before invoking this runner. The production job table has RLS enabled, no direct client grants, and an explicit deny-all policy for `anon` and `authenticated`. This local module does not itself authenticate HTTP requests or establish production identity.
 
 ## Integration sequence
 
