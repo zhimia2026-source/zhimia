@@ -1,0 +1,32 @@
+name: ZHI supervised Python Worker
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: Approved ZHI Python job UUID
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  execute-approved-job:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out trusted main branch code
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Execute allowlisted task
+        env:
+          JOB_ID: ${{ inputs.job_id }}
+          ZHI_WORKER_API_URL: ${{ vars.ZHI_WORKER_API_URL }}
+          ZHI_PYTHON_WORKER_SECRET: ${{ secrets.ZHI_PYTHON_WORKER_SECRET }}
+        run: python scripts/python_worker_action.py
