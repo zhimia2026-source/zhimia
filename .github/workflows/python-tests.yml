@@ -41,5 +41,7 @@ jobs:
         run: deno check supabase/functions/zhi-python-worker/index.ts
       - name: Type-check ZHI community chat integration
         run: deno check supabase/functions/zhi-community/index.ts
+      - name: Type-check ZHI token admin Edge Function
+        run: deno check supabase/functions/zhi-token-admin/index.ts
       - name: Run health advisor safety tests
         run: deno test supabase/functions/zhi-health-advisor/safety_test.ts
