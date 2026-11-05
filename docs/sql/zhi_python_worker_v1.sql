@@ -8,11 +8,11 @@ create table if not exists public.zhi_python_jobs (
   task_type text not null check (task_type in ('healthcheck', 'aurora_ecosystem_report')),
   status text not null default 'proposed'
     check (status in ('proposed', 'queued', 'running', 'completed', 'failed', 'cancelled')),
-  input jsonb not null default '{}'::jsonb check (jsonb_typeof(input) = 'object'),
-  permission_scope text[] not null default '{}'::text[],
+  input jsonb not null default '{}'::jsonb check (jsonb_typeof(input) = 'object' and octet_length(input::text) <= 128000),
+  permission_scope text[] not null default '{}'::text[] check (permission_scope <@ array['aurora.events.read']::text[]),
   execution_limits jsonb not null default '{"timeout_seconds":10,"max_input_bytes":128000,"max_events":1000}'::jsonb
     check (jsonb_typeof(execution_limits) = 'object'),
-  result jsonb check (result is null or jsonb_typeof(result) = 'object'),
+  result jsonb check (result is null or (jsonb_typeof(result) = 'object' and octet_length(result::text) <= 128000)),
   error_code text check (error_code is null or char_length(error_code) <= 80),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
