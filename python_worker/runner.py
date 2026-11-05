@@ -7,7 +7,7 @@ from pathlib import Path
 import tempfile
 from typing import Any
 
-from .contracts import JobRequest, JobValidationError
+from .contracts import JobRequest
 from .handlers import HANDLERS
 
 
@@ -17,7 +17,14 @@ class WorkspaceError(RuntimeError):
 
 def _workspace_path(root: Path, agent_id: str, workspace_id: str) -> Path:
     root = root.expanduser().resolve()
-    candidate = root / agent_id / workspace_id
+    agent_dir = root / agent_id
+    agent_dir.mkdir(parents=True, exist_ok=True)
+    resolved_agent_dir = agent_dir.resolve()
+    if not resolved_agent_dir.is_relative_to(root):
+        raise WorkspaceError("agent_workspace_path_escape")
+    candidate = resolved_agent_dir / workspace_id
+    if candidate.is_symlink():
+        raise WorkspaceError("workspace_symlink_not_allowed")
     candidate.mkdir(parents=True, exist_ok=True)
     resolved = candidate.resolve()
     if not resolved.is_relative_to(root):
