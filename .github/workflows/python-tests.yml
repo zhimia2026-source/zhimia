@@ -19,6 +19,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Compile Python sources
+        run: python -m compileall -q main.py python_worker scripts tests
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
 
@@ -35,5 +37,7 @@ jobs:
         run: deno check supabase/functions/zhi-health-advisor/index.ts
       - name: Type-check ZHI movement Edge Function
         run: deno check supabase/functions/zhi-movement/index.ts
+      - name: Type-check ZHI Python Worker Edge Function
+        run: deno check supabase/functions/zhi-python-worker/index.ts
       - name: Run health advisor safety tests
         run: deno test supabase/functions/zhi-health-advisor/safety_test.ts
