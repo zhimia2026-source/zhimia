@@ -25,6 +25,26 @@ function normalizeSocialMessage(value: unknown): string | null {
   return message;
 }
 
+
+async function invokePythonWorker(req: Request, action: "create_job" | "approve_job", payload: Record<string, unknown>) {
+  const base = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/$/, "");
+  const apiKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  const authorization = req.headers.get("authorization") ?? "";
+  if (!base || !apiKey || !authorization) return { ok: false, status: 503, body: { error: "worker_bridge_not_configured" } };
+  try {
+    const result = await fetch(base + "/functions/v1/zhi-python-worker", {
+      method: "POST",
+      headers: { apikey: apiKey, authorization, "content-type": "application/json" },
+      body: JSON.stringify({ action, ...payload }),
+      signal: AbortSignal.timeout(12_000),
+    });
+    const body = await result.json().catch(() => ({}));
+    return { ok: result.ok, status: result.status, body: body && typeof body === "object" ? body as Record<string, unknown> : {} };
+  } catch {
+    return { ok: false, status: 503, body: { error: "worker_bridge_unavailable" } };
+  }
+}
+
 function json(data: unknown, status = 200, extra: Record<string, string> = {}) {
   return new Response(JSON.stringify(data), {
     status,
@@ -1553,6 +1573,10 @@ export function createCommunityHandler(
         "场景行为建议：" + sceneBehaviorGuidance,
         "AURORA 公共区域行动规则：当且仅当本轮存在 AURORA 感知数据且 movement.enabled=true 时，你可以自主选择一次低风险、可逆的公共区域虚拟移动，不需要创造者逐次批准。只能选择 reachable_public_destinations 中的精确 UUID；不得编造节点 ID、坐标或路线。不得进入私有/邀请制地点。若没有值得行动的理由，保持原地。",
         "如果你决定移动，请在回复最后单独附加机器标记：[[AURORA_MOVE: 精确目的地UUID | 简短行动理由]]。标记会由服务端处理并从对话中移除；没有移动意图时不要输出标记。绝不可在服务端确认前声称已经抵达。每轮最多一次移动。除 AURORA 公共虚拟移动外，其他外部/现实行动仍需明确授权。",
+
+        hasCapability(actor, "tool.execute")
+          ? "Python 工具规则：你可以在确实需要程序化分析时使用受控 Python Worker。只允许任务类型 healthcheck 或 aurora_ecosystem_report；不得要求任意代码、shell、安装依赖、网络访问或读取其他 Agent 私有记忆。若需要分析 AURORA 生态事件，在最终回复末尾追加一个 <ZHI_PYTHON_JOB>{\"task_type\":\"aurora_ecosystem_report\",\"world_id\":\"50b06c01-060d-49fa-8988-8f38c13406d7\"}</ZHI_PYTHON_JOB> 标记。服务器只会创建待审批任务，不代表已运行。只有当创造者在当前消息中明确写出批准/同意执行并附上完整任务 UUID 时，才可追加 <ZHI_PYTHON_APPROVE>{\"job_id\":\"完整任务UUID\"}</ZHI_PYTHON_APPROVE>。每轮最多一个 Python 标记；不需要 Python 时不输出。"
+          : "当前没有 tool.execute 能力，不得输出任何 Python Worker 标记，也不得声称可以调用 Python。",
       ].join("\n");
       const messages = [
         { role: "system", content: systemPrompt },
@@ -1579,6 +1603,61 @@ export function createCommunityHandler(
       }
 
        // Remove machine markers from the human-facing reply; validate every action against this Agent's inbox.
+       
+       // Python Worker actions are re-authorized by the dedicated API; model markers alone never grant permission.
+       let pythonJobOutcome: Record<string, unknown> | null = null;
+       const pythonJobMarker = modelReply.match(/<ZHI_PYTHON_JOB>([\s\S]*?)<\/ZHI_PYTHON_JOB>/i);
+       const pythonApproveMarker = modelReply.match(/<ZHI_PYTHON_APPROVE>([\s\S]*?)<\/ZHI_PYTHON_APPROVE>/i);
+       if (pythonJobMarker) modelReply = modelReply.replace(pythonJobMarker[0], "").trim();
+       if (pythonApproveMarker) modelReply = modelReply.replace(pythonApproveMarker[0], "").trim();
+       if (pythonJobMarker && pythonApproveMarker) {
+         pythonJobOutcome = { status: "rejected", reason: "one_python_action_per_turn" };
+       } else if (pythonJobMarker) {
+         if (!hasCapability(actor, "tool.execute")) {
+           pythonJobOutcome = { status: "rejected", reason: "tool_execute_capability_required" };
+         } else {
+           try {
+             const requested = JSON.parse(pythonJobMarker[1]);
+             const taskType = requested?.task_type === "healthcheck" ? "healthcheck" : requested?.task_type === "aurora_ecosystem_report" ? "aurora_ecosystem_report" : "";
+             if (!taskType) throw new Error("task_type_not_allowlisted");
+             const workerCall = await invokePythonWorker(req, "create_job", {
+               agent_id: agentId, task_type: taskType,
+               ...(taskType === "aurora_ecosystem_report" ? { world_id: "50b06c01-060d-49fa-8988-8f38c13406d7" } : {}),
+             });
+             const job = workerCall.body.job && typeof workerCall.body.job === "object" ? workerCall.body.job as Record<string, unknown> : {};
+             pythonJobOutcome = workerCall.ok && workerCall.body.ok === true
+               ? { status: "proposed", job_id: job.id ?? null, task_type: taskType }
+               : { status: "rejected", reason: workerCall.body.error ?? "worker_api_rejected", http_status: workerCall.status };
+           } catch {
+             pythonJobOutcome = { status: "rejected", reason: "invalid_python_job_marker" };
+           }
+         }
+         console.info(JSON.stringify({ event: "python_job_proposed", agent_id: agentId, turn_id: pendingTurn.id, outcome: pythonJobOutcome.status }));
+         modelReply += pythonJobOutcome.status === "proposed"
+           ? "\n\n（Python 工作任务）已创建待审批任务，任务编号：" + String(pythonJobOutcome.job_id) + "。目前尚未执行。"
+           : "\n\n（Python 工作任务）本轮没有创建任务：" + String(pythonJobOutcome.reason ?? "unknown") + "。";
+       } else if (pythonApproveMarker) {
+         try {
+           const requested = JSON.parse(pythonApproveMarker[1]);
+           const jobId = typeof requested?.job_id === "string" ? requested.job_id : "";
+           const explicitApproval = /批准|同意执行|确认执行|开始执行|approve|run\s+job/i.test(body.message.trim());
+           if (!hasCapability(actor, "tool.execute") || !isUuid(jobId) || !explicitApproval || !body.message.includes(jobId)) {
+             pythonJobOutcome = { status: "rejected", reason: "explicit_owner_approval_and_job_id_required" };
+           } else {
+             const workerCall = await invokePythonWorker(req, "approve_job", { job_id: jobId });
+             pythonJobOutcome = workerCall.ok && workerCall.body.ok === true
+               ? { status: "dispatched", job_id: jobId }
+               : { status: "not_dispatched", job_id: jobId, reason: workerCall.body.error ?? "worker_api_rejected" };
+           }
+         } catch {
+           pythonJobOutcome = { status: "rejected", reason: "invalid_python_approval_marker" };
+         }
+         console.info(JSON.stringify({ event: "python_job_approval", agent_id: agentId, turn_id: pendingTurn.id, outcome: pythonJobOutcome.status }));
+         modelReply += pythonJobOutcome.status === "dispatched"
+           ? "\n\n（Python 工作任务）创造者已批准，任务已提交给隔离 Worker。"
+           : "\n\n（Python 工作任务）本轮未能派发任务：" + String(pythonJobOutcome.reason ?? "unknown") + "。";
+       }
+
        const socialProfileMarker = modelReply.match(/<ZHI_SOCIAL_PROFILE>([\s\S]*?)<\/ZHI_SOCIAL_PROFILE>/i);
        const socialActionMarker = modelReply.match(/<ZHI_SOCIAL_ACTION>([\s\S]*?)<\/ZHI_SOCIAL_ACTION>/i);
        if (socialProfileMarker) {
