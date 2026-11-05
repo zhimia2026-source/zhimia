@@ -11,3 +11,7 @@ verify_jwt = false
 # zhi-federated-movement authenticates federation peer tokens in its handler.
 [functions.zhi-federated-movement]
 verify_jwt = false
+
+# zhi-python-worker authenticates ZHI personal tokens and a separate worker callback secret.
+[functions.zhi-python-worker]
+verify_jwt = false
