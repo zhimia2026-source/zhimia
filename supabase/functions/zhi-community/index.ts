@@ -703,7 +703,7 @@ export function createCommunityHandler(
         return reply({ error: "invalid_argument", detail: "source_turn_id_must_be_uuid" }, 400);
       }
       const { data: sourceTurn, error: sourceError } = await db.from("zhi_agent_chat_turns")
-        .select("id,status").eq("id", body.source_turn_id).eq("owner_user_id", actor.userId)
+        .select("id,name,description,visibility,status,environment_state").eq("id", body.source_turn_id).eq("owner_user_id", actor.userId)
         .eq("agent_id", agentId).eq("status", "complete").maybeSingle();
       if (sourceError) throw new Error("database_error");
       if (!sourceTurn) return reply({ error: "not_found", detail: "source_chat_turn_not_found" }, 404);
