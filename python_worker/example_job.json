@@ -1,0 +1,21 @@
+{
+  "agent_id": "hannah",
+  "task_id": "aurora-report-demo-001",
+  "workspace_id": "hannah-aurora-analysis",
+  "task_type": "aurora_ecosystem_report",
+  "permission_scope": ["aurora.events.read"],
+  "execution_limits": {
+    "timeout_seconds": 10,
+    "max_input_bytes": 128000,
+    "max_events": 1000
+  },
+  "input": {
+    "events": [
+      {
+        "event_kind": "rainfall",
+        "occurred_at": "2026-11-05T01:00:00Z",
+        "causal_chain": ["weather", "soil_moisture"]
+      }
+    ]
+  }
+}
