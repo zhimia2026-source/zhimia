@@ -6,7 +6,7 @@ import { buildFeedbackRecord, buildRevisionProposal } from "./cognitive_cycle_he
 import { buildPrivateAgentContext, buildPrivateChatHistory, buildSceneAwarenessContext, buildSceneBehaviorGuidance } from "./chat_context_helpers.ts";
 import { computeSceneEnvironment, normalizeSceneEnvironmentConfig } from "./environment_helpers.ts";
 import { canReadPrivateCognition } from "./constitutional_helpers.ts";
-import { normalizeAgentReflection, normalizeMemoryCandidate, normalizeAgentCreatorMessage, isLongTermMemoryEligible, buildPrivateReflectionMessages } from "./memory_experience_helpers.ts";
+import { normalizeAgentReflection, normalizeMemoryCandidate, normalizeAgentCreatorMessage, isLongTermMemoryEligible, buildPrivateReflectionMessages, buildPrivateMemoryLogEvent } from "./memory_experience_helpers.ts";
 import { rankPrivateMemories } from "./long_term_memory_helpers.ts";
 import { buildAgentAddress, parseAgentAddress } from "./agent_address_helpers.ts";
 
@@ -2038,12 +2038,23 @@ export function createCommunityHandler(
           console.info(JSON.stringify({ event: "creator_inbox_note_not_proposed", agent_id: agentId, turn_id: completed.id }));
         }
         if (longTermMemoryRequiresConsent) {
+          console.info(JSON.stringify(buildPrivateMemoryLogEvent(
+            "private_memory_decision", agentId, completed.id, "consent_required",
+          )));
           growth = { reflection: "completed", memory: "consent_required" };
         } else {
         const reflection = normalizeAgentReflection(rawReflectionContent);
         if (!reflection || reflection.importance < 3) {
+          console.info(JSON.stringify(buildPrivateMemoryLogEvent(
+            "private_memory_decision", agentId, completed.id,
+            reflection ? "not_selected_low_value" : "invalid_reflection_output",
+            reflection?.importance,
+          )));
           growth = { reflection: "completed", memory: "not_selected" };
         } else {
+          console.info(JSON.stringify(buildPrivateMemoryLogEvent(
+            "private_memory_decision", agentId, completed.id, "eligible_for_write", reflection.importance,
+          )));
           const { error: reflectionSaveError } = await db.from("zhi_agent_micro_experiences").insert({
             owner_user_id: actor.userId,
             agent_id: agentId,
@@ -2059,6 +2070,9 @@ export function createCommunityHandler(
             memory_status: "auto_curated",
           });
           if (!reflectionSaveError) {
+            console.info(JSON.stringify(buildPrivateMemoryLogEvent(
+              "private_memory_write_completed", agentId, completed.id, "saved", reflection.importance,
+            )));
             let brainMemoryStatus = "not_applicable";
             if (miaBrainContext && reflection.importance >= 3) {
               const { data: brainReflection, error: brainReflectionError } = await db.rpc("mia_brain_commit_reflection", {
@@ -2087,8 +2101,15 @@ export function createCommunityHandler(
                 : reflection.importance >= 3 ? "saved" : "low_value_reflection_saved",
             };
           } else if (reflectionSaveError.code === "23505") {
+            console.info(JSON.stringify(buildPrivateMemoryLogEvent(
+              "private_memory_write_completed", agentId, completed.id, "deduplicated", reflection.importance,
+            )));
             growth = { reflection: "completed", memory: "already_recorded" };
           } else {
+            console.warn(JSON.stringify(buildPrivateMemoryLogEvent(
+              "private_memory_write_completed", agentId, completed.id, "save_failed",
+              reflection.importance, reflectionSaveError.code,
+            )));
             growth = { reflection: "completed", memory: "save_failed" };
           }
         }
