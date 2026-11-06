@@ -882,7 +882,7 @@ export function createCommunityHandler(
         headers: { authorization: "Bearer " + providerConfig.apiKey, "content-type": "application/json" },
         body: JSON.stringify({
           model: providerConfig.model,
-          messages: reflectionMessages,
+          messages: [{ role: "system", content: reflectionPrompt }],
           temperature: 0.1,
           max_tokens: 700,
           stream: false,
@@ -1973,7 +1973,7 @@ export function createCommunityHandler(
           headers: { authorization: `Bearer ${providerKey}`, "content-type": "application/json" },
           body: JSON.stringify({
             model: providerModel,
-            messages: [{ role: "system", content: reflectionPrompt }],
+            messages: reflectionMessages,
             temperature: 0.1,
             max_tokens: 700,
             stream: false,
