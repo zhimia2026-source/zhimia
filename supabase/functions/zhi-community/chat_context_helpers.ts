@@ -85,6 +85,9 @@ export function buildPrivateAgentContext(
       : [];
     return {
       experience_type: boundedText(experience.experience_type, 40),
+      source_kind: boundedText(experience.source_kind, 40),
+      source_ref: boundedText(experience.source_ref, 160),
+      world_id: boundedText(experience.world_id, 80),
       occurred_at: boundedText(experience.occurred_at, 80),
       observed_facts: claims(experience.observed_facts),
       hypotheses: claims(experience.hypotheses),
