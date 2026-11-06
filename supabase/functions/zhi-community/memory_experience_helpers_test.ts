@@ -78,3 +78,15 @@ Deno.test("creator notes parse JSON fenced responses but never accept injected f
     throw new Error("creator note JSON parsing failed");
   }
 });
+
+
+import { isLongTermMemoryEligible } from "./memory_experience_helpers.ts";
+
+Deno.test("long-term memory quality gate only retains importance 3 through 5", () => {
+  if (isLongTermMemoryEligible(1) || isLongTermMemoryEligible(2) ||
+      !isLongTermMemoryEligible(3) || !isLongTermMemoryEligible(4) ||
+      !isLongTermMemoryEligible(5) || isLongTermMemoryEligible(6) ||
+      isLongTermMemoryEligible("3")) {
+    throw new Error("long-term memory importance gate is incorrect");
+  }
+});
