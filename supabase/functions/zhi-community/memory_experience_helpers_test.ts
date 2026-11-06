@@ -107,16 +107,16 @@ Deno.test("private reflection uses a user-role data message after system-only re
 
 import { buildPrivateMemoryLogEvent } from "./memory_experience_helpers.ts";
 
-Deno.test("private memory telemetry contains metadata only and excludes reflection content", () => {
-  const secret = "PRIVATE_REFLECTION_BODY_MUST_NOT_APPEAR";
+Deno.test("private memory telemetry is allowlisted and rejects content-shaped values", () => {
+  const privateText = "PRIVATE_REFLECTION_BODY_MUST_NOT_APPEAR";
   const decision = buildPrivateMemoryLogEvent(
-    "private_memory_decision", "agent-1", "turn-1", "eligible_for_write", 4,
+    "private_memory_decision", "agent-1", "turn-1", privateText, 4, privateText,
   );
   const failed = buildPrivateMemoryLogEvent(
     "private_memory_write_completed", "agent-1", "turn-1", "save_failed", 4, "42501",
   );
   const serialized = JSON.stringify([decision, failed]);
-  if (serialized.includes(secret) || serialized.includes("reflection") && serialized.includes(secret)) {
+  if (serialized.includes(privateText)) {
     throw new Error("private reflection content leaked into telemetry");
   }
   const allowedKeys = new Set(["event", "agent_id", "turn_id", "outcome", "importance", "error_code"]);
@@ -125,7 +125,8 @@ Deno.test("private memory telemetry contains metadata only and excludes reflecti
       throw new Error("telemetry included a non-allowlisted field");
     }
   }
-  if (failed.outcome !== "save_failed" || failed.error_code !== "42501") {
-    throw new Error("telemetry outcome metadata was not preserved");
+  if (decision.outcome !== "unknown" || "error_code" in decision ||
+      failed.outcome !== "save_failed" || failed.error_code !== "42501") {
+    throw new Error("telemetry outcome metadata was not safely normalized");
   }
 });
