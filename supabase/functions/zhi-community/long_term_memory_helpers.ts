@@ -119,7 +119,7 @@ export function rankPrivateMemories<T extends PrivateMemoryRecord>(
     // from being displaced by a stream of newer, low-value events.
     const score = queryTokens.length
       ? 0.48 * lexical + 0.12 * entity + 0.18 * importance + 0.12 * evidence + 0.10 * recency
-      : 0.42 * importance + 0.28 * evidence + 0.30 * recency;
+      : 0.50 * importance + 0.30 * evidence + 0.20 * recency;
 
     return {
       memory,
