@@ -37,6 +37,8 @@ jobs:
         run: deno check supabase/functions/zhi-federation/index.ts
       - name: Test ecological event perception context
         run: deno test supabase/functions/zhi-community/chat_context_helpers_test.ts
+      - name: Test AURORA long-term private memory retrieval
+        run: deno test supabase/functions/zhi-community/long_term_memory_helpers_test.ts
       - name: Test deterministic AURORA virtual movement validation
         run: deno test supabase/functions/zhi-community/movement_helpers_test.ts
       - name: Test unified AURORA environment event stream
