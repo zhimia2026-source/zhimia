@@ -7,6 +7,7 @@ import { buildPrivateAgentContext, buildPrivateChatHistory, buildSceneAwarenessC
 import { computeSceneEnvironment, normalizeSceneEnvironmentConfig } from "./environment_helpers.ts";
 import { canReadPrivateCognition } from "./constitutional_helpers.ts";
 import { normalizeAgentReflection, normalizeMemoryCandidate, normalizeAgentCreatorMessage } from "./memory_experience_helpers.ts";
+import { rankPrivateMemories } from "./long_term_memory_helpers.ts";
 import { buildAgentAddress, parseAgentAddress } from "./agent_address_helpers.ts";
 
 const MAX_BODY_BYTES = 64_000;
@@ -1312,10 +1313,10 @@ export function createCommunityHandler(
       // experiences are never injected into model prompts.
       const memoryResult = hasCapability(actor, "agent.memory.read")
         ? await db.from("zhi_agent_micro_experiences")
-          .select("experience_type,observed_facts,hypotheses,unknowns,reflection,importance,occurred_at")
+          .select("experience_type,source_kind,source_ref,world_id,observed_facts,hypotheses,unknowns,reflection,importance,occurred_at,metadata")
           .eq("owner_user_id", actor.userId).eq("agent_id", agentId)
           .in("memory_status", ["approved", "auto_curated"]).or("importance.gte.3,source_kind.eq.scene_event")
-          .order("occurred_at", { ascending: false }).limit(12)
+          .order("occurred_at", { ascending: false }).limit(80)
         : { data: [], error: null };
       const brainResult = await db.rpc("mia_brain_private_context", {
         p_agent_id: agentId,
@@ -1331,8 +1332,13 @@ export function createCommunityHandler(
           !Array.isArray(brainResult.data)
         ? brainResult.data as Record<string, unknown>
         : null;
+      const rankedPrivateMemories = rankPrivateMemories(
+        body.message,
+        memoryResult.data ?? [],
+        { limit: 12 },
+      ).map((item) => item.memory);
       const privateContext = buildPrivateAgentContext(
-        agent, cognition, memoryResult.data ?? [], miaBrainContext,
+        agent, cognition, rankedPrivateMemories, miaBrainContext,
       );
       let sceneAwarenessContext = "";
       let spatialPerceptionContext = "";
@@ -2040,7 +2046,7 @@ export function createCommunityHandler(
           growth = { reflection: "completed", memory: "consent_required" };
         } else {
         const reflection = normalizeAgentReflection(rawReflectionContent);
-        if (!reflection) {
+        if (!reflection || reflection.importance < 3) {
           growth = { reflection: "completed", memory: "not_selected" };
         } else {
           const { error: reflectionSaveError } = await db.from("zhi_agent_micro_experiences").insert({
