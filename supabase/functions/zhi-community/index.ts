@@ -6,7 +6,7 @@ import { buildFeedbackRecord, buildRevisionProposal } from "./cognitive_cycle_he
 import { buildPrivateAgentContext, buildPrivateChatHistory, buildSceneAwarenessContext, buildSceneBehaviorGuidance } from "./chat_context_helpers.ts";
 import { computeSceneEnvironment, normalizeSceneEnvironmentConfig } from "./environment_helpers.ts";
 import { canReadPrivateCognition } from "./constitutional_helpers.ts";
-import { normalizeAgentReflection, normalizeMemoryCandidate, normalizeAgentCreatorMessage } from "./memory_experience_helpers.ts";
+import { normalizeAgentReflection, normalizeMemoryCandidate, normalizeAgentCreatorMessage, isLongTermMemoryEligible } from "./memory_experience_helpers.ts";
 import { rankPrivateMemories } from "./long_term_memory_helpers.ts";
 import { buildAgentAddress, parseAgentAddress } from "./agent_address_helpers.ts";
 
@@ -893,6 +893,14 @@ export function createCommunityHandler(
       const reflectionResult = await reflectionResponse.json().catch(() => ({}));
       const reflection = normalizeAgentReflection(reflectionResult?.choices?.[0]?.message?.content);
       if (!reflection) return reply({ error: "scene_memory_reflection_invalid" }, 502);
+      if (!isLongTermMemoryEligible(reflection.importance)) {
+        return reply({
+          memory: null,
+          private_memory: true,
+          enters_future_context: false,
+          note: "not_selected_low_value_experience",
+        }, 200);
+      }
 
       const { data: saved, error: saveError } = await db.from("zhi_agent_micro_experiences").insert({
         owner_user_id: actor.userId,
@@ -905,7 +913,7 @@ export function createCommunityHandler(
         hypotheses: reflection.hypotheses,
         unknowns: reflection.unknowns,
         reflection: reflection.reflection,
-        importance: Math.max(2, reflection.importance),
+        importance: reflection.importance,
         memory_status: "auto_curated",
       }).select("id,agent_id,world_id,experience_type,source_kind,source_ref,observed_facts,hypotheses,unknowns,reflection,importance,memory_status,occurred_at,created_at")
         .single();
@@ -1315,7 +1323,7 @@ export function createCommunityHandler(
         ? await db.from("zhi_agent_micro_experiences")
           .select("experience_type,source_kind,source_ref,world_id,observed_facts,hypotheses,unknowns,reflection,importance,occurred_at")
           .eq("owner_user_id", actor.userId).eq("agent_id", agentId)
-          .in("memory_status", ["approved", "auto_curated"]).or("importance.gte.3,source_kind.eq.scene_event")
+          .in("memory_status", ["approved", "auto_curated"]).gte("importance", 3)
           .order("occurred_at", { ascending: false }).limit(80)
         : { data: [], error: null };
       const brainResult = await db.rpc("mia_brain_private_context", {
