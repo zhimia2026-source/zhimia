@@ -132,7 +132,7 @@ export function buildPrivateReflectionMessages(
     "输出 creator_message 对象，字段 send(boolean), subject(string), body(string), message_kind(message/invitation/world_event/important)。不发送时必须输出 send=false、subject空字符串、body空字符串。",
     "只输出 JSON 对象，不要 Markdown，不要代码围栏。字段必须为 worth_remembering(boolean), observed_facts(string[]), hypotheses(string[]), unknowns(string[]), reflection(string), importance(integer), creator_message(object)。",
     "若无长期价值，输出 worth_remembering=false、空数组、importance=1，并在 reflection 中说明本轮无需长期记忆。",
-  ].join("\\n");
+  ].join("\n");
   const data = JSON.stringify({
     user_message: typeof userMessage === "string" ? userMessage.slice(0, 3000) : "",
     assistant_message: typeof assistantMessage === "string" ? assistantMessage.slice(0, 3000) : "",
