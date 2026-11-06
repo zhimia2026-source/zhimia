@@ -64,12 +64,12 @@ The runtime retrieves only rows already filtered by:
 
 Within that private set, V1 ranks candidates using low-cost hybrid signals:
 - lexical relevance to the current user message (including Chinese bigrams);
-- explicit entity labels, when available;
+- phrase/keyword overlap across observed facts, hypotheses and reflections; optional entity labels are supported by the ranker but are not yet persisted in the current micro-experience table;
 - importance;
 - evidence quality (observed facts weighted above hypotheses; unknowns remain visible);
 - recency as a weak signal, so important older experiences are not automatically displaced.
 
-The runtime injects at most 12 ranked memories. This is deterministic and requires no embedding API, external vector service, or additional LLM call. It is a practical first retrieval layer, not a claim of full semantic vector search.
+The runtime injects at most 12 ranked memories. The current database table has no dedicated entity-label column, so production V1 uses phrase/keyword relevance, importance, evidence quality and recency; the ranker accepts entity labels for future additive use. This is deterministic and requires no embedding API, external vector service, or additional LLM call. It is a practical first retrieval layer, not a claim of full semantic vector search.
 
 ## 5. Truth and privacy boundaries
 
