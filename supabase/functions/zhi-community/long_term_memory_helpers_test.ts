@@ -22,7 +22,7 @@ Deno.test("query relevance retrieves an older matching experience ahead of a new
     },
   ], { nowMs: now, limit: 2 });
 
-  if (!ranked[0].memory.observed_facts?.toString().includes("水晶林")) {
+  if (!JSON.stringify(ranked[0].memory.observed_facts).includes("水晶林")) {
     throw new Error("relevant older experience was not retrieved first");
   }
 });
