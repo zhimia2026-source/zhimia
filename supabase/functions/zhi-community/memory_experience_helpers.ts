@@ -107,3 +107,9 @@ export function normalizeAgentCreatorMessage(raw: unknown): AgentCreatorMessage 
     return { subject, body, message_kind: kind };
   } catch { return null; }
 }
+
+
+/** Only meaningful experiences become durable long-term memories. */
+export function isLongTermMemoryEligible(importance: unknown): boolean {
+  return typeof importance === "number" && Number.isInteger(importance) && importance >= 3 && importance <= 5;
+}
