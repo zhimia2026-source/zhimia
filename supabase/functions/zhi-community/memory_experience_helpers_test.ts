@@ -90,3 +90,16 @@ Deno.test("long-term memory quality gate only retains importance 3 through 5", (
     throw new Error("long-term memory importance gate is incorrect");
   }
 });
+
+
+import { buildPrivateReflectionMessages } from "./memory_experience_helpers.ts";
+
+Deno.test("private reflection uses a user-role data message after system-only requests were rejected", () => {
+  const messages = buildPrivateReflectionMessages("记住我偏好简洁回答", "好的，我会尽量简洁。");
+  if (messages.length !== 2 || messages[0].role !== "system" || messages[1].role !== "user") {
+    throw new Error("reflection request must contain system instructions and a user data message");
+  }
+  if (!messages[1].content.includes("记住我偏好简洁回答") || messages[0].content.includes("记住我偏好简洁回答")) {
+    throw new Error("conversation data must remain separated from trusted system instructions");
+  }
+});
