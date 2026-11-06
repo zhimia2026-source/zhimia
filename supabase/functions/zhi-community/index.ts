@@ -1313,7 +1313,7 @@ export function createCommunityHandler(
       // experiences are never injected into model prompts.
       const memoryResult = hasCapability(actor, "agent.memory.read")
         ? await db.from("zhi_agent_micro_experiences")
-          .select("experience_type,source_kind,source_ref,world_id,observed_facts,hypotheses,unknowns,reflection,importance,occurred_at,metadata")
+          .select("experience_type,source_kind,source_ref,world_id,observed_facts,hypotheses,unknowns,reflection,importance,occurred_at")
           .eq("owner_user_id", actor.userId).eq("agent_id", agentId)
           .in("memory_status", ["approved", "auto_curated"]).or("importance.gte.3,source_kind.eq.scene_event")
           .order("occurred_at", { ascending: false }).limit(80)
