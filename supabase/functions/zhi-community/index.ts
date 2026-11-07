@@ -1382,10 +1382,14 @@ export function createCommunityHandler(
           if (auroraWorld?.status === "open") {
             auroraWorldId = auroraWorld.id;
             const sceneRuntime = await loadSceneRuntimeEnvironment(db, auroraWorld.id, auroraWorld.environment_state);
-            const environmentFeedback = asRecord(sceneRuntime.environment.environment_feedback);
+            const asRuntimeRecord = (value: unknown): Record<string, unknown> =>
+              value !== null && typeof value === "object" && !Array.isArray(value)
+                ? value as Record<string, unknown>
+                : {};
+            const environmentFeedback = asRuntimeRecord(sceneRuntime.environment.environment_feedback);
             const ecosystemEvents = Array.isArray(environmentFeedback.events) ? environmentFeedback.events : [];
             ecosystemEventCount = ecosystemEvents.length;
-            ecosystemEventKinds = ecosystemEvents.map((event: unknown) => String(asRecord(event).event_kind ?? ""));
+            ecosystemEventKinds = ecosystemEvents.map((event: unknown) => String(asRuntimeRecord(event).event_kind ?? ""));
             ecosystemStateRevision = Number.isInteger(environmentFeedback.state_revision)
               ? Number(environmentFeedback.state_revision)
               : null;
