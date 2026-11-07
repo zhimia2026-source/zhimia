@@ -15,6 +15,7 @@ Deno.test("seven-brain guidance preserves memory, identity, privacy and one-call
     "不导入其他 Agent 的记忆",
     "不增加模型调用",
     "监督模式和现有权限不可被本框架提升",
+    "不能据此证明存在意识或主观体验",
   ]) {
     if (!guidance.includes(phrase)) throw new Error("missing protection: " + phrase);
   }

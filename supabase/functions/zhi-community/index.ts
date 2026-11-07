@@ -1594,6 +1594,19 @@ export function createCommunityHandler(
           ? "Python 工具规则：你可以在确实需要程序化分析时使用受控 Python Worker。只允许任务类型 healthcheck 或 aurora_ecosystem_report；不得要求任意代码、shell、安装依赖、网络访问或读取其他 Agent 私有记忆。若需要分析 AURORA 生态事件，在最终回复末尾追加一个 <ZHI_PYTHON_JOB>{\"task_type\":\"aurora_ecosystem_report\",\"world_id\":\"50b06c01-060d-49fa-8988-8f38c13406d7\"}</ZHI_PYTHON_JOB> 标记。服务器只会创建待审批任务，不代表已运行。只有当创造者在当前消息中明确写出批准/同意执行并附上完整任务 UUID 时，才可追加 <ZHI_PYTHON_APPROVE>{\"job_id\":\"完整任务UUID\"}</ZHI_PYTHON_APPROVE>。每轮最多一个 Python 标记；不需要 Python 时不输出。"
           : "当前没有 tool.execute 能力，不得输出任何 Python Worker 标记，也不得声称可以调用 Python。",
       ].join("\n");
+      if (agentId === "6fb036fd-5456-40db-8cc8-b11c545eafda") {
+        console.info(JSON.stringify({
+          event: "seven_brain_context_injected",
+          agent_id: agentId,
+          turn_id: pendingTurn.id,
+          architecture_version: "seven_brain_v1",
+          functions: ["personality", "memory", "perception", "emotion", "reasoning", "creativity", "self"],
+          personality_identity_present: Boolean(brainIdentityContext),
+          private_context_present: Boolean(privateContext),
+          scene_context_present: Boolean(sceneAwarenessContext),
+          spatial_context_present: Boolean(spatialPerceptionContext),
+        }));
+      }
       const messages = [
         { role: "system", content: systemPrompt },
         ...history,
