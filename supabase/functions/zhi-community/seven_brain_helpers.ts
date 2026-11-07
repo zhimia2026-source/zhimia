@@ -45,7 +45,7 @@ export function buildSevenBrainRuntimeDiagnostics(input: SevenBrainRuntimeDiagno
     .map((kind) => kind.toLowerCase().replace(/[^a-z0-9_:-]/g, "").slice(0, 64))
     .filter(Boolean))].slice(0, 8);
   const allowedPositionStatuses = new Set([
-    "position_unobserved", "position_estimated", "position_confirmed",
+    "position_unobserved", "position_estimated", "position_inferred", "position_confirmed",
     "position_stale", "position_uncertain", "unavailable",
   ]);
   return {
