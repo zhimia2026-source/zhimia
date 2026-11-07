@@ -44,6 +44,14 @@ Deno.test("seven-brain runtime diagnostics expose evidence counts without conten
       diagnostics.reachable_public_destination_count !== 6) {
     throw new Error("spatial evidence metadata was not preserved");
   }
+  const inferred = buildSevenBrainRuntimeDiagnostics({
+    privateMemoryCount: 0, privateMemoryMaxImportance: 0, ecosystemEventCount: 0,
+    ecosystemEventKinds: [], ecosystemStateRevision: null,
+    spatialPositionStatus: "inferred", reachablePublicDestinationCount: 0,
+  });
+  if (inferred.spatial_position_status !== "position_inferred") {
+    throw new Error("inferred spatial position must remain distinguishable from confirmed or estimated");
+  }
   if (JSON.stringify(diagnostics).includes("植物生长")) {
     throw new Error("untrusted free-form event labels must not enter diagnostics");
   }
