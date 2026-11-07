@@ -1985,6 +1985,28 @@ export function createCommunityHandler(
         reflectionStage = "provider_response_parse";
         const reflectionResult = await reflectionResponse.json().catch(() => ({}));
         const rawReflectionContent = reflectionResult?.choices?.[0]?.message?.content;
+        // Safe provider diagnostics: record only bounded metadata, never model output.
+        const rawContentLength = typeof rawReflectionContent === "string"
+          ? rawReflectionContent.length
+          : Array.isArray(rawReflectionContent) ? rawReflectionContent.length : 0;
+        const responseLengthBucket = rawContentLength === 0 ? "empty"
+          : rawContentLength <= 256 ? "1_256"
+          : rawContentLength <= 512 ? "257_512"
+          : rawContentLength <= 1024 ? "513_1024" : "1025_plus";
+        const rawFinishReason = reflectionResult?.choices?.[0]?.finish_reason;
+        const safeFinishReason = ["stop", "length", "content_filter", "tool_calls", "function_call"].includes(rawFinishReason)
+          ? rawFinishReason
+          : rawFinishReason == null ? "unknown" : "other";
+        console.info(JSON.stringify({
+          event: "private_reflection_provider_diagnostics",
+          agent_id: agentId,
+          turn_id: completed.id,
+          finish_reason: safeFinishReason,
+          response_content_type: typeof rawReflectionContent === "string"
+            ? "string" : Array.isArray(rawReflectionContent) ? "array" : "other",
+          response_length_bucket: responseLengthBucket,
+          refusal_present: typeof reflectionResult?.choices?.[0]?.message?.refusal === "string",
+        }));
         const creatorMessage = normalizeAgentCreatorMessage(rawReflectionContent);
         let creatorDecision = creatorMessage ? "send_proposed" : "invalid_payload";
         if (!creatorMessage && typeof rawReflectionContent === "string") {
