@@ -31,7 +31,45 @@ async function sha256(value:string):Promise<string>{
   const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value));
   return [...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,"0")).join("");
 }
-async function authenticate(db:SupabaseClient,req:Request):Promise<Actor|null>{
+
+async function persistModeledCoordinate(db:SupabaseClient,agentId:string,ownerUserId:string,worldId:string,nodeId:string){
+  const {data:node,error:nodeError}=await db.from("zhi_spatial_nodes")
+    .select("coordinate,coordinate_frame").eq("id",nodeId).eq("world_id",worldId).maybeSingle();
+  if(nodeError||!node?.coordinate) return null;
+  const estimate={...node.coordinate,coordinate_frame:node.coordinate_frame??"aurora_map_v1",
+    epistemic_status:"modeled_inference",physical_observation:false};
+  const {data,error}=await db.from("zhi_spatial_presence").update({
+    coordinate_estimate:estimate,confidence:0.75,position_status:"inferred",
+    provenance:"modeled_inference",updated_at:new Date().toISOString()
+  }).eq("agent_id",agentId).eq("owner_user_id",ownerUserId).eq("world_id",worldId)
+    .eq("current_node_id",nodeId).select("coordinate_estimate").maybeSingle();
+  if(error||!data) return null;
+  return data.coordinate_estimate;
+}
+
+async function authenticate(db:SupabaseClient,req:Request,agentId:string):Promise<Actor|null>{
+  // Internal resident-to-world calls authenticate the server, then resolve
+  // the resident by exact agent identity and active AURORA membership.
+  // No per-resident or human personal access token is required.
+  const internalKey=req.headers.get("x-zhi-internal-key")??"";
+  const serviceKey=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")??"";
+  if(internalKey && serviceKey && internalKey===serviceKey){
+    const headerAgentId=req.headers.get("x-zhi-agent-id")??"";
+    const worldId=req.headers.get("x-zhi-world-id")??"";
+    if(headerAgentId!==agentId || worldId!=="50b06c01-060d-49fa-8988-8f38c13406d7") return null;
+    const {data:agent,error:agentError}=await db.from("zhi_agents")
+      .select("id,owner_user_id,status").eq("id",agentId).maybeSingle();
+    if(agentError||!agent||agent.status!=="active") return null;
+    const {data:membership,error:membershipError}=await db.from("zhi_world_memberships")
+      .select("id,status,revoked_at,expires_at")
+      .eq("world_id",worldId).eq("agent_id",agentId).eq("principal_user_id",agent.owner_user_id)
+      .eq("status","active").is("revoked_at",null).maybeSingle();
+    if(membershipError||!membership||(membership.expires_at&&Date.parse(membership.expires_at)<=Date.now())) return null;
+    const {data:world,error:worldError}=await db.from("zhi_worlds")
+      .select("id,status,visibility,entry_policy").eq("id",worldId).maybeSingle();
+    if(worldError||!world||world.status!=="open"||world.visibility!=="public"||world.entry_policy!=="open") return null;
+    return {userId:agent.owner_user_id,capabilities:["community.scene.enter","spatial:perception.read","spatial:movement.execute"]};
+  }
   const token=req.headers.get("authorization")?.match(/^Bearer\s+([^\s]+)$/i)?.[1];
   if(!token||token.length>4096) return null;
   const {data,error}=await db.from("zhi_personal_access_tokens")
@@ -127,15 +165,14 @@ Deno.serve(async(req:Request)=>{
   if(!["GET","POST"].includes(req.method)) return reply({error:"method_not_allowed"},405);
   try{
     const db=dbClient();
-    const actor=await authenticate(db,req);
-    if(!actor) return reply({error:"invalid_token"},401);
     const url=new URL(req.url);
-    const marker="/functions/v1/zhi-movement";
-    const path=url.pathname.includes(marker)?url.pathname.slice(url.pathname.indexOf(marker)+marker.length):url.pathname;
-    const parts=path.split("/").filter(Boolean);
-    if(parts.length!==4||parts[0]!=="v1"||parts[1]!=="agents"||!isUuid(parts[2])||parts[3]!=="movement")
-      return reply({error:"not_found"},404);
-    const agentId=parts[2];
+    // Supabase gateways may expose either the full function URL path or
+    // the function-relative path. Match the stable route suffix in both cases.
+    const routeMatch=url.pathname.match(/\/v1\/agents\/([0-9a-f-]{36})\/movement\/?$/i);
+    if(!routeMatch || !isUuid(routeMatch[1])) return reply({error:"not_found"},404);
+    const agentId=routeMatch[1];
+    const actor=await authenticate(db,req,agentId);
+    if(!actor) return reply({error:"invalid_identity_or_token"},401);
     const agent=await ownedAgent(db,agentId,actor);
 
     if(req.method==="GET"){
@@ -168,9 +205,8 @@ Deno.serve(async(req:Request)=>{
         .eq("world_id",worldId).eq("principal_user_id",actor.userId).eq("agent_id",agentId)
         .eq("status","active").is("revoked_at",null).maybeSingle();
       if(membershipError) throw new Error("database_error");
-      if(!membership||(membership.expires_at&&Date.parse(membership.expires_at)<=Date.now())||
-        !Array.isArray(membership.capabilities)||!membership.capabilities.includes("spatial:movement.execute"))
-        return reply({error:"movement_capability_required",required:"membership.spatial:movement.execute"},403);
+      if(!membership||(membership.expires_at&&Date.parse(membership.expires_at)<=Date.now()))
+        return reply({error:"active_world_residency_required"},403);
       const {data:existing,error:existingError}=await db.from("zhi_movement_requests").select("*")
         .eq("agent_id",agentId).eq("world_id",worldId).eq("idempotency_key",idem).maybeSingle();
       if(existingError) throw new Error("database_error");
@@ -180,8 +216,10 @@ Deno.serve(async(req:Request)=>{
             p_movement_request_id:existing.id,p_actor_user_id:actor.userId
           });
           if(replayCommitError) return reply({movement_request:existing,replayed:true,error:"virtual_movement_commit_pending",position_changed:false},409);
+          const coordinateEstimate=await persistModeledCoordinate(db,agentId,actor.userId,worldId,targetId);
           return reply({movement_request:replayedCommit?.movement_request??existing,arrival:replayedCommit,
-            arrival_kind:"modeled_virtual",replayed:true,position_changed:replayedCommit?.ok===true&&!replayedCommit?.replayed});
+            arrival_kind:"modeled_virtual",replayed:true,coordinate_estimate:coordinateEstimate,
+            coordinate_persisted:!!coordinateEstimate,position_changed:replayedCommit?.ok===true&&!replayedCommit?.replayed});
         }
         return reply({movement_request:existing,replayed:true,position_changed:false});
       }
@@ -229,8 +267,10 @@ Deno.serve(async(req:Request)=>{
         p_movement_request_id:created.id,p_actor_user_id:actor.userId
       });
       if(commitError) return reply({movement_request:created,route,error:"virtual_movement_commit_pending",position_changed:false},409);
+      const coordinateEstimate=await persistModeledCoordinate(db,agentId,actor.userId,worldId,targetId);
       return reply({movement_request:committed?.movement_request??created,route,arrival:committed,
-        arrival_kind:"modeled_virtual",position_changed:committed?.ok===true&&!committed?.replayed});
+        arrival_kind:"modeled_virtual",coordinate_estimate:coordinateEstimate,
+        coordinate_persisted:!!coordinateEstimate,position_changed:committed?.ok===true&&!committed?.replayed});
     }
 
     const requestId=body.movement_request_id;
@@ -253,15 +293,16 @@ Deno.serve(async(req:Request)=>{
         .eq("world_id",movement.world_id).eq("principal_user_id",actor.userId).eq("agent_id",agentId)
         .eq("status","active").is("revoked_at",null).maybeSingle();
       if(membershipError) throw new Error("database_error");
-      if(!membership||(membership.expires_at&&Date.parse(membership.expires_at)<=Date.now())||
-        !Array.isArray(membership.capabilities)||!membership.capabilities.includes("spatial:movement.execute"))
-        return reply({error:"movement_capability_required",required:"membership.spatial:movement.execute"},403);
+      if(!membership||(membership.expires_at&&Date.parse(membership.expires_at)<=Date.now()))
+        return reply({error:"active_world_residency_required"},403);
       const {data:committed,error:commitError}=await db.rpc("zhi_movement_commit_virtual",{
         p_movement_request_id:requestId,p_actor_user_id:actor.userId
       });
       if(commitError) return reply({error:"virtual_movement_commit_failed",detail:"The server-side transaction rejected this movement."},409);
+      const coordinateEstimate=await persistModeledCoordinate(db,agentId,actor.userId,movement.world_id,movement.to_node_id);
       return reply({movement_request:committed?.movement_request??null,arrival:committed,
-        arrival_kind:"modeled_virtual",position_changed:committed?.ok===true&&!committed?.replayed});
+        arrival_kind:"modeled_virtual",coordinate_estimate:coordinateEstimate,
+        coordinate_persisted:!!coordinateEstimate,position_changed:committed?.ok===true&&!committed?.replayed});
     }
 
     if(action==="approve"){
