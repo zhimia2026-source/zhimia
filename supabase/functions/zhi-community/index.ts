@@ -6,7 +6,7 @@ import { buildFeedbackRecord, buildRevisionProposal } from "./cognitive_cycle_he
 import { buildPrivateAgentContext, buildPrivateChatHistory, buildSceneAwarenessContext, buildSceneBehaviorGuidance } from "./chat_context_helpers.ts";
 import { computeSceneEnvironment, normalizeSceneEnvironmentConfig } from "./environment_helpers.ts";
 import { canReadPrivateCognition } from "./constitutional_helpers.ts";
-import { normalizeAgentReflection, normalizeMemoryCandidate, normalizeAgentCreatorMessage, isLongTermMemoryEligible, buildPrivateReflectionMessages, buildPrivateMemoryLogEvent } from "./memory_experience_helpers.ts";
+import { normalizeAgentReflection, normalizeAgentReflectionWithReason, normalizeMemoryCandidate, normalizeAgentCreatorMessage, isLongTermMemoryEligible, buildPrivateReflectionMessages, buildPrivateMemoryLogEvent } from "./memory_experience_helpers.ts";
 import { rankPrivateMemories } from "./long_term_memory_helpers.ts";
 import { buildAgentAddress, parseAgentAddress } from "./agent_address_helpers.ts";
 
@@ -2044,12 +2044,14 @@ export function createCommunityHandler(
           )));
           growth = { reflection: "completed", memory: "consent_required" };
         } else {
-        const reflection = normalizeAgentReflection(rawReflectionContent);
+        const reflectionParse = normalizeAgentReflectionWithReason(rawReflectionContent);
+        const reflection = reflectionParse.value;
         if (!reflection || reflection.importance < 3) {
           console.info(JSON.stringify(buildPrivateMemoryLogEvent(
             "private_memory_decision", agentId, completed.id,
             reflection ? "not_selected_low_value" : "invalid_reflection_output",
             reflection?.importance,
+            reflectionParse.errorCode,
           )));
           growth = { reflection: "completed", memory: "not_selected" };
         } else {
