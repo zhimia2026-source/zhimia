@@ -227,7 +227,7 @@ export function buildPrivateMemoryLogEvent(
     "invalid_candidate", "importance_mismatch", "empty_content",
   ]);
   const safeErrorCode = typeof errorCode === "string" &&
-    (/^\\d{5}$/.test(errorCode) || safeErrorCodes.has(errorCode))
+    (/^[0-9]{5}$/.test(errorCode) || safeErrorCodes.has(errorCode))
     ? errorCode
     : undefined;
   return {
