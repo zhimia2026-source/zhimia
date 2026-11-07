@@ -222,7 +222,12 @@ export function buildPrivateMemoryLogEvent(
   errorCode?: unknown,
 ): Record<string, unknown> {
   const safeOutcome = /^[a-z_]{1,48}$/.test(outcome) ? outcome : "unknown";
-  const safeErrorCode = typeof errorCode === "string" && /^[a-zA-Z0-9_-]{1,40}$/.test(errorCode)
+  const safeErrorCodes = new Set([
+    "parse_failed", "invalid_shape", "unsupported_fields", "missing_worth_flag",
+    "invalid_candidate", "importance_mismatch", "empty_content",
+  ]);
+  const safeErrorCode = typeof errorCode === "string" &&
+    (/^\\d{5}$/.test(errorCode) || safeErrorCodes.has(errorCode))
     ? errorCode
     : undefined;
   return {
