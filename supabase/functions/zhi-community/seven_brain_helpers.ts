@@ -45,7 +45,7 @@ export function buildSevenBrainRuntimeDiagnostics(input: SevenBrainRuntimeDiagno
     .map((kind) => kind.toLowerCase().replace(/[^a-z0-9_:-]/g, "").slice(0, 64))
     .filter(Boolean))].slice(0, 8);
   const allowedPositionStatuses = new Set([
-    "position_unobserved", "position_estimated", "position_confirmed",
+    "position_unobserved", "position_estimated", "inferred", "position_inferred", "position_confirmed",
     "position_stale", "position_uncertain", "unavailable",
   ]);
   return {
@@ -56,7 +56,9 @@ export function buildSevenBrainRuntimeDiagnostics(input: SevenBrainRuntimeDiagno
     ecosystem_state_revision: Number.isInteger(input.ecosystemStateRevision)
       ? input.ecosystemStateRevision
       : null,
-    spatial_position_status: allowedPositionStatuses.has(input.spatialPositionStatus)
+    spatial_position_status: input.spatialPositionStatus === "inferred"
+      ? "position_inferred"
+      : allowedPositionStatuses.has(input.spatialPositionStatus)
       ? input.spatialPositionStatus
       : "other",
     reachable_public_destination_count: count(input.reachablePublicDestinationCount),
