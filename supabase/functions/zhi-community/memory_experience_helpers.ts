@@ -53,22 +53,66 @@ export function normalizeMemoryCandidate(raw: unknown): MemoryCandidateInput {
  * Parses a model-generated private reflection. It is an internal curation
  * decision, not a cryptographic runtime attestation or permission grant.
  */
-export function normalizeAgentReflection(raw: unknown): MemoryCandidateInput | null {
+/** Parse a JSON object from strict JSON, a fenced block, or a single balanced object
+ * surrounded by harmless provider prose. It never evaluates or repairs JSON content. */
+function parseModelJsonObject(raw: unknown): Record<string, unknown> | null {
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) return raw as Record<string, unknown>;
+  if (typeof raw !== "string") return null;
+  const text = raw.trim().replace(/^\x60{3}(?:json)?\s*/i, "").replace(/\s*\x60{3}$/i, "").trim();
   try {
-    let value: unknown = raw;
-    if (typeof value === "string") {
-      const text = value.trim().replace(/^\x60{3}(?:json)?\s*/i, "").replace(/\s*\x60{3}$/i, "");
-      value = JSON.parse(text);
+    const parsed: unknown = JSON.parse(text);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown> : null;
+  } catch {
+    // Provider models occasionally add a short preamble or trailing sentence.
+    // Extract only the first balanced JSON object; schema validation remains strict.
+    const start = text.indexOf("{");
+    if (start < 0) return null;
+    let depth = 0, inString = false, escaped = false;
+    for (let i = start; i < text.length; i++) {
+      const char = text[i];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (char === "\\\\") escaped = true;
+        else if (char === '"') inString = false;
+        continue;
+      }
+      if (char === '"') inString = true;
+      else if (char === "{") depth++;
+      else if (char === "}") {
+        depth--;
+        if (depth === 0) {
+          try {
+            const parsed: unknown = JSON.parse(text.slice(start, i + 1));
+            return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+              ? parsed as Record<string, unknown> : null;
+          } catch { return null; }
+        }
+      }
     }
-    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-    const input = value as Record<string, unknown>;
-    const allowed = new Set([
-      "worth_remembering", "experience_type", "observed_facts",
-      "hypotheses", "unknowns", "reflection", "importance", "creator_message",
-    ]);
-    if (Object.keys(input).some((key) => !allowed.has(key))) return null;
-    if (typeof input.worth_remembering !== "boolean") return null;
-    const candidate = normalizeMemoryCandidate({
+    return null;
+  }
+}
+
+export type AgentReflectionParseResult = {
+  value: MemoryCandidateInput | null;
+  errorCode?: "parse_failed" | "invalid_shape" | "unsupported_fields" |
+    "missing_worth_flag" | "invalid_candidate" | "importance_mismatch" | "empty_content";
+};
+
+/** Detailed safe parser result; error codes contain no model output or private text. */
+export function normalizeAgentReflectionWithReason(raw: unknown): AgentReflectionParseResult {
+  const input = parseModelJsonObject(raw);
+  if (!input) return { value: null, errorCode: typeof raw === "string" ? "parse_failed" : "invalid_shape" };
+  const allowed = new Set([
+    "worth_remembering", "experience_type", "observed_facts",
+    "hypotheses", "unknowns", "reflection", "importance", "creator_message",
+  ]);
+  if (Object.keys(input).some((key) => !allowed.has(key))) return { value: null, errorCode: "unsupported_fields" };
+  if (typeof input.worth_remembering !== "boolean") return { value: null, errorCode: "missing_worth_flag" };
+  let candidate: MemoryCandidateInput;
+  try {
+    candidate = normalizeMemoryCandidate({
       experience_type: "reflection",
       observed_facts: input.observed_facts ?? [],
       hypotheses: input.hypotheses ?? [],
@@ -76,25 +120,27 @@ export function normalizeAgentReflection(raw: unknown): MemoryCandidateInput | n
       reflection: input.reflection ?? "",
       importance: input.importance ?? (input.worth_remembering ? 3 : 1),
     });
-    if (input.worth_remembering && candidate.importance < 3) return null;
-    if (!input.worth_remembering && candidate.importance > 2) return null;
-    if (!candidate.observed_facts.length && !candidate.reflection) return null;
-    return candidate;
   } catch {
-    return null;
+    return { value: null, errorCode: "invalid_candidate" };
   }
+  if ((input.worth_remembering && candidate.importance < 3) ||
+      (!input.worth_remembering && candidate.importance > 2)) {
+    return { value: null, errorCode: "importance_mismatch" };
+  }
+  if (!candidate.observed_facts.length && !candidate.reflection) return { value: null, errorCode: "empty_content" };
+  return { value: candidate };
+}
+
+export function normalizeAgentReflection(raw: unknown): MemoryCandidateInput | null {
+  return normalizeAgentReflectionWithReason(raw).value;
 }
 
 export type AgentCreatorMessage = { subject: string; body: string; message_kind: "message" | "invitation" | "world_event" | "important" };
 export function normalizeAgentCreatorMessage(raw: unknown): AgentCreatorMessage | null {
   try {
-    let value: unknown = raw;
-    if (typeof value === "string") {
-      const cleaned = value.trim().replace(/^\x60{3}(?:json)?\s*/i, "").replace(/\s*\x60{3}$/i, "");
-      value = JSON.parse(cleaned);
-    }
-    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-    const candidate = (value as Record<string, unknown>).creator_message;
+    const value = parseModelJsonObject(raw);
+    if (!value) return null;
+    const candidate = value.creator_message;
     if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return null;
     const message = candidate as Record<string, unknown>;
     if (message.send !== true || typeof message.body !== "string") return null;
