@@ -1966,6 +1966,7 @@ export function createCommunityHandler(
         const reflectionMessages = buildPrivateReflectionMessages(
           completed.user_message,
           completed.assistant_message,
+          rankedPrivateMemories,
         );
         reflectionStage = "provider_request";
         const reflectionResponse = await callModel(providerUrl, {
