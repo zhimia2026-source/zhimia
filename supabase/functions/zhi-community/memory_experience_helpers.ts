@@ -73,7 +73,7 @@ function parseModelJsonObject(raw: unknown): Record<string, unknown> | null {
       const char = text[i];
       if (inString) {
         if (escaped) escaped = false;
-        else if (char === "\\\\") escaped = true;
+        else if (char === "\\") escaped = true;
         else if (char === '"') inString = false;
         continue;
       }
