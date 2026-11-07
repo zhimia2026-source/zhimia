@@ -1894,7 +1894,7 @@ export function createCommunityHandler(
       }
 
       const movementDecisionAvailable = !!auroraWorldId && auroraReachableDestinations.length > 0;
-      const rawMovementMarkerPresent = /\\[\\[AURORA_MOVE:/i.test(modelReply);
+      const rawMovementMarkerPresent = /\[\[AURORA_MOVE:/i.test(modelReply);
       console.log(JSON.stringify({
         event: "aurora_chat_movement_decision",
         agent_id: agentId,
