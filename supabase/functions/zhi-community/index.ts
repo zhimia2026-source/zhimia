@@ -1893,6 +1893,22 @@ export function createCommunityHandler(
         }
       }
 
+      const movementDecisionAvailable = !!auroraWorldId && auroraReachableDestinations.length > 0;
+      const rawMovementMarkerPresent = /\\[\\[AURORA_MOVE:/i.test(modelReply);
+      console.log(JSON.stringify({
+        event: "aurora_chat_movement_decision",
+        agent_id: agentId,
+        turn_id: pendingTurn.id,
+        movement_available: movementDecisionAvailable,
+        reachable_public_destination_count: auroraReachableDestinations.length,
+        spatial_position_status: spatialPositionStatus,
+        model_marker_present: !!moveMarker,
+        malformed_marker_present: rawMovementMarkerPresent && !moveMarker,
+        explicit_user_intent_fallback: movementIntent?.source === "explicit_user_intent",
+        decision: movementIntent ? "intent_selected" : movementDecisionAvailable ? "no_movement_intent" : "movement_unavailable",
+        intent_source: movementIntent?.source ?? null,
+      }));
+
       if (movementIntent) {
         const targetId = movementIntent.targetId;
         const reason = movementIntent.reason;
