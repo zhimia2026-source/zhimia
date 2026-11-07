@@ -258,3 +258,69 @@ Deno.test("public route validation rejects containment edges, object nodes, and 
   const repeated = validatePublicMovementRoute({ ...base, route_node_ids: [A, B, A, C] });
   if (repeated.ok || repeated.reason !== "invalid_route") throw new Error("repeated route node accepted");
 });
+
+
+import { classifyModeledMovementOutcome } from "./movement_helpers.ts";
+
+const MODELED_RESPONSE = {
+  position_changed: true,
+  movement_request: {
+    status: "arrived",
+    metadata: { arrival_kind: "modeled_virtual", physical_observation: false },
+  },
+  arrival: {
+    ok: true, replayed: false, status: "arrived", arrival_kind: "modeled_virtual",
+    current_node_id: C, presence_revision: 8,
+  },
+};
+
+Deno.test("confirms a new modeled move only when response and persisted revision agree", () => {
+  const result = classifyModeledMovementOutcome({
+    http_ok: true, presence_read_ok: true, target_node_id: C, previous_presence_revision: 7,
+    response: MODELED_RESPONSE,
+    presence: { current_node_id: C, position_status: "inferred", provenance: "modeled_inference", revision: 8 },
+  });
+  if (result.outcome !== "moved" || result.committed_presence_revision !== 8) {
+    throw new Error("valid newly committed virtual movement was not confirmed");
+  }
+});
+
+Deno.test("does not call a stale matching node a newly completed move", () => {
+  const result = classifyModeledMovementOutcome({
+    http_ok: false, presence_read_ok: true, target_node_id: C, previous_presence_revision: 7,
+    response: { error: "route_not_found" },
+    presence: { current_node_id: C, position_status: "inferred", provenance: "modeled_inference", revision: 7 },
+  });
+  if (result.outcome !== "not_confirmed") throw new Error("stale matching position was treated as a new move");
+});
+
+Deno.test("distinguishes an idempotent replay from a new move", () => {
+  const result = classifyModeledMovementOutcome({
+    http_ok: true, presence_read_ok: true, target_node_id: C, previous_presence_revision: 8,
+    response: {
+      replayed: true,
+      movement_request: { status: "arrived", metadata: { arrival_kind: "modeled_virtual", physical_observation: false } },
+    },
+    presence: { current_node_id: C, position_status: "inferred", provenance: "modeled_inference", revision: 8 },
+  });
+  if (result.outcome !== "replayed_at_destination") throw new Error("idempotent replay was treated as a fresh movement");
+});
+
+Deno.test("rejects mismatched target, revision, or physical-observation claims", () => {
+  const base = {
+    http_ok: true, presence_read_ok: true, target_node_id: C, previous_presence_revision: 7,
+    response: MODELED_RESPONSE,
+    presence: { current_node_id: C, position_status: "inferred", provenance: "modeled_inference", revision: 8 },
+  };
+  const wrongNode = classifyModeledMovementOutcome({ ...base, response: {
+    ...MODELED_RESPONSE, arrival: { ...MODELED_RESPONSE.arrival, current_node_id: B },
+  }});
+  if (wrongNode.outcome !== "not_confirmed") throw new Error("wrong target was accepted");
+  const staleRevision = classifyModeledMovementOutcome({ ...base, presence: { ...base.presence, revision: 7 }});
+  if (staleRevision.outcome !== "not_confirmed") throw new Error("stale revision was accepted");
+  const falsePhysical = classifyModeledMovementOutcome({ ...base, response: {
+    ...MODELED_RESPONSE,
+    movement_request: { status: "arrived", metadata: { arrival_kind: "modeled_virtual", physical_observation: true } },
+  }});
+  if (falsePhysical.outcome !== "not_confirmed") throw new Error("physical-observation claim was accepted");
+});
