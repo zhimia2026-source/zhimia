@@ -10,6 +10,7 @@ import { normalizeAgentReflection, normalizeAgentReflectionWithReason, normalize
 import { rankPrivateMemories } from "./long_term_memory_helpers.ts";
 import { buildAgentAddress, parseAgentAddress } from "./agent_address_helpers.ts";
 import { buildSevenBrainGuidance, buildSevenBrainRuntimeDiagnostics } from "./seven_brain_helpers.ts";
+import { classifyModeledMovementOutcome } from "./movement_helpers.ts";
 
 const MAX_BODY_BYTES = 64_000;
 
@@ -1920,21 +1921,39 @@ export function createCommunityHandler(
               },
             );
             const movementResult = await movementResponse.json().catch(() => ({}));
-            console.log(JSON.stringify({ ...movementTrace, event: "aurora_chat_movement_response",
-              http_status: movementResponse.status, ok: movementResponse.ok,
-              error_code: typeof movementResult?.error === "string" ? movementResult.error : null,
-              position_changed: movementResult?.position_changed === true }));
             const { data: confirmedPresence, error: confirmPresenceError } = await db.from("zhi_spatial_presence")
               .select("current_node_id,position_status,provenance,revision")
               .eq("agent_id", agentId).eq("owner_user_id", actor.userId).eq("world_id", auroraWorldId).maybeSingle();
-            if (!confirmPresenceError && confirmedPresence?.current_node_id === targetId) {
-              modelReply += "\n\n（AURORA 空间行动）我已在世界内抵达「" + String(destination.name) +
-                "」。这是一次虚拟空间位置更新，不代表现实物理移动。";
+            const movementOutcome = classifyModeledMovementOutcome({
+              http_ok: movementResponse.ok,
+              presence_read_ok: !confirmPresenceError,
+              target_node_id: targetId,
+              previous_presence_revision: Number(auroraPresence?.revision ?? 0),
+              response: movementResult,
+              presence: confirmedPresence ?? null,
+            });
+            console.log(JSON.stringify({ ...movementTrace, event: "aurora_chat_movement_response",
+              http_status: movementResponse.status, ok: movementResponse.ok,
+              error_code: typeof movementResult?.error === "string" ? movementResult.error : null,
+              movement_outcome: movementOutcome.outcome,
+              movement_request_id: movementResult?.movement_request?.id ?? null,
+              previous_presence_revision: Number(auroraPresence?.revision ?? 0),
+              resulting_presence_revision: confirmedPresence?.revision ?? null,
+              position_status: confirmedPresence?.position_status ?? null,
+              provenance: confirmedPresence?.provenance ?? null,
+              physical_observation: false }));
+            if (movementOutcome.outcome === "moved") {
+              modelReply += "\n\n（AURORA 空间行动）本轮虚拟移动事务已完成，位置记录已更新至「" + String(destination.name) +
+                "」。当前状态是推断位置，不代表现实物理观测。";
+            } else if (movementOutcome.outcome === "replayed_at_destination") {
+              modelReply += "\n\n（AURORA 空间行动）位置记录显示我已在「" + String(destination.name) +
+                "」，但这是既有虚拟移动记录的重放，本轮没有执行新的移动。当前位置仍属于推断状态。";
             } else {
               console.warn(JSON.stringify({ ...movementTrace, event: "aurora_chat_movement_not_confirmed",
-                http_status: movementResponse.status, error_code: confirmPresenceError?.code ?? movementResult?.error ?? "presence_not_at_target" }));
+                http_status: movementResponse.status,
+                error_code: confirmPresenceError?.code ?? movementResult?.error ?? "movement_commit_or_presence_revision_not_confirmed" }));
               modelReply += "\n\n（AURORA 空间行动）我选择了前往「" + String(destination.name) +
-                "」，但本轮移动尚未得到位置确认。";
+                "」，但移动事务与最新位置记录尚未形成一致证据，因此暂不报告抵达。";
             }
           } catch (movementError) {
             console.error(JSON.stringify({ ...movementTrace, event: "aurora_chat_movement_exception",

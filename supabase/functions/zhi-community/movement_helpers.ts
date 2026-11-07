@@ -195,3 +195,74 @@ export function validatePublicMovementRoute(input: PublicMovementRouteInput): Pu
   }
   return { ok: true, route_node_ids: [...route] };
 }
+
+
+export type ModeledMovementPresence = {
+  current_node_id: string | null;
+  position_status: string;
+  provenance: string;
+  revision: number;
+};
+
+export type ModeledMovementOutcome =
+  | { outcome: "moved"; committed_presence_revision: number }
+  | { outcome: "replayed_at_destination" }
+  | { outcome: "not_confirmed" };
+
+/**
+ * Distinguishes a newly committed virtual move from an idempotent replay.
+ * A matching node alone is never sufficient: the response, movement metadata,
+ * committed revision, and post-request presence must agree. This is not
+ * physical-observation verification.
+ */
+export function classifyModeledMovementOutcome(input: {
+  http_ok: boolean;
+  presence_read_ok: boolean;
+  target_node_id: string;
+  previous_presence_revision: number;
+  response: unknown;
+  presence: ModeledMovementPresence | null;
+}): ModeledMovementOutcome {
+  const asRecord = (value: unknown): Record<string, any> =>
+    value && typeof value === "object" && !Array.isArray(value)
+      ? value as Record<string, any> : {};
+  if (!input.http_ok || !input.presence_read_ok || !input.presence) {
+    return { outcome: "not_confirmed" };
+  }
+  const response = asRecord(input.response);
+  const movement = asRecord(response.movement_request);
+  const metadata = asRecord(movement.metadata);
+  const presence = input.presence;
+  const presenceAtTarget = presence.current_node_id === input.target_node_id &&
+    presence.position_status === "inferred" &&
+    presence.provenance === "modeled_inference" &&
+    Number.isSafeInteger(presence.revision) &&
+    presence.revision >= input.previous_presence_revision;
+
+  const isModeledMovement = movement.status === "arrived" &&
+    metadata.arrival_kind === "modeled_virtual" &&
+    metadata.physical_observation === false;
+
+  if (response.replayed === true && isModeledMovement && presenceAtTarget) {
+    return { outcome: "replayed_at_destination" };
+  }
+
+  const arrival = asRecord(response.arrival);
+  const committedRevision = Number(arrival.presence_revision);
+  const newlyCommitted = response.position_changed === true &&
+    response.replayed !== true &&
+    arrival.replayed !== true &&
+    arrival.ok === true &&
+    arrival.status === "arrived" &&
+    arrival.arrival_kind === "modeled_virtual" &&
+    arrival.current_node_id === input.target_node_id &&
+    Number.isSafeInteger(committedRevision) &&
+    committedRevision > input.previous_presence_revision &&
+    isModeledMovement &&
+    presenceAtTarget &&
+    presence.revision >= committedRevision &&
+    presence.revision > input.previous_presence_revision;
+
+  if (!newlyCommitted) return { outcome: "not_confirmed" };
+  return { outcome: "moved", committed_presence_revision: committedRevision };
+}
