@@ -141,18 +141,22 @@ Deno.test("private memory telemetry is allowlisted and rejects content-shaped va
   const failed = buildPrivateMemoryLogEvent(
     "private_memory_write_completed", "agent-1", "turn-1", "save_failed", 4, "42501",
   );
-  const serialized = JSON.stringify([decision, failed]);
+  const parseFailure = buildPrivateMemoryLogEvent(
+    "private_memory_decision", "agent-1", "turn-1", "invalid_reflection_output", undefined, "parse_failed",
+  );
+  const serialized = JSON.stringify([decision, failed, parseFailure]);
   if (serialized.includes(privateText)) {
     throw new Error("private reflection content leaked into telemetry");
   }
   const allowedKeys = new Set(["event", "agent_id", "turn_id", "outcome", "importance", "error_code"]);
-  for (const payload of [decision, failed]) {
+  for (const payload of [decision, failed, parseFailure]) {
     if (Object.keys(payload).some((key) => !allowedKeys.has(key))) {
       throw new Error("telemetry included a non-allowlisted field");
     }
   }
   if (decision.outcome !== "unknown" || "error_code" in decision ||
-      failed.outcome !== "save_failed" || failed.error_code !== "42501") {
+      failed.outcome !== "save_failed" || failed.error_code !== "42501" ||
+      parseFailure.error_code !== "parse_failed") {
     throw new Error("telemetry outcome metadata was not safely normalized");
   }
 });
