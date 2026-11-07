@@ -9,7 +9,7 @@ import { canReadPrivateCognition } from "./constitutional_helpers.ts";
 import { normalizeAgentReflection, normalizeAgentReflectionWithReason, normalizeMemoryCandidate, normalizeAgentCreatorMessage, isLongTermMemoryEligible, buildPrivateReflectionMessages, buildPrivateMemoryLogEvent } from "./memory_experience_helpers.ts";
 import { rankPrivateMemories } from "./long_term_memory_helpers.ts";
 import { buildAgentAddress, parseAgentAddress } from "./agent_address_helpers.ts";
-import { buildSevenBrainGuidance } from "./seven_brain_helpers.ts";
+import { buildSevenBrainGuidance, buildSevenBrainRuntimeDiagnostics } from "./seven_brain_helpers.ts";
 
 const MAX_BODY_BYTES = 64_000;
 
@@ -1355,6 +1355,11 @@ export function createCommunityHandler(
       let auroraWorldId: string | null = null;
       let auroraReachableDestinations: Array<Record<string, any>> = [];
       let auroraPresence: Record<string, any> | null = null;
+      let ecosystemEventCount = 0;
+      let ecosystemEventKinds: string[] = [];
+      let ecosystemStateRevision: number | null = null;
+      let spatialPositionStatus = "unavailable";
+      let reachablePublicDestinationCount = 0;
       const AURORA_WORLD_ID = "50b06c01-060d-49fa-8988-8f38c13406d7";
       const PROTOTYPE_MIA_AGENT_ID = "34833ba9-2be7-4a55-9b52-62c402f759b5";
 
@@ -1377,6 +1382,13 @@ export function createCommunityHandler(
           if (auroraWorld?.status === "open") {
             auroraWorldId = auroraWorld.id;
             const sceneRuntime = await loadSceneRuntimeEnvironment(db, auroraWorld.id, auroraWorld.environment_state);
+            const environmentFeedback = asRecord(sceneRuntime.environment.environment_feedback);
+            const ecosystemEvents = Array.isArray(environmentFeedback.events) ? environmentFeedback.events : [];
+            ecosystemEventCount = ecosystemEvents.length;
+            ecosystemEventKinds = ecosystemEvents.map((event: unknown) => String(asRecord(event).event_kind ?? ""));
+            ecosystemStateRevision = Number.isInteger(environmentFeedback.state_revision)
+              ? Number(environmentFeedback.state_revision)
+              : null;
             const sceneAwareness = buildSceneAwarenessContext({
               name: auroraWorld.name, description: auroraWorld.description, visibility: auroraWorld.visibility,
             }, sceneRuntime.environment);
@@ -1410,11 +1422,13 @@ export function createCommunityHandler(
             auroraPresence = presence ?? {
               current_node_id: null, position_status: "position_unobserved", provenance: "unobserved", revision: 0,
             };
+            spatialPositionStatus = String(auroraPresence.position_status ?? "unavailable");
             const allRouteNodes = routeNodes ?? [];
             const publicDestinations = allRouteNodes.filter((node: any) => ["region", "place"].includes(node.node_type));
             auroraReachableDestinations = findReachablePublicDestinations(
               auroraPresence.current_node_id, publicDestinations, allRouteNodes, routeEdges ?? [],
             );
+            reachablePublicDestinationCount = auroraReachableDestinations.length;
             spatialPerceptionContext = JSON.stringify({
               world_id: auroraWorld.id,
               current_presence: auroraPresence,
@@ -1605,6 +1619,16 @@ export function createCommunityHandler(
           private_context_present: Boolean(privateContext),
           scene_context_present: Boolean(sceneAwarenessContext),
           spatial_context_present: Boolean(spatialPerceptionContext),
+          ...buildSevenBrainRuntimeDiagnostics({
+            privateMemoryCount: rankedPrivateMemories.length,
+            privateMemoryMaxImportance: rankedPrivateMemories.reduce((max: number, memory: Record<string, unknown>) =>
+              Math.max(max, Number.isInteger(memory.importance) ? Number(memory.importance) : 0), 0),
+            ecosystemEventCount,
+            ecosystemEventKinds,
+            ecosystemStateRevision,
+            spatialPositionStatus,
+            reachablePublicDestinationCount,
+          }),
         }));
       }
       const messages = [
