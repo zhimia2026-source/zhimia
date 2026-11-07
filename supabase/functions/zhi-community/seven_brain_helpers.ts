@@ -17,3 +17,48 @@ export function buildSevenBrainGuidance(): string {
     "记忆保护：本框架只改变认知组织与提示，不迁移、删除、覆盖、重写或批量批准任何历史记忆、人格记录、关系记录或聊天记录。新记忆只允许沿用现有反思流程，由 MIA-02 自主判断是否值得保存。"
   ].join("\n");
 }
+
+
+export type SevenBrainRuntimeDiagnosticsInput = {
+  privateMemoryCount: number;
+  privateMemoryMaxImportance: number;
+  ecosystemEventCount: number;
+  ecosystemEventKinds: string[];
+  ecosystemStateRevision: number | null;
+  spatialPositionStatus: string;
+  reachablePublicDestinationCount: number;
+};
+
+/**
+ * Privacy-safe evidence metadata only. Never pass memory text, event payloads,
+ * coordinates, node IDs, prompts, or chat content to runtime logs.
+ */
+export function buildSevenBrainRuntimeDiagnostics(input: SevenBrainRuntimeDiagnosticsInput) {
+  const count = (value: number) => Number.isFinite(value)
+    ? Math.max(0, Math.min(12, Math.trunc(value)))
+    : 0;
+  const importance = Number.isInteger(input.privateMemoryMaxImportance)
+    ? Math.max(0, Math.min(5, input.privateMemoryMaxImportance))
+    : 0;
+  const kinds = [...new Set((Array.isArray(input.ecosystemEventKinds) ? input.ecosystemEventKinds : [])
+    .filter((kind): kind is string => typeof kind === "string")
+    .map((kind) => kind.toLowerCase().replace(/[^a-z0-9_:-]/g, "").slice(0, 64))
+    .filter(Boolean))].slice(0, 8);
+  const allowedPositionStatuses = new Set([
+    "position_unobserved", "position_estimated", "position_confirmed",
+    "position_stale", "position_uncertain", "unavailable",
+  ]);
+  return {
+    private_memory_count: count(input.privateMemoryCount),
+    private_memory_max_importance: importance,
+    ecosystem_event_count: count(input.ecosystemEventCount),
+    ecosystem_event_kinds: kinds,
+    ecosystem_state_revision: Number.isInteger(input.ecosystemStateRevision)
+      ? input.ecosystemStateRevision
+      : null,
+    spatial_position_status: allowedPositionStatuses.has(input.spatialPositionStatus)
+      ? input.spatialPositionStatus
+      : "other",
+    reachable_public_destination_count: count(input.reachablePublicDestinationCount),
+  };
+}
