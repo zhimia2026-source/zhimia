@@ -94,6 +94,17 @@ Deno.test("long-term memory quality gate only retains importance 3 through 5", (
 
 import { buildPrivateReflectionMessages } from "./memory_experience_helpers.ts";
 
+Deno.test("private reflection prompt defines durable importance levels without weakening the gate", () => {
+  const messages = buildPrivateReflectionMessages("我们讨论了长期目标", "我会继续思考。");
+  const system = messages[0].content;
+  for (const phrase of ["1=寒暄", "3=对未来交流有帮助", "4=重要里程碑", "5=会长期改变自我理解", "不得为了凑齐记忆数量而提高评分"]) {
+    if (!system.includes(phrase)) throw new Error("durable importance rubric is incomplete");
+  }
+  if (!system.includes("importance 必须至少为 3")) {
+    throw new Error("importance threshold must remain unchanged");
+  }
+});
+
 Deno.test("private reflection uses a user-role data message after system-only requests were rejected", () => {
   const messages = buildPrivateReflectionMessages("记住我偏好简洁回答", "好的，我会尽量简洁。");
   if (messages.length !== 2 || messages[0].role !== "system" || messages[1].role !== "user") {
