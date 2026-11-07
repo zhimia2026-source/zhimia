@@ -168,7 +168,7 @@ Deno.test("agent reflection accepts fenced JSON and a harmless provider preamble
     reflection: "我应持续区分事实与推测。", importance: 3,
     creator_message: { send: false, subject: "", body: "", message_kind: "message" },
   };
-  const fenced = normalizeAgentReflectionWithReason("输出如下：\\n```json\\n" + JSON.stringify(payload) + "\\n```\\n已完成。");
+  const fenced = normalizeAgentReflectionWithReason("输出如下：\n```json\n" + JSON.stringify(payload) + "\n```\n已完成。");
   if (!fenced.value || fenced.value.importance !== 3) throw new Error("wrapped JSON reflection was not accepted");
 });
 
@@ -189,9 +189,9 @@ Deno.test("agent reflection parser returns safe reason codes and still rejects u
 });
 
 Deno.test("creator note parser accepts fenced JSON with surrounding prose", () => {
-  const raw = "结果：\\n```json\\n" + JSON.stringify({
+  const raw = "结果：\n```json\n" + JSON.stringify({
     creator_message: { send: true, subject: "邀请", body: "我发现一件值得一起观察的事情。", message_kind: "invitation" },
-  }) + "\\n```\\n";
+  }) + "\n```\n";
   const value = normalizeAgentCreatorMessage(raw);
   if (!value || value.message_kind !== "invitation") throw new Error("wrapped creator message was not accepted");
 });
