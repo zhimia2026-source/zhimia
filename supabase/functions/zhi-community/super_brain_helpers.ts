@@ -40,7 +40,7 @@ export type SuperBrainDiagnosticsInput = {
   privateMemoryLoaded: boolean;
   environmentEventCount: number;
   environmentRevision: number | null;
-  capabilityLayersUsed: string[];
+  capabilityLayersAvailable: string[];
   modelInvocationCount: number;
 };
 
@@ -64,8 +64,8 @@ export function buildSuperBrainDiagnostics(input: SuperBrainDiagnosticsInput) {
     environment_revision: Number.isSafeInteger(input.environmentRevision)
       ? input.environmentRevision
       : null,
-    capability_layers_used: [...new Set(
-      (Array.isArray(input.capabilityLayersUsed) ? input.capabilityLayersUsed : [])
+    capability_layers_available: [...new Set(
+      (Array.isArray(input.capabilityLayersAvailable) ? input.capabilityLayersAvailable : [])
         .filter((layer): layer is string => typeof layer === "string" && knownLayers.has(layer)),
     )].sort(),
     model_invocation_count: count(input.modelInvocationCount),
