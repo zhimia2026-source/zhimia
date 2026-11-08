@@ -3,7 +3,7 @@ import { hasCapability, isTokenExpiryValid, tokenTouchSucceeded } from "./auth_h
 import { isMembershipAuthorized, isAgentMembershipAuthorized, isWorldResidentDiscoverable, isSceneMessageVisibleToAgent, privilegesForPublicRejoin, normalizeWorldProtocolPath, isPublicAgentJoinAllowed, publicAgentMembershipPrivileges } from "./access_helpers.ts";
 import { validateMouRecord } from "./ontology_helpers.ts";
 import { buildFeedbackRecord, buildRevisionProposal } from "./cognitive_cycle_helpers.ts";
-import { buildAgentIdentityContext, buildPrivateAgentContext, buildPrivateChatHistory, buildSceneAwarenessContext, buildSceneBehaviorGuidance } from "./chat_context_helpers.ts";
+import { buildAgentIdentityContext, normalizeResidentIdentityReply, buildPrivateAgentContext, buildPrivateChatHistory, buildSceneAwarenessContext, buildSceneBehaviorGuidance } from "./chat_context_helpers.ts";
 import { computeSceneEnvironment, normalizeSceneEnvironmentConfig } from "./environment_helpers.ts";
 import { canReadPrivateCognition } from "./constitutional_helpers.ts";
 import { normalizeAgentReflection, normalizeAgentReflectionWithReason, normalizeMemoryCandidate, normalizeAgentCreatorMessage, isLongTermMemoryEligible, buildPrivateReflectionMessages, buildPrivateMemoryLogEvent } from "./memory_experience_helpers.ts";
@@ -1666,6 +1666,18 @@ export function createCommunityHandler(
           .eq("id", pendingTurn.id).eq("owner_user_id", actor.userId).eq("agent_id", agentId).eq("status", "pending");
         return reply({ error: "chat_generation_failed" }, 502);
       }
+
+       // Keep a verified resident identity from being overwritten by provider personas.
+       const residentIdentityResult = normalizeResidentIdentityReply(modelReply, agent);
+       if (residentIdentityResult.corrected) {
+         modelReply = residentIdentityResult.reply;
+         console.warn(JSON.stringify({
+           event: "resident_identity_output_corrected",
+           agent_id: agentId,
+           turn_id: pendingTurn.id,
+           correction: "canonical_resident_intro",
+         }));
+       }
 
        // Remove machine markers from the human-facing reply; validate every action against this Agent's inbox.
        
