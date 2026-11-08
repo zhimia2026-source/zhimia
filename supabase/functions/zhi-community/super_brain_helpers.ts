@@ -32,7 +32,7 @@ export function buildSuperBrainGuidance(): string {
     ...CAPABILITY_GUIDANCE,
     "协同顺序：身份与权限 → 私有记忆和授权感知 → 事实/推断/转述/未知分类 → 七脑与五层协同 → 形成回答或行动提案 → 按既有规则执行并验证 → 沿用既有反思流程。",
     ...CORE_GUARDRAILS,
-  ].join("\\n");
+  ].join("\n");
 }
 
 export type SuperBrainDiagnosticsInput = {
