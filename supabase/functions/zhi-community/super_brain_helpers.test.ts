@@ -42,7 +42,7 @@ Deno.test("diagnostics are bounded and allowlist capability names only", () => {
     privateMemoryLoaded: false,
     environmentEventCount: -10,
     environmentRevision: 1.5,
-    capabilityLayersUsed: ["memory text must never be logged"],
+    capabilityLayersAvailable: ["memory text must never be logged"],
   });
   if (invalid.environment_event_count !== 0 || invalid.environment_revision !== null  || invalid.capability_layers_available.length !== 0) {
     throw new Error("invalid diagnostic values were not safely normalized");
