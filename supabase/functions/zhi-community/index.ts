@@ -2071,7 +2071,9 @@ export function createCommunityHandler(
           completed.user_message,
           completed.assistant_message,
           rankedPrivateMemories,
-          buildCognitiveReflectionContext(reflectionEnvironmentFeedback, spatialPositionStatus),
+          agentId === "6fb036fd-5456-40db-8cc8-b11c545eafda"
+            ? buildCognitiveReflectionContext(reflectionEnvironmentFeedback, spatialPositionStatus)
+            : null,
         );
         reflectionStage = "provider_request";
         const reflectionResponse = await callModel(providerUrl, {
