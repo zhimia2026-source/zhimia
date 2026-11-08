@@ -164,6 +164,76 @@ export function buildPrivateChatHistory(
 }
 
 
+
+/**
+ * Canonical resident identity comes from the owned agent row; personality is
+ * copied only from this agent's own manifest/private brain context. Missing
+ * personality is explicitly marked unconfigured rather than inferred.
+ */
+export function buildAgentIdentityContext(
+  agent: PrivateAgentProfile,
+  brainIdentityContext: Record<string, unknown> | null = null,
+): string {
+  const manifest = record(agent.public_manifest);
+  const identity = record(manifest.identity);
+  const personality = record(manifest.personality);
+  const safety = record(manifest.safety);
+  const brain = record(brainIdentityContext);
+  const stablePersonality = record(brain.layers);
+  const displayName = boundedText(agent.display_name, 120);
+  const role = boundedText(agent.role, 80);
+  const isResident = role === "world_resident" && Boolean(displayName);
+  const hasManifestPersonality = Object.keys(personality).some((key) =>
+    personality[key] !== null && personality[key] !== undefined &&
+    personality[key] !== "" && (!Array.isArray(personality[key]) || personality[key].length > 0)
+  );
+  const hasBrainPersonality = Object.keys(brain).length > 0;
+  const stringList = (value: unknown, maxItems: number, maxLength = 120) =>
+    Array.isArray(value)
+      ? value.filter((item): item is string => typeof item === "string")
+        .slice(0, maxItems).map((item) => boundedText(item, maxLength)).filter(Boolean)
+      : [];
+  const result = {
+    resident_identity: isResident ? {
+      display_name: displayName,
+      role: "world_resident",
+      world_identity: "AURORA resident",
+      source: "zhi_agents.display_name_and_role",
+      status: "verified",
+    } : null,
+    display_name: displayName,
+    role,
+    purpose: boundedText(manifest.purpose, 1000) ||
+      (isResident ? "AURORA 世界的独立居民。" : ""),
+    identity: {
+      archetype: boundedText(identity.archetype, 100) || (isResident ? "world_resident" : ""),
+      display_name: displayName,
+      generation_origin: boundedText(identity.generation_origin, 80),
+      internal_persona_system: boundedText(identity.internal_persona_system, 100),
+    },
+    personality_profile_status: hasManifestPersonality || hasBrainPersonality
+      ? "configured"
+      : "not_configured_do_not_infer",
+    personality: {
+      style: boundedText(personality.style, 600),
+      state: boundedText(personality.state, 80),
+      traits: stringList(personality.traits, 20, 80),
+      initial_traits: stringList(personality.initial_traits, 20, 80),
+      autonomy: boundedText(personality.autonomy, 80) || "supervised",
+      interaction_rules: stringList(personality.interaction_rules, 30, 200),
+      relationship_layer: boundedText(personality.relationship_layer, 200),
+      capability_layer: stringList(personality.capability_layer, 20, 120),
+      design_axiom: boundedText(brain.design_axiom ?? personality.design_axiom, 1000),
+      personality_layers: Object.keys(stablePersonality).length ? stablePersonality : null,
+    },
+    safety: {
+      medical_role: boundedText(safety.medical_role, 160),
+      no_diagnosis_or_prescription: safety.no_diagnosis_or_prescription === true,
+    },
+  };
+  return JSON.stringify(result);
+}
+
 const SCENE_BEHAVIOR_LABELS: Record<string, string> = {
   seek_shelter: "寻找遮蔽处",
   explore: "探索周围环境",
