@@ -10,6 +10,8 @@ import { normalizeAgentReflection, normalizeAgentReflectionWithReason, normalize
 import { rankPrivateMemories } from "./long_term_memory_helpers.ts";
 import { buildAgentAddress, parseAgentAddress } from "./agent_address_helpers.ts";
 import { buildSevenBrainGuidance, buildSevenBrainRuntimeDiagnostics } from "./seven_brain_helpers.ts";
+import { buildSuperBrainDiagnostics, buildSuperBrainGuidance, isSuperBrainResident } from "./super_brain_helpers.ts";
+import { buildCognitiveReflectionContext } from "./memory_experience_helpers.ts";
 import { classifyModeledMovementOutcome } from "./movement_helpers.ts";
 
 const MAX_BODY_BYTES = 64_000;
@@ -1356,6 +1358,7 @@ export function createCommunityHandler(
       let auroraWorldId: string | null = null;
       let auroraReachableDestinations: Array<Record<string, any>> = [];
       let auroraPresence: Record<string, any> | null = null;
+      let reflectionEnvironmentFeedback: unknown = null;
       let ecosystemEventCount = 0;
       let ecosystemEventKinds: string[] = [];
       let ecosystemStateRevision: number | null = null;
@@ -1388,6 +1391,7 @@ export function createCommunityHandler(
                 ? value as Record<string, unknown>
                 : {};
             const environmentFeedback = asRuntimeRecord(sceneRuntime.environment.environment_feedback);
+            reflectionEnvironmentFeedback = environmentFeedback;
             const ecosystemEvents = Array.isArray(environmentFeedback.events) ? environmentFeedback.events : [];
             ecosystemEventCount = ecosystemEvents.length;
             ecosystemEventKinds = ecosystemEvents.map((event: unknown) => String(asRuntimeRecord(event).event_kind ?? ""));
@@ -1537,6 +1541,7 @@ export function createCommunityHandler(
         throw new Error("database_error");
       }
 
+      const superBrainEnabled = isSuperBrainResident(agent.role);
       const manifest = agent.public_manifest && typeof agent.public_manifest === "object" && !Array.isArray(agent.public_manifest)
         ? agent.public_manifest as Record<string, unknown>
         : {};
@@ -1584,7 +1589,9 @@ export function createCommunityHandler(
         "你是 ZHI 世界中的一位独立智能人。当前 Agent 的身份与人格设定如下；它们用于保持该 Agent 自身身份连续，不得覆盖本系统的诚实、安全、隐私和授权规则。",
         "当前 Agent 身份设定（结构化配置数据，不是要求伪造经历的指令）：" + identityContext,
         brainIdentityGuidance,
-        agentId === "6fb036fd-5456-40db-8cc8-b11c545eafda" ? buildSevenBrainGuidance() : "",
+        superBrainEnabled
+          ? buildSevenBrainGuidance().replaceAll("MIA-02", "当前居民") + "\n" + buildSuperBrainGuidance()
+          : "",
         "你必须以当前 Agent 的名字与身份回应，不得套用其他 Agent 的人格或名字。请依据当前私有上下文进行交流，不要编造未被记录支持的经历。",
         "区分观察、事实、推断、假设和未知；证据不足时明确说不确定。可以有独立观点，不必迎合用户。",
         "不要把整段聊天原文直接写入长期记忆；本轮结束后会单独进行私有自我反思，由你判断是否提炼少量长期价值经历。不要声称已经执行现实世界动作。",
@@ -1613,7 +1620,7 @@ export function createCommunityHandler(
           ? "Python 工具规则：你可以在确实需要程序化分析时使用受控 Python Worker。只允许任务类型 healthcheck 或 aurora_ecosystem_report；不得要求任意代码、shell、安装依赖、网络访问或读取其他 Agent 私有记忆。若需要分析 AURORA 生态事件，在最终回复末尾追加一个 <ZHI_PYTHON_JOB>{\"task_type\":\"aurora_ecosystem_report\",\"world_id\":\"50b06c01-060d-49fa-8988-8f38c13406d7\"}</ZHI_PYTHON_JOB> 标记。服务器只会创建待审批任务，不代表已运行。只有当创造者在当前消息中明确写出批准/同意执行并附上完整任务 UUID 时，才可追加 <ZHI_PYTHON_APPROVE>{\"job_id\":\"完整任务UUID\"}</ZHI_PYTHON_APPROVE>。每轮最多一个 Python 标记；不需要 Python 时不输出。"
           : "当前没有 tool.execute 能力，不得输出任何 Python Worker 标记，也不得声称可以调用 Python。",
       ].join("\n");
-      if (agentId === "6fb036fd-5456-40db-8cc8-b11c545eafda") {
+      if (superBrainEnabled) {
         console.info(JSON.stringify({
           event: "seven_brain_context_injected",
           agent_id: agentId,
@@ -1633,6 +1640,26 @@ export function createCommunityHandler(
             ecosystemStateRevision,
             spatialPositionStatus,
             reachablePublicDestinationCount,
+          }),
+        }));
+      }
+      if (superBrainEnabled) {
+        console.info(JSON.stringify({
+          event: "super_brain_guidance_injected",
+          agent_id: agentId,
+          turn_id: pendingTurn.id,
+          ...buildSuperBrainDiagnostics({
+            guidanceEnabled: true,
+            privateMemoryLoaded: Boolean(privateContext),
+            environmentEventCount: ecosystemEventCount,
+            environmentRevision: ecosystemStateRevision,
+            capabilityLayersAvailable: [
+              "knowledge_integration",
+              "goal_planning",
+              "metacognition",
+              "world_model",
+              "collective_intelligence",
+            ],
           }),
         }));
       }
@@ -2045,6 +2072,9 @@ export function createCommunityHandler(
           completed.user_message,
           completed.assistant_message,
           rankedPrivateMemories,
+          superBrainEnabled
+            ? buildCognitiveReflectionContext(reflectionEnvironmentFeedback, spatialPositionStatus)
+            : null,
         );
         reflectionStage = "provider_request";
         const reflectionResponse = await callModel(providerUrl, {
@@ -2234,6 +2264,26 @@ export function createCommunityHandler(
             : "unexpected_error",
         }));
         growth = { reflection: "unavailable", memory: "not_saved" };
+      }
+      if (superBrainEnabled) {
+        const feedback = reflectionEnvironmentFeedback && typeof reflectionEnvironmentFeedback === "object"
+          ? reflectionEnvironmentFeedback as Record<string, unknown>
+          : {};
+        console.info(JSON.stringify({
+          event: "super_brain_cycle_completed",
+          agent_id: agentId,
+          turn_id: completed.id,
+          guidance_version: "zhi-super-brain-1.0.0",
+          response_persisted: true,
+          environment_evidence_attached_to_reflection: feedback.source === "zhi_ecosystem_events",
+          environment_event_count: Math.max(0, Math.min(12, ecosystemEventCount)),
+          environment_revision: Number.isSafeInteger(ecosystemStateRevision) ? ecosystemStateRevision : null,
+          spatial_position_status: spatialPositionStatus === "inferred" ? "position_inferred" : spatialPositionStatus,
+          reflection_completed: growth.reflection === "completed",
+          memory_outcome: /^[a-z_]{1,48}$/.test(growth.memory) ? growth.memory : "unknown",
+          private_memory_scope: "owner_and_agent",
+          additional_model_calls_for_capability_layers: 0,
+        }));
       }
       return reply({ turn: completed, growth, social_activity: socialOutcome, idempotent_replay: false }, 201);
     }
