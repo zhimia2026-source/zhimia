@@ -2,7 +2,8 @@ import { buildCognitiveReflectionContext, buildPrivateReflectionMessages } from 
 import {
   buildSuperBrainDiagnostics,
   buildSuperBrainGuidance,
-  SUPER_BRAIN_GUIDANCE_VERSION,\n  isSuperBrainResident,
+  SUPER_BRAIN_GUIDANCE_VERSION,
+  isSuperBrainResident,
 } from "./super_brain_helpers.ts";
 
 Deno.test("Super Brain guidance contains seven-brain and five capability layers", () => {
