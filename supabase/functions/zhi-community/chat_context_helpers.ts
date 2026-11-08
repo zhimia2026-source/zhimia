@@ -188,8 +188,8 @@ export function normalizeResidentIdentityReply(
     return { reply, corrected: false };
   }
   const remaining = reply.slice(firstLine.length).replace(/^\r?\n/, "").trimStart();
-  const canonical = `我是${name}，AURORA 世界的居民。`;
-  return { reply: remaining ? `${canonical}\n\n${remaining}` : canonical, corrected: true };
+  const canonical = \`我是\${name}，AURORA 世界的居民。\`;
+  return { reply: remaining ? \`\${canonical}\n\n\${remaining}\` : canonical, corrected: true };
 }
 
 export function buildAgentIdentityContext(
