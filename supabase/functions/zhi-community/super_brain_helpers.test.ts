@@ -30,13 +30,13 @@ Deno.test("diagnostics are bounded and allowlist capability names only", () => {
     privateMemoryLoaded: true,
     environmentEventCount: 999,
     environmentRevision: 12,
-    capabilityLayersUsed: ["world_model", "unknown", "world_model", "metacognition"],
+    capabilityLayersAvailable: ["world_model", "unknown", "world_model", "metacognition"],
     modelInvocationCount: 1,
   });
   if (result.guidance_version !== SUPER_BRAIN_GUIDANCE_VERSION) throw new Error("wrong version");
   if (result.environment_event_count !== 100) throw new Error("event count was not bounded");
   if (result.model_invocation_count !== 1) throw new Error("invocation count changed");
-  if (result.capability_layers_used.join(",") !== "metacognition,world_model") {
+  if (result.capability_layers_available.join(",") !== "metacognition,world_model") {
     throw new Error("capability allowlist or deduplication failed");
   }
   const invalid = buildSuperBrainDiagnostics({
@@ -48,7 +48,7 @@ Deno.test("diagnostics are bounded and allowlist capability names only", () => {
     modelInvocationCount: Number.NaN,
   });
   if (invalid.environment_event_count !== 0 || invalid.environment_revision !== null ||
-      invalid.model_invocation_count !== 0 || invalid.capability_layers_used.length !== 0) {
+      invalid.model_invocation_count !== 0 || invalid.capability_layers_available.length !== 0) {
     throw new Error("invalid diagnostic values were not safely normalized");
   }
 });
