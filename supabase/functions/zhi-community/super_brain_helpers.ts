@@ -69,3 +69,14 @@ export function buildSuperBrainDiagnostics(input: SuperBrainDiagnosticsInput) {
     )].sort(),
   };
 }
+
+
+/** Enable the shared cognitive architecture for every AURORA world resident,
+ * while excluding the legacy prototype Mia governor. This changes capability
+ * guidance only; identity, personality, and private memory remain agent-scoped.
+ */
+export function isSuperBrainResident(role: unknown, agentId: unknown): boolean {
+  return role === "world_resident" &&
+    typeof agentId === "string" &&
+    agentId !== "34833ba9-2be7-4a55-9b52-62c402f759b5";
+}
