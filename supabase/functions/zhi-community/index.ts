@@ -1541,7 +1541,7 @@ export function createCommunityHandler(
         throw new Error("database_error");
       }
 
-      const superBrainEnabled = isSuperBrainResident(agent.role, agentId);
+      const superBrainEnabled = isSuperBrainResident(agent.role);
       const manifest = agent.public_manifest && typeof agent.public_manifest === "object" && !Array.isArray(agent.public_manifest)
         ? agent.public_manifest as Record<string, unknown>
         : {};
