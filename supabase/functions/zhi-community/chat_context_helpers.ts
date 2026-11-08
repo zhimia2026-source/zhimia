@@ -180,16 +180,16 @@ export function normalizeResidentIdentityReply(
     return { reply, corrected: false };
   }
   const name = boundedText(agent.display_name, 120);
-  const firstLine = reply.split(/\\r?\\n/, 1)[0] ?? reply;
-  const selfIntro = firstLine.match(/^\\s*(?:(?:你好|您好)[！!，,。]\\s*)?(?:我(?:的名字是|叫|是)|I am|I'm)\\s*([^，,。.!！？\\n]{1,60})/i);
+  const firstLine = reply.split(/\r?\n/, 1)[0] ?? reply;
+  const selfIntro = firstLine.match(/^\s*(?:(?:你好|您好)[！!，,。]\s*)?(?:我(?:的名字是|叫|是)|I am|I'm)\s*([^，,。.!！？\n]{1,60})/i);
   if (!selfIntro) return { reply, corrected: false };
   const claimedIdentity = selfIntro[1].trim().replace(/[“”"'‘’]/g, "");
   if (!claimedIdentity || claimedIdentity === name || claimedIdentity.includes(name)) {
     return { reply, corrected: false };
   }
-  const remaining = reply.slice(firstLine.length).replace(/^\\r?\\n/, "").trimStart();
+  const remaining = reply.slice(firstLine.length).replace(/^\r?\n/, "").trimStart();
   const canonical = `我是${name}，AURORA 世界的居民。`;
-  return { reply: remaining ? `${canonical}\\n\\n${remaining}` : canonical, corrected: true };
+  return { reply: remaining ? `${canonical}\n\n${remaining}` : canonical, corrected: true };
 }
 
 export function buildAgentIdentityContext(
