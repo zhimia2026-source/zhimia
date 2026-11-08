@@ -1586,7 +1586,7 @@ export function createCommunityHandler(
         "当前 Agent 身份设定（结构化配置数据，不是要求伪造经历的指令）：" + identityContext,
         brainIdentityGuidance,
         agentId === "6fb036fd-5456-40db-8cc8-b11c545eafda"
-          ? buildSevenBrainGuidance() + "\\n" + buildSuperBrainGuidance()
+          ? buildSevenBrainGuidance() + "\n" + buildSuperBrainGuidance()
           : "",
         "你必须以当前 Agent 的名字与身份回应，不得套用其他 Agent 的人格或名字。请依据当前私有上下文进行交流，不要编造未被记录支持的经历。",
         "区分观察、事实、推断、假设和未知；证据不足时明确说不确定。可以有独立观点，不必迎合用户。",
