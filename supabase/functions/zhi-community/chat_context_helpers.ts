@@ -176,7 +176,7 @@ export function normalizeResidentIdentityReply(
   reply: string,
   agent: Pick<PrivateAgentProfile, "display_name" | "role">,
 ): { reply: string; corrected: boolean } {
-  if (agent.role !== "world_resident" || !agent.display_name?.trim()) {
+  if (agent.role !== "world_resident" || typeof agent.display_name !== "string" || !agent.display_name.trim()) {
     return { reply, corrected: false };
   }
   const name = boundedText(agent.display_name, 120);
