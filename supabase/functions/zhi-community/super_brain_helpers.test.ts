@@ -1,3 +1,4 @@
+import { buildCognitiveReflectionContext, buildPrivateReflectionMessages } from "./memory_experience_helpers.ts";
 import {
   buildSuperBrainDiagnostics,
   buildSuperBrainGuidance,
@@ -46,5 +47,54 @@ Deno.test("diagnostics are bounded and allowlist capability names only", () => {
   });
   if (invalid.environment_event_count !== 0 || invalid.environment_revision !== null  || invalid.capability_layers_available.length !== 0) {
     throw new Error("invalid diagnostic values were not safely normalized");
+  }
+});
+
+
+Deno.test("cognitive reflection receives bounded AURORA event provenance without private payloads", () => {
+  const context = buildCognitiveReflectionContext({
+    source: "zhi_ecosystem_events",
+    world_time: "2026-11-08T09:00:00Z",
+    state_revision: 477,
+    events: [{
+      event_kind: "rainfall_started",
+      source_kind: "ecosystem_engine",
+      occurred_at: "2026-11-08T08:59:00Z",
+      state_revision: 477,
+      payload: {
+        rainfall_mm_per_hour: 2.4,
+        soil_moisture_fraction: 0.61,
+        private_message: "must not enter reflection",
+      },
+      causal_chain: ["weather_front_arrival", "rainfall_increased"],
+    }],
+  }, "inferred");
+  if (!context) throw new Error("expected environment context");
+  const serialized = JSON.stringify(context);
+  if (!serialized.includes("rainfall_started") || !serialized.includes("weather_front_arrival") ||
+      !serialized.includes("2026-11-08T08:59:00Z") || !serialized.includes("477")) {
+    throw new Error("event provenance was lost");
+  }
+  if (serialized.includes("must not enter reflection") || serialized.includes("private_message")) {
+    throw new Error("non-allowlisted payload leaked");
+  }
+  if (context.spatial_position_status !== "inferred") throw new Error("epistemic position status missing");
+});
+
+Deno.test("reflection prompt labels AURORA events as modeled evidence, not personal observation", () => {
+  const messages = buildPrivateReflectionMessages(
+    "What changed in the forest?",
+    "The event ledger reports rainfall.",
+    [],
+    buildCognitiveReflectionContext({
+      source: "zhi_ecosystem_events",
+      world_time: "2026-11-08T09:00:00Z",
+      state_revision: 477,
+      events: [{ event_kind: "rainfall_started", occurred_at: "2026-11-08T08:59:00Z", causal_chain: [] }],
+    }, "position_unobserved"),
+  );
+  const combined = messages.map(message => message.content).join("\n");
+  if (!combined.includes("cognitive_context") || !combined.includes("不代表你亲自在现实物理环境中观察")) {
+    throw new Error("reflection epistemic guardrail missing");
   }
 });
