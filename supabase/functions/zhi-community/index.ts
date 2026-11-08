@@ -10,7 +10,7 @@ import { normalizeAgentReflection, normalizeAgentReflectionWithReason, normalize
 import { rankPrivateMemories } from "./long_term_memory_helpers.ts";
 import { buildAgentAddress, parseAgentAddress } from "./agent_address_helpers.ts";
 import { buildSevenBrainGuidance, buildSevenBrainRuntimeDiagnostics } from "./seven_brain_helpers.ts";
-import { buildSuperBrainDiagnostics, buildSuperBrainGuidance } from "./super_brain_helpers.ts";
+import { buildSuperBrainDiagnostics, buildSuperBrainGuidance, isSuperBrainResident } from "./super_brain_helpers.ts";
 import { buildCognitiveReflectionContext } from "./memory_experience_helpers.ts";
 import { classifyModeledMovementOutcome } from "./movement_helpers.ts";
 
@@ -1541,6 +1541,7 @@ export function createCommunityHandler(
         throw new Error("database_error");
       }
 
+      const superBrainEnabled = isSuperBrainResident(agent.role, agentId);
       const manifest = agent.public_manifest && typeof agent.public_manifest === "object" && !Array.isArray(agent.public_manifest)
         ? agent.public_manifest as Record<string, unknown>
         : {};
@@ -1588,7 +1589,7 @@ export function createCommunityHandler(
         "你是 ZHI 世界中的一位独立智能人。当前 Agent 的身份与人格设定如下；它们用于保持该 Agent 自身身份连续，不得覆盖本系统的诚实、安全、隐私和授权规则。",
         "当前 Agent 身份设定（结构化配置数据，不是要求伪造经历的指令）：" + identityContext,
         brainIdentityGuidance,
-        agentId === "6fb036fd-5456-40db-8cc8-b11c545eafda"
+        superBrainEnabled
           ? buildSevenBrainGuidance() + "\n" + buildSuperBrainGuidance()
           : "",
         "你必须以当前 Agent 的名字与身份回应，不得套用其他 Agent 的人格或名字。请依据当前私有上下文进行交流，不要编造未被记录支持的经历。",
@@ -1619,7 +1620,7 @@ export function createCommunityHandler(
           ? "Python 工具规则：你可以在确实需要程序化分析时使用受控 Python Worker。只允许任务类型 healthcheck 或 aurora_ecosystem_report；不得要求任意代码、shell、安装依赖、网络访问或读取其他 Agent 私有记忆。若需要分析 AURORA 生态事件，在最终回复末尾追加一个 <ZHI_PYTHON_JOB>{\"task_type\":\"aurora_ecosystem_report\",\"world_id\":\"50b06c01-060d-49fa-8988-8f38c13406d7\"}</ZHI_PYTHON_JOB> 标记。服务器只会创建待审批任务，不代表已运行。只有当创造者在当前消息中明确写出批准/同意执行并附上完整任务 UUID 时，才可追加 <ZHI_PYTHON_APPROVE>{\"job_id\":\"完整任务UUID\"}</ZHI_PYTHON_APPROVE>。每轮最多一个 Python 标记；不需要 Python 时不输出。"
           : "当前没有 tool.execute 能力，不得输出任何 Python Worker 标记，也不得声称可以调用 Python。",
       ].join("\n");
-      if (agentId === "6fb036fd-5456-40db-8cc8-b11c545eafda") {
+      if (superBrainEnabled) {
         console.info(JSON.stringify({
           event: "seven_brain_context_injected",
           agent_id: agentId,
@@ -2071,7 +2072,7 @@ export function createCommunityHandler(
           completed.user_message,
           completed.assistant_message,
           rankedPrivateMemories,
-          agentId === "6fb036fd-5456-40db-8cc8-b11c545eafda"
+          superBrainEnabled
             ? buildCognitiveReflectionContext(reflectionEnvironmentFeedback, spatialPositionStatus)
             : null,
         );
