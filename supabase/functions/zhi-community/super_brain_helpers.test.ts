@@ -2,7 +2,7 @@ import { buildCognitiveReflectionContext, buildPrivateReflectionMessages } from 
 import {
   buildSuperBrainDiagnostics,
   buildSuperBrainGuidance,
-  SUPER_BRAIN_GUIDANCE_VERSION,
+  SUPER_BRAIN_GUIDANCE_VERSION,\n  isSuperBrainResident,
 } from "./super_brain_helpers.ts";
 
 Deno.test("Super Brain guidance contains seven-brain and five capability layers", () => {
@@ -97,4 +97,13 @@ Deno.test("reflection prompt labels AURORA events as modeled evidence, not perso
   if (!combined.includes("cognitive_context") || !combined.includes("不代表你亲自在现实物理环境中观察")) {
     throw new Error("reflection epistemic guardrail missing");
   }
+});
+
+
+Deno.test("shared Super Brain applies to world residents but not prototype Mia or governors", () => {
+  if (!isSuperBrainResident("world_resident", "6fb036fd-5456-40db-8cc8-b11c545eafda")) throw new Error("MIA-02 should retain Super Brain");
+  if (!isSuperBrainResident("world_resident", "30427542-d4c6-4e45-bc68-fabf66f8a6a7")) throw new Error("Alice should receive shared Super Brain");
+  if (!isSuperBrainResident("world_resident", "cf9d1a03-d5d5-4afa-949a-2964671f45d9")) throw new Error("Lily should receive shared Super Brain");
+  if (isSuperBrainResident("world_governor", "34833ba9-2be7-4a55-9b52-62c402f759b5")) throw new Error("prototype Mia governor must remain excluded");
+  if (isSuperBrainResident("external_agent", "external-1")) throw new Error("non-resident external agent must not be implicitly included");
 });
