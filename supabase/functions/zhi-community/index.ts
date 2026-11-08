@@ -1643,7 +1643,7 @@ export function createCommunityHandler(
           }),
         }));
       }
-      if (agentId === "6fb036fd-5456-40db-8cc8-b11c545eafda") {
+      if (superBrainEnabled) {
         console.info(JSON.stringify({
           event: "super_brain_guidance_injected",
           agent_id: agentId,
@@ -2265,7 +2265,7 @@ export function createCommunityHandler(
         }));
         growth = { reflection: "unavailable", memory: "not_saved" };
       }
-      if (agentId === "6fb036fd-5456-40db-8cc8-b11c545eafda") {
+      if (superBrainEnabled) {
         const feedback = reflectionEnvironmentFeedback && typeof reflectionEnvironmentFeedback === "object"
           ? reflectionEnvironmentFeedback as Record<string, unknown>
           : {};
