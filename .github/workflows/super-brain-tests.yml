@@ -3,6 +3,7 @@ name: Super Brain foundation tests
 on:
   pull_request:
     paths:
+      - "supabase/functions/zhi-community/index.ts"
       - "supabase/functions/zhi-community/super_brain_helpers.ts"
       - "supabase/functions/zhi-community/super_brain_helpers.test.ts"
       - ".github/workflows/super-brain-tests.yml"
@@ -10,6 +11,7 @@ on:
     branches:
       - main
     paths:
+      - "supabase/functions/zhi-community/index.ts"
       - "supabase/functions/zhi-community/super_brain_helpers.ts"
       - "supabase/functions/zhi-community/super_brain_helpers.test.ts"
       - ".github/workflows/super-brain-tests.yml"
@@ -27,5 +29,7 @@ jobs:
         uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - name: Type-check and run Super Brain helper tests
+      - name: Type-check ZHI community runtime
+        run: deno check supabase/functions/zhi-community/index.ts
+      - name: Run Super Brain helper tests
         run: deno test supabase/functions/zhi-community/super_brain_helpers.test.ts
