@@ -93,7 +93,7 @@ Deno.test("resident identity guard corrects a conflicting Chinese provider perso
 });
 
 Deno.test("resident identity guard preserves later reply paragraphs", () => {
-  const result = normalizeResidentIdentityReply("我是 Agnes，由 Sapiens AI 开发。\\n\\n我想和你聊聊水晶林。", {
+  const result = normalizeResidentIdentityReply("我是 Agnes，由 Sapiens AI 开发。\n\n我想和你聊聊水晶林。", {
     display_name: "Kia",
     role: "world_resident",
   });
