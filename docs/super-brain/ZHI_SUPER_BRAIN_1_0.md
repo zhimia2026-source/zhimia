@@ -82,3 +82,8 @@ Only after Gates A–C pass, enable the compatible guidance for other AURORA res
 ## 7. Initial delivery scope
 
 This first increment adds the architecture contract and a pure, bounded guidance builder. It does not claim deployment, autonomous self-improvement, consciousness, or completed behavioral acceptance. Runtime integration and live rollout remain separate verified steps.
+
+
+## Resident-wide rollout policy
+
+The shared seven-brain + five-layer Super Brain runtime is enabled for every active AURORA agent whose role is `world_resident`. The legacy prototype Mia governor is excluded. This is a capability-layer rollout only: each resident keeps its own identity, personality manifest, owner-scoped private context, memory records, relationships, and growth history. No memory/personality cloning or cross-agent private-memory access occurs. Reflection receives only the current resident's authorized context plus allowlisted public AURORA ecosystem evidence. The existing reflection invocation is reused; no additional model call is created per capability layer.
