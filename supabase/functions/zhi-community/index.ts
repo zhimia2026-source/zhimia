@@ -1560,7 +1560,8 @@ export function createCommunityHandler(
           !Array.isArray(privateContextData.mia_brain_identity)
         ? privateContextData.mia_brain_identity as Record<string, unknown>
         : null;
-      const identityContext = buildAgentIdentityContext(agent, brainIdentityContext);\n      const brainIdentityGuidance = brainIdentityContext
+      const identityContext = buildAgentIdentityContext(agent, brainIdentityContext);
+      const brainIdentityGuidance = brainIdentityContext
         ? "MIA-02 的人格设计公理与三层人格来自她自己的私有大脑身份记录，是稳定价值方向；它们不能覆盖诚实、安全、隐私、授权和现实行动监督规则。"
         : "";
       const systemPrompt = [
@@ -1605,7 +1606,8 @@ export function createCommunityHandler(
           turn_id: pendingTurn.id,
           architecture_version: "seven_brain_v1",
           functions: ["personality", "memory", "perception", "emotion", "reasoning", "creativity", "self"],
-          resident_identity_present: agent.role === "world_resident" && typeof agent.display_name === "string" && agent.display_name.trim().length > 0,\n          personality_identity_present: Object.keys(personality).length > 0 || Boolean(brainIdentityContext),
+          resident_identity_present: agent.role === "world_resident" && typeof agent.display_name === "string" && agent.display_name.trim().length > 0,
+          personality_identity_present: Object.keys(personality).length > 0 || Boolean(brainIdentityContext),
           private_context_present: Boolean(privateContext),
           scene_context_present: Boolean(sceneAwarenessContext),
           spatial_context_present: Boolean(spatialPerceptionContext),
