@@ -41,7 +41,6 @@ export type SuperBrainDiagnosticsInput = {
   environmentEventCount: number;
   environmentRevision: number | null;
   capabilityLayersAvailable: string[];
-  modelInvocationCount: number;
 };
 
 /**
@@ -68,6 +67,5 @@ export function buildSuperBrainDiagnostics(input: SuperBrainDiagnosticsInput) {
       (Array.isArray(input.capabilityLayersAvailable) ? input.capabilityLayersAvailable : [])
         .filter((layer): layer is string => typeof layer === "string" && knownLayers.has(layer)),
     )].sort(),
-    model_invocation_count: count(input.modelInvocationCount),
   };
 }
