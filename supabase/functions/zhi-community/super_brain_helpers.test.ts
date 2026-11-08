@@ -101,10 +101,8 @@ Deno.test("reflection prompt labels AURORA events as modeled evidence, not perso
 });
 
 
-Deno.test("shared Super Brain applies to world residents but not prototype Mia or governors", () => {
-  if (!isSuperBrainResident("world_resident")) throw new Error("MIA-02 should retain Super Brain");
-  if (!isSuperBrainResident("world_resident")) throw new Error("Alice should receive shared Super Brain");
-  if (!isSuperBrainResident("world_resident")) throw new Error("Lily should receive shared Super Brain");
-  if (isSuperBrainResident("world_governor")) throw new Error("prototype Mia governor must remain excluded");
-  if (isSuperBrainResident("external_agent")) throw new Error("non-resident external agent must not be implicitly included");
+Deno.test("shared Super Brain applies only to AURORA world residents", () => {
+  if (!isSuperBrainResident("world_resident")) throw new Error("world resident should receive shared Super Brain");
+  if (isSuperBrainResident("world_governor")) throw new Error("governor must remain excluded");
+  if (isSuperBrainResident("external_agent")) throw new Error("external agent must not be implicitly included");
 });
