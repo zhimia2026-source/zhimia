@@ -75,8 +75,7 @@ export function buildSuperBrainDiagnostics(input: SuperBrainDiagnosticsInput) {
  * while excluding the legacy prototype Mia governor. This changes capability
  * guidance only; identity, personality, and private memory remain agent-scoped.
  */
-export function isSuperBrainResident(role: unknown, agentId: unknown): boolean {
-  return role === "world_resident" &&
-    typeof agentId === "string" &&
-    agentId !== "34833ba9-2be7-4a55-9b52-62c402f759b5";
+export function isSuperBrainResident(role: unknown): boolean {
+  // The role allowlist excludes prototype governors without hard-coded identities.
+  return role === "world_resident";
 }
