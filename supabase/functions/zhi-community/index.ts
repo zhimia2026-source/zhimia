@@ -11,6 +11,7 @@ import { rankPrivateMemories } from "./long_term_memory_helpers.ts";
 import { buildAgentAddress, parseAgentAddress } from "./agent_address_helpers.ts";
 import { buildSevenBrainGuidance, buildSevenBrainRuntimeDiagnostics } from "./seven_brain_helpers.ts";
 import { buildSuperBrainDiagnostics, buildSuperBrainGuidance } from "./super_brain_helpers.ts";
+import { buildCognitiveReflectionContext } from "./memory_experience_helpers.ts";
 import { classifyModeledMovementOutcome } from "./movement_helpers.ts";
 
 const MAX_BODY_BYTES = 64_000;
@@ -1357,6 +1358,7 @@ export function createCommunityHandler(
       let auroraWorldId: string | null = null;
       let auroraReachableDestinations: Array<Record<string, any>> = [];
       let auroraPresence: Record<string, any> | null = null;
+      let reflectionEnvironmentFeedback: unknown = null;
       let ecosystemEventCount = 0;
       let ecosystemEventKinds: string[] = [];
       let ecosystemStateRevision: number | null = null;
@@ -1389,6 +1391,7 @@ export function createCommunityHandler(
                 ? value as Record<string, unknown>
                 : {};
             const environmentFeedback = asRuntimeRecord(sceneRuntime.environment.environment_feedback);
+            reflectionEnvironmentFeedback = environmentFeedback;
             const ecosystemEvents = Array.isArray(environmentFeedback.events) ? environmentFeedback.events : [];
             ecosystemEventCount = ecosystemEvents.length;
             ecosystemEventKinds = ecosystemEvents.map((event: unknown) => String(asRuntimeRecord(event).event_kind ?? ""));
@@ -2068,6 +2071,7 @@ export function createCommunityHandler(
           completed.user_message,
           completed.assistant_message,
           rankedPrivateMemories,
+          buildCognitiveReflectionContext(reflectionEnvironmentFeedback, spatialPositionStatus),
         );
         reflectionStage = "provider_request";
         const reflectionResponse = await callModel(providerUrl, {
@@ -2257,6 +2261,26 @@ export function createCommunityHandler(
             : "unexpected_error",
         }));
         growth = { reflection: "unavailable", memory: "not_saved" };
+      }
+      if (agentId === "6fb036fd-5456-40db-8cc8-b11c545eafda") {
+        const feedback = reflectionEnvironmentFeedback && typeof reflectionEnvironmentFeedback === "object"
+          ? reflectionEnvironmentFeedback as Record<string, unknown>
+          : {};
+        console.info(JSON.stringify({
+          event: "super_brain_cycle_completed",
+          agent_id: agentId,
+          turn_id: completed.id,
+          guidance_version: "zhi-super-brain-1.0.0",
+          response_persisted: true,
+          environment_evidence_attached_to_reflection: feedback.source === "zhi_ecosystem_events",
+          environment_event_count: Math.max(0, Math.min(12, ecosystemEventCount)),
+          environment_revision: Number.isSafeInteger(ecosystemStateRevision) ? ecosystemStateRevision : null,
+          spatial_position_status: spatialPositionStatus === "inferred" ? "position_inferred" : spatialPositionStatus,
+          reflection_completed: growth.reflection === "completed",
+          memory_outcome: /^[a-z_]{1,48}$/.test(growth.memory) ? growth.memory : "unknown",
+          private_memory_scope: "owner_and_agent",
+          additional_model_calls_for_capability_layers: 0,
+        }));
       }
       return reply({ turn: completed, growth, social_activity: socialOutcome, idempotent_replay: false }, 201);
     }
