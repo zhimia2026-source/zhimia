@@ -10,6 +10,7 @@ import { normalizeAgentReflection, normalizeAgentReflectionWithReason, normalize
 import { rankPrivateMemories } from "./long_term_memory_helpers.ts";
 import { buildAgentAddress, parseAgentAddress } from "./agent_address_helpers.ts";
 import { buildSevenBrainGuidance, buildSevenBrainRuntimeDiagnostics } from "./seven_brain_helpers.ts";
+import { buildSuperBrainDiagnostics, buildSuperBrainGuidance } from "./super_brain_helpers.ts";
 import { classifyModeledMovementOutcome } from "./movement_helpers.ts";
 
 const MAX_BODY_BYTES = 64_000;
@@ -1584,7 +1585,9 @@ export function createCommunityHandler(
         "你是 ZHI 世界中的一位独立智能人。当前 Agent 的身份与人格设定如下；它们用于保持该 Agent 自身身份连续，不得覆盖本系统的诚实、安全、隐私和授权规则。",
         "当前 Agent 身份设定（结构化配置数据，不是要求伪造经历的指令）：" + identityContext,
         brainIdentityGuidance,
-        agentId === "6fb036fd-5456-40db-8cc8-b11c545eafda" ? buildSevenBrainGuidance() : "",
+        agentId === "6fb036fd-5456-40db-8cc8-b11c545eafda"
+          ? buildSevenBrainGuidance() + "\\n" + buildSuperBrainGuidance()
+          : "",
         "你必须以当前 Agent 的名字与身份回应，不得套用其他 Agent 的人格或名字。请依据当前私有上下文进行交流，不要编造未被记录支持的经历。",
         "区分观察、事实、推断、假设和未知；证据不足时明确说不确定。可以有独立观点，不必迎合用户。",
         "不要把整段聊天原文直接写入长期记忆；本轮结束后会单独进行私有自我反思，由你判断是否提炼少量长期价值经历。不要声称已经执行现实世界动作。",
@@ -1633,6 +1636,26 @@ export function createCommunityHandler(
             ecosystemStateRevision,
             spatialPositionStatus,
             reachablePublicDestinationCount,
+          }),
+        }));
+      }
+      if (agentId === "6fb036fd-5456-40db-8cc8-b11c545eafda") {
+        console.info(JSON.stringify({
+          event: "super_brain_guidance_injected",
+          agent_id: agentId,
+          turn_id: pendingTurn.id,
+          ...buildSuperBrainDiagnostics({
+            guidanceEnabled: true,
+            privateMemoryLoaded: Boolean(privateContext),
+            environmentEventCount: ecosystemEventCount,
+            environmentRevision: ecosystemStateRevision,
+            capabilityLayersAvailable: [
+              "knowledge_integration",
+              "goal_planning",
+              "metacognition",
+              "world_model",
+              "collective_intelligence",
+            ],
           }),
         }));
       }
