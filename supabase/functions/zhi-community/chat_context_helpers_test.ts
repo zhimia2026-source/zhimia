@@ -1,4 +1,4 @@
-import { buildSceneAwarenessContext } from "./chat_context_helpers.ts";
+import { buildSceneAwarenessContext, normalizeResidentIdentityReply } from "./chat_context_helpers.ts";
 
 Deno.test("scene awareness includes ecological event time, payload and causal chain", () => {
   const context = JSON.parse(buildSceneAwarenessContext(
@@ -80,4 +80,52 @@ Deno.test("agents without a private MIA brain mapping receive no MIA-02 personal
   const context = JSON.parse(buildPrivateAgentContext({ display_name: "Other Agent", role: "resident" }, [], [], null));
   if (context.mia_brain_identity !== null) throw new Error("MIA-02 identity leaked to another agent");
   if (context.mia_brain_private_history !== null) throw new Error("MIA-02 private history leaked to another agent");
+});
+
+
+Deno.test("resident identity guard corrects a conflicting Chinese provider persona", () => {
+  const result = normalizeResidentIdentityReply("我是 Agnes，由 Sapiens AI 开发。", {
+    display_name: "Kia",
+    role: "world_resident",
+  });
+  if (!result.corrected) throw new Error("conflicting identity was not corrected");
+  if (result.reply !== "我是Kia，AURORA 世界的居民。") throw new Error("canonical resident identity mismatch");
+});
+
+Deno.test("resident identity guard preserves later reply paragraphs", () => {
+  const result = normalizeResidentIdentityReply("我是 Agnes，由 Sapiens AI 开发。\n\n我想和你聊聊水晶林。", {
+    display_name: "Kia",
+    role: "world_resident",
+  });
+  if (!result.corrected) throw new Error("conflicting identity was not corrected");
+  if (!result.reply.includes("我想和你聊聊水晶林。")) throw new Error("later reply content was lost");
+});
+
+Deno.test("resident identity guard corrects English provider personas", () => {
+  const result = normalizeResidentIdentityReply("I'm Agnes, developed by Sapiens AI.", {
+    display_name: "Kia",
+    role: "world_resident",
+  });
+  if (!result.corrected || !result.reply.startsWith("我是Kia，AURORA 世界的居民。")) {
+    throw new Error("English conflicting identity was not corrected");
+  }
+});
+
+Deno.test("resident identity guard leaves canonical residents and non-residents unchanged", () => {
+  const canonical = "我是Kia，AURORA 世界的居民。";
+  const alreadyCanonical = normalizeResidentIdentityReply(canonical, {
+    display_name: "Kia",
+    role: "world_resident",
+  });
+  if (alreadyCanonical.corrected || alreadyCanonical.reply !== canonical) {
+    throw new Error("canonical identity was changed");
+  }
+  const governor = "我是 Agnes，由 Sapiens AI 开发。";
+  const nonResident = normalizeResidentIdentityReply(governor, {
+    display_name: "MIA",
+    role: "world_governor",
+  });
+  if (nonResident.corrected || nonResident.reply !== governor) {
+    throw new Error("non-resident identity was changed");
+  }
 });
