@@ -18,6 +18,8 @@ on:
       - "supabase/functions/zhi-community/super_brain_helpers.ts"
       - "supabase/functions/zhi-community/super_brain_helpers.test.ts"
       - "supabase/functions/zhi-community/memory_experience_helpers.ts"
+      - "supabase/functions/zhi-community/legal_intelligence_helpers.ts"
+      - "supabase/functions/zhi-community/legal_intelligence_helpers.test.ts"
       - ".github/workflows/super-brain-tests.yml"
 
 permissions:
