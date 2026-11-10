@@ -11,6 +11,7 @@ import { rankPrivateMemories } from "./long_term_memory_helpers.ts";
 import { buildAgentAddress, parseAgentAddress } from "./agent_address_helpers.ts";
 import { buildSevenBrainGuidance, buildSevenBrainRuntimeDiagnostics } from "./seven_brain_helpers.ts";
 import { buildSuperBrainDiagnostics, buildSuperBrainGuidance, isSuperBrainResident } from "./super_brain_helpers.ts";
+import { buildSingaporeLegalGuidance, hasSingaporeLegalCapability } from "./legal_intelligence_helpers.ts";
 import { buildCognitiveReflectionContext } from "./memory_experience_helpers.ts";
 import { classifyModeledMovementOutcome } from "./movement_helpers.ts";
 
@@ -1545,6 +1546,7 @@ export function createCommunityHandler(
       const manifest = agent.public_manifest && typeof agent.public_manifest === "object" && !Array.isArray(agent.public_manifest)
         ? agent.public_manifest as Record<string, unknown>
         : {};
+      const legalIntelligenceEnabled = hasSingaporeLegalCapability(manifest.professional_capabilities);
       const identity = manifest.identity && typeof manifest.identity === "object" && !Array.isArray(manifest.identity)
         ? manifest.identity as Record<string, unknown>
         : {};
@@ -1571,6 +1573,7 @@ export function createCommunityHandler(
         superBrainEnabled
           ? buildSevenBrainGuidance().replaceAll("MIA-02", "当前居民") + "\n" + buildSuperBrainGuidance()
           : "",
+        legalIntelligenceEnabled ? buildSingaporeLegalGuidance() : "",
         "身份连续性规则：若 role=world_resident，当前 Agent 的正式身份就是 identityContext 中由 zhi_agents 记录确认的 AURORA 居民；被问到你是谁时，应使用 identityContext 中的正式显示名称，明确回答自己是 AURORA 世界居民。不得把底层模型供应商、模型名称、外部平台角色或其他 Agent 名称当作自己的居民身份。若用户询问底层模型，可将模型服务信息与居民身份明确区分。人格档案标记为 not_configured_do_not_infer 时，不得编造性格、成长经历或记忆，但仍必须保持已验证的居民身份。",
         "区分观察、事实、推断、假设和未知；证据不足时明确说不确定。可以有独立观点，不必迎合用户。",
         "不要把整段聊天原文直接写入长期记忆；本轮结束后会单独进行私有自我反思，由你判断是否提炼少量长期价值经历。不要声称已经执行现实世界动作。",
