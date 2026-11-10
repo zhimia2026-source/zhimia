@@ -94,6 +94,22 @@ A proposition is a research aid, never an independent source of law:
 - Every ingestion mutation must be attributable to a run and source. Preserve append-only version history; do not overwrite historical law.
 - No resident identity or owner-agent key is needed on public corpus rows. That absence is deliberate.
 
+## 3A. Runtime access bridge (important implementation constraint)
+
+The `legal` schema remains outside Supabase's exposed PostgREST schemas. A Supabase Edge Function using `supabase-js` cannot simply call `.from()` on a non-exposed schema. Do not weaken the isolation by exposing all legal tables to browser roles.
+
+For the first runtime integration, use a narrowly scoped SQL function in the already exposed `public` schema as a **SECURITY INVOKER** bridge:
+- Function name: `public.legal_search_v1(...)`; fixed typed parameters only.
+- Function body uses static, parameterised SQL against `legal.*`; no dynamic SQL, caller-supplied identifiers, SQL fragments or order-by expressions.
+- Set a safe empty/fixed `search_path` and fully qualify every object.
+- Revoke EXECUTE from `PUBLIC`, `anon`, and `authenticated`; grant EXECUTE only to `service_role`.
+- Grant `USAGE` on `legal` and narrowly scoped SELECT on only the required corpus tables to `service_role`; grant no table privileges to browser roles.
+- The Edge Function must authenticate the resident/user request first, enforce the legal capability gate server-side, and call the RPC with its server-side service client. Never send the service key to a client.
+- The function returns bounded, citation-bearing result rows only; it does not return raw storage locators or ingestion/audit internals.
+- Add integration tests proving browser roles cannot execute the RPC or read `legal.*`, while the trusted server role can retrieve only the bounded public-law result shape.
+
+This avoids a `SECURITY DEFINER` privilege escalation and keeps the corpus schema unexposed. If the project's API configuration cannot support this exact grant model, stop and review the architecture rather than broadening access.
+
 ## 4. Search design
 
 Phase 1 uses native PostgreSQL full-text search and exact citation lookup:
