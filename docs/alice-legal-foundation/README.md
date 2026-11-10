@@ -68,7 +68,8 @@ Space and satellite regulation where applicable; autonomous systems; robotics; A
 - Attorney-General's Chambers: https://www.agc.gov.sg/
 - Ministry of Law: https://www.mlaw.gov.sg/
 - Singapore Courts legal system and judgments: https://www.judiciary.gov.sg/
-- eLitigation judgments: https://www.elitigation.sg/gd
+- Singapore Courts written judgments and case summaries: https://www.judiciary.gov.sg/judgments/judgments-case-summaries
+- eLitigation court services and cause-book search: https://www.elitigation.sg/
 - Parliament and Hansard: https://www.parliament.gov.sg/
 - ACRA: https://www.acra.gov.sg/
 - MAS: https://www.mas.gov.sg/
