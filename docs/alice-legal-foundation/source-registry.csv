@@ -1,0 +1,40 @@
+domain,authority,official_url,source_types,ingestion_notes
+Constitution and legislation,Attorney-General's Chambers,https://sso.agc.gov.sg/,Constitution Acts subsidiary legislation versions,Track current repealed spent uncommenced and historical versions
+Gazette,Government of Singapore,https://www.egazette.gov.sg/,Gazette notices commencement subsidiary legislation,Preserve publication date and legal effect
+Court judgments,Singapore Courts,https://www.judiciary.gov.sg/judgments/judgments-case-summaries,Written judgments and case summaries,Use the written judgment as primary text; treat summaries as secondary discovery aids; record court level date neutral citation and paragraph pinpoints
+eLitigation court services,Singapore Courts,https://www.elitigation.sg/,Electronic filing court services and cause-book search,Use for its stated court-service functions; do not assume it is a bulk judgment corpus or a public API
+Legislative history,Parliament of Singapore,https://www.parliament.gov.sg/,Bills Hansard committee materials,Context only not enacted law
+Legal policy,Ministry of Law,https://www.mlaw.gov.sg/,Legal system policy consultation legal services,Label policy and consultation separately
+Corporate,ACRA,https://www.acra.gov.sg/,Companies LLP VCC accounting corporate service provider law,Link each regulator page to underlying statute and subsidiary legislation
+Financial,Monetary Authority of Singapore,https://www.mas.gov.sg/,Banking securities insurance payments financial regulation,Separate Acts regulations notices directions and guidance
+Tax,IRAS,https://www.iras.gov.sg/,Income tax GST stamp duty property tax customs guidance,Track tax-year and effective-date differences
+Employment,Ministry of Manpower,https://www.mom.gov.sg/,Employment work passes workplace safety industrial relations,Guidance is not automatically the statutory text
+Personal data,Personal Data Protection Commission,https://www.pdpc.gov.sg/,PDPA decisions advisory guidelines enforcement,Distinguish statute regulations decisions and guidance
+Intellectual property,IPOS,https://www.ipos.gov.sg/,Patents trade marks copyright designs IP administration,Link guidance to legislation and decisions
+Land and conveyancing,Singapore Land Authority,https://www.sla.gov.sg/,Land registration title conveyancing state land,Verify governing statute and registry data terms
+Planning and built environment,Urban Redevelopment Authority,https://www.ura.gov.sg/,Planning zoning development control,Record plan version and parcel/date context
+Building and construction,Building and Construction Authority,https://www1.bca.gov.sg/,Building control construction safety licensing,Link technical codes to legal status and incorporation
+Road and transport,Land Transport Authority,https://www.lta.gov.sg/,Road traffic vehicle public transport,Include subsidiary legislation and notices
+Maritime,Maritime and Port Authority of Singapore,https://www.mpa.gov.sg/,Shipping ports maritime safety,Track international conventions as implemented domestically
+Aviation,Civil Aviation Authority of Singapore,https://www.caas.gov.sg/,Aviation safety licensing air navigation,Distinguish domestic rules and ICAO materials
+Environment,National Environment Agency,https://www.nea.gov.sg/,Pollution waste public health environmental regulation,Record regulations codes and licence conditions
+Food,Singapore Food Agency,https://www.sfa.gov.sg/,Food safety imports food establishments,Connect licensing requirements to legislation
+Health,Ministry of Health,https://www.moh.gov.sg/,Healthcare services health policy licensing,Separate law from clinical or policy guidance
+Medicines and devices,Health Sciences Authority,https://www.hsa.gov.sg/,Medicines medical devices therapeutic products,Track product class and applicable regulations
+Telecommunications and media,Infocomm Media Development Authority,https://www.imda.gov.sg/,Telecoms broadcasting online services codes,Record binding status of codes and directions
+Cybersecurity,Cyber Security Agency of Singapore,https://www.csa.gov.sg/,Cybersecurity regulation critical information infrastructure,Link obligations to applicable Acts and notices
+Competition and consumer,Competition and Consumer Commission of Singapore,https://www.cccs.gov.sg/,Competition consumer protection enforcement decisions,Record statutory basis and decision status
+Anti-corruption,Corrupt Practices Investigation Bureau,https://www.cpib.gov.sg/,Corruption prevention investigation,Use primary law and official enforcement materials
+Police and criminal enforcement,Singapore Police Force,https://www.police.gov.sg/,Criminal procedure public order police guidance,Do not treat public advisories as legal authority
+Fire and civil defence,Singapore Civil Defence Force,https://www.scdf.gov.sg/,Fire safety emergency services,Link codes and licensing requirements to legislation
+Immigration,Immigration and Checkpoints Authority,https://www.ica.gov.sg/,Immigration citizenship passports border controls,Track status-specific legislation and regulations
+Narcotics,Central Narcotics Bureau,https://www.cnb.gov.sg/,Misuse of drugs enforcement,Use current statute and subsidiary legislation
+Housing and development,Ministry of National Development,https://www.mnd.gov.sg/,Housing land planning built environment policy,Distinguish policy from binding law
+Environment policy,Ministry of Sustainability and the Environment,https://www.mse.gov.sg/,Climate environmental policy,Track enacted obligations separately from targets
+Social and family,Ministry of Social and Family Development,https://www.msf.gov.sg/,Child protection family social services,Use family statutes and court decisions as primary legal sources
+Education,Ministry of Education,https://www.moe.gov.sg/,Education regulation and policy,Separate statutory obligations from school policy
+Defence,Ministry of Defence,https://www.mindef.gov.sg/,Defence and security policy,Use applicable public legislation and official notices
+Foreign affairs,Ministry of Foreign Affairs,https://www.mfa.gov.sg/,Treaties diplomatic and international law materials,Track treaty status and domestic implementation
+Professional conduct,Law Society of Singapore,https://www.lawsociety.org.sg/,Professional conduct practice guidance,Verify applicable legislation and binding professional rules
+Legal research,Singapore Academy of Law,https://www.sal.org.sg/,Legal research law reform legal profession,Secondary research unless source is an official rule
+Legal education,Singapore Institute of Legal Education,https://www.sile.edu.sg/,Admission and continuing legal education,Verify current admission and practice requirements

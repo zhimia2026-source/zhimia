@@ -1,0 +1,37 @@
+domain_id,legal_domain,subdomains,primary_official_authorities,core_source_types,priority
+01,Constitutional and public law,Constitution administrative law judicial review elections parliament public finance,AGC;Parliament;Singapore Courts;MinLaw,Constitution;Acts;judgments;Bills;Hansard;Gazette,P0
+02,Legislation and statutory interpretation,Acts subsidiary legislation commencement amendment repeal interpretation,AGC;Government Gazette;Parliament,Acts;subsidiary legislation;Gazette notices;Bills;Hansard,P0
+03,Courts and civil procedure,Civil procedure appeals enforcement costs limitation court jurisdiction,Singapore Courts;AGC;MinLaw,Court rules;practice directions;judgments;Acts,P0
+04,Criminal law and procedure,Offences investigations bail disclosure trial sentencing appeals,AGC;Singapore Courts;MHA;SPF;CPIB;CNB,Acts;subsidiary legislation;judgments;official enforcement materials,P0
+05,Evidence and remedies,Evidence admissibility burdens presumptions injunctions damages specific relief,Singapore Courts;AGC,Acts;judgments;court rules,P0
+06,Alternative dispute resolution,Arbitration mediation adjudication enforcement,Singapore Courts;MinLaw;SIAC,Acts;rules;judgments;institutional rules with status labels,P1
+07,Contract and commercial obligations,Formation interpretation breach remedies misrepresentation guarantees,AGC;Singapore Courts,Acts;judgments,P0
+08,Tort restitution and equity,Negligence defamation unjust enrichment fiduciary duties trusts,AGC;Singapore Courts,Acts;judgments,P0
+09,Company and corporate law,Incorporation directors shareholders governance restructuring,ACRA;AGC;Singapore Courts,Acts;subsidiary legislation;ACRA rules;judgments,P0
+10,Insolvency and restructuring,Bankruptcy winding up schemes receivership restructuring,MinLaw;ACRA;Singapore Courts;AGC,Acts;subsidiary legislation;judgments;practice directions,P0
+11,Banking and financial regulation,Banking capital markets insurance payments financial advisers fintech, MAS;AGC;Singapore Courts,Acts;subsidiary legislation;MAS notices directions guidelines enforcement,P0
+12,Competition and consumer law,Competition mergers abuse consumer protection unfair practices,CCCS;AGC;Singapore Courts,Acts;guidelines;decisions;judgments,P1
+13,Tax and customs,Income tax GST stamp duty property tax customs excise,IRAS;Singapore Customs;AGC;Singapore Courts,Acts;subsidiary legislation;tax rulings;judgments,P0
+14,Employment and workplace,Employment contracts wages dismissal workplace safety industrial relations,MOM;TADM;WSHC;AGC;Singapore Courts,Acts;subsidiary legislation;decisions;guidelines,P0
+15,Immigration nationality and border law,Passes residency citizenship border controls,ICA;MOM;MHA;AGC,Acts;subsidiary legislation;official notices,P1
+16,Family and child law,Marriage divorce maintenance custody adoption child protection,FJC;MSF;AGC;Singapore Courts,Acts;subsidiary legislation;judgments;practice directions,P0
+17,Succession and mental capacity,Wills probate estate administration mental capacity,AGC;Singapore Courts;Office of Public Guardian,Acts;rules;judgments;official forms,P1
+18,Land and property,Land title conveyancing leases mortgages strata housing,SLA;MND;HDB;AGC;Singapore Courts,Acts;subsidiary legislation;land registry material;judgments,P0
+19,Planning and construction,Planning permission building control construction payment adjudication,URA;BCA;AGC;Singapore Courts,Acts;regulations;codes;directions;judgments,P1
+20,Transport road and rail,Road traffic licensing public transport rail regulation,LTA;AGC;Singapore Courts,Acts;subsidiary legislation;notices;judgments,P1
+21,Maritime and shipping,Ports shipping admiralty carriage marine safety,MPA;AGC;Singapore Courts,Acts;subsidiary legislation;conventions as implemented;judgments,P1
+22,Aviation law,Air navigation aviation safety licensing,CAAS;AGC;Singapore Courts,Acts;regulations;directions;judgments,P2
+23,Data privacy and cybersecurity,PDPA breach notification cybersecurity critical infrastructure,PDPC;CSA;IMDA;AGC;Singapore Courts,Acts;regulations;directions;decisions;guidelines,P0
+24,Intellectual property,Copyright patents trade marks designs trade secrets,IPOS;AGC;Singapore Courts,Acts;regulations;registrations;judgments,P1
+25,Telecommunications media and digital platforms,Telecoms broadcasting online safety platform duties,IMDA;MDDI;AGC;Singapore Courts,Acts;codes;licence conditions;directions;judgments,P1
+26,Environment climate and natural resources,Pollution waste climate energy biodiversity wildlife,MSE;NEA;NParks;EMA;AGC;Singapore Courts,Acts;regulations;licence conditions;judgments,P1
+27,Health food and life sciences,Healthcare services medicines devices food safety bioethics,MOH;HSA;SFA;AGC;Singapore Courts,Acts;regulations;licensing;directions;judgments,P1
+28,Education charities societies and culture,Education regulation charities societies religious institutions,MOE;MCCY;MSF;AGC;Singapore Courts,Acts;regulations;registrations;judgments,P2
+29,International and conflict of laws,Treaties sanctions state immunity foreign judgments cross-border disputes,MFA;AGC;MinLaw;Singapore Courts;UN Treaty Collection,Acts;cases;treaty texts;ratification/status records,P1
+30,Public procurement and government contracts,Tendering procurement government contracts review,MOF;GeBIZ;AGC;Singapore Courts,procurement rules;contract terms;Acts;judgments,P2
+31,Professional regulation,Legal medical accounting engineering and other licensed professions,LSRA;Law Society;SILE;MOH;professional regulators,Acts;rules;codes;disciplinary decisions,P1
+32,National security and public order,Internal security terrorism financing corruption official secrets,MHA;MFA;CPIB;SPF;AGC;Singapore Courts,Acts;subsidiary legislation;judgments;official notices,P1
+33,Technology and emerging law,AI robotics blockchain virtual assets digital identity autonomous systems,IMDA;MAS;PDPC;CSA;AGC;Singapore Courts,Acts;consultations;codes;guidance;judgments;label proposals separately,P1
+34,Social welfare and human rights,Social assistance disability equality vulnerable persons,MSF;MOM;MOH;AGC;Singapore Courts,Acts;regulations;official policies;judgments,P2
+35,Military and defence law,Military justice service discipline defence procurement,MINDEF;AGC;Singapore Courts,Acts;regulations;orders;judgments,P2
+36,International trade and sanctions,Customs export controls sanctions trade remedies,MFA;Singapore Customs;MTI;AGC,Acts;subsidiary legislation;official notices;treaties,P1
