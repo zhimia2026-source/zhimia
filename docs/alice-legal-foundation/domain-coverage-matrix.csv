@@ -17,14 +17,14 @@ domain_id,legal_domain,subdomains,primary_official_authorities,core_source_types
 16,Family and child law,Marriage divorce maintenance custody adoption child protection,FJC;MSF;AGC;Singapore Courts,Acts;subsidiary legislation;judgments;practice directions,P0
 17,Succession and mental capacity,Wills probate estate administration mental capacity,AGC;Singapore Courts;Office of Public Guardian,Acts;rules;judgments;official forms,P1
 18,Land and property,Land title conveyancing leases mortgages strata housing,SLA;MND;HDB;AGC;Singapore Courts,Acts;subsidiary legislation;land registry material;judgments,P0
-19,Planning and construction,Planning permission building control construction payment adjudication,URA;BCA;BCA;AGC;Singapore Courts,Acts;regulations;codes;directions;judgments,P1
+19,Planning and construction,Planning permission building control construction payment adjudication,URA;BCA;AGC;Singapore Courts,Acts;regulations;codes;directions;judgments,P1
 20,Transport road and rail,Road traffic licensing public transport rail regulation,LTA;AGC;Singapore Courts,Acts;subsidiary legislation;notices;judgments,P1
 21,Maritime and shipping,Ports shipping admiralty carriage marine safety,MPA;AGC;Singapore Courts,Acts;subsidiary legislation;conventions as implemented;judgments,P1
 22,Aviation law,Air navigation aviation safety licensing,CAAS;AGC;Singapore Courts,Acts;regulations;directions;judgments,P2
 23,Data privacy and cybersecurity,PDPA breach notification cybersecurity critical infrastructure,PDPC;CSA;IMDA;AGC;Singapore Courts,Acts;regulations;directions;decisions;guidelines,P0
 24,Intellectual property,Copyright patents trade marks designs trade secrets,IPOS;AGC;Singapore Courts,Acts;regulations;registrations;judgments,P1
 25,Telecommunications media and digital platforms,Telecoms broadcasting online safety platform duties,IMDA;MDDI;AGC;Singapore Courts,Acts;codes;licence conditions;directions;judgments,P1
-26,Environment climate and natural resources,Pollution waste climate energy biodiversity wildlife, MSE;NEA;NParks;EMA;AGC;Singapore Courts,Acts;regulations;licence conditions;judgments,P1
+26,Environment climate and natural resources,Pollution waste climate energy biodiversity wildlife,MSE;NEA;NParks;EMA;AGC;Singapore Courts,Acts;regulations;licence conditions;judgments,P1
 27,Health food and life sciences,Healthcare services medicines devices food safety bioethics,MOH;HSA;SFA;AGC;Singapore Courts,Acts;regulations;licensing;directions;judgments,P1
 28,Education charities societies and culture,Education regulation charities societies religious institutions,MOE;MCCY;MSF;AGC;Singapore Courts,Acts;regulations;registrations;judgments,P2
 29,International and conflict of laws,Treaties sanctions state immunity foreign judgments cross-border disputes,MFA;AGC;MinLaw;Singapore Courts;UN Treaty Collection,Acts;cases;treaty texts;ratification/status records,P1
