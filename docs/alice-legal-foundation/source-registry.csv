@@ -1,8 +1,8 @@
 domain,authority,official_url,source_types,ingestion_notes
 Constitution and legislation,Attorney-General's Chambers,https://sso.agc.gov.sg/,Constitution Acts subsidiary legislation versions,Track current repealed spent uncommenced and historical versions
 Gazette,Government of Singapore,https://www.egazette.gov.sg/,Gazette notices commencement subsidiary legislation,Preserve publication date and legal effect
-Court judgments,Judiciary Singapore,https://www.judiciary.gov.sg/,Judgments court rules practice directions,Record court level date neutral citation and subsequent treatment
-Judgment repository,Singapore Courts,https://www.elitigation.sg/gd,Judgments,Verify exact judgment paragraphs and availability
+Court judgments,Singapore Courts,https://www.judiciary.gov.sg/judgments/judgments-case-summaries,Written judgments and case summaries,Use the written judgment as primary text; treat summaries as secondary discovery aids; record court level date neutral citation and paragraph pinpoints
+eLitigation court services,Singapore Courts,https://www.elitigation.sg/,Electronic filing court services and cause-book search,Use for its stated court-service functions; do not assume it is a bulk judgment corpus or a public API
 Legislative history,Parliament of Singapore,https://www.parliament.gov.sg/,Bills Hansard committee materials,Context only not enacted law
 Legal policy,Ministry of Law,https://www.mlaw.gov.sg/,Legal system policy consultation legal services,Label policy and consultation separately
 Corporate,ACRA,https://www.acra.gov.sg/,Companies LLP VCC accounting corporate service provider law,Link each regulator page to underlying statute and subsidiary legislation
@@ -18,7 +18,7 @@ Road and transport,Land Transport Authority,https://www.lta.gov.sg/,Road traffic
 Maritime,Maritime and Port Authority of Singapore,https://www.mpa.gov.sg/,Shipping ports maritime safety,Track international conventions as implemented domestically
 Aviation,Civil Aviation Authority of Singapore,https://www.caas.gov.sg/,Aviation safety licensing air navigation,Distinguish domestic rules and ICAO materials
 Environment,National Environment Agency,https://www.nea.gov.sg/,Pollution waste public health environmental regulation,Record regulations codes and licence conditions
-Food, Singapore Food Agency,https://www.sfa.gov.sg/,Food safety imports food establishments,Connect licensing requirements to legislation
+Food,Singapore Food Agency,https://www.sfa.gov.sg/,Food safety imports food establishments,Connect licensing requirements to legislation
 Health,Ministry of Health,https://www.moh.gov.sg/,Healthcare services health policy licensing,Separate law from clinical or policy guidance
 Medicines and devices,Health Sciences Authority,https://www.hsa.gov.sg/,Medicines medical devices therapeutic products,Track product class and applicable regulations
 Telecommunications and media,Infocomm Media Development Authority,https://www.imda.gov.sg/,Telecoms broadcasting online services codes,Record binding status of codes and directions
