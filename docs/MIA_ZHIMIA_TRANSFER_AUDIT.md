@@ -1,0 +1,156 @@
+# Mia → ZHIMIA archive transfer: implementation audit
+
+Audit date: 2026-11-04
+
+## Verified projects and batch
+
+- Source Supabase project: `dbooikzqprnqbgpfwsze` (`zee-extension`).
+- Target Supabase project: `lvxmygrgqtmzqgailmyl` (`ZHIMIA`).
+- Target Agent: `34833ba9-2be7-4a55-9b52-62c402f759b5` (`MIA`).
+- Source Mia identity: `cb6d01b4-0e3f-46ee-8946-360aa91db1ea`.
+- Archive batch: `a14c9095-2c72-4d11-80b6-8274cd9bf43c`.
+- Target Edge Function `mia-private-import`: ACTIVE, version 4, JWT verification enabled (latest deployment state; historical deployment increments below are retained as audit history).
+- Target private archive schema and tables exist; `mia_private.mia_archive_records` currently contains 0 rows.
+- Target migration batch remains `planned`; no source records have been transferred.
+- Target has one pre-created Mia identity row; normalized history tables remain empty.
+- Target private-schema tables have RLS enabled. The current `mia_private` schema has no ordinary role policies; do not add broad client policies.
+
+## Live source counts
+
+The source currently has 25 tables in the migration allowlist:
+
+| Table | Live rows |
+|---|---:|
+| mia_identity | 1 |
+| mia_chat_sessions | 1 |
+| mia_messages | 5,908 |
+| mia_memories | 3,342 |
+| mia_emotion_events | 1,524 |
+| mia_life_events | 2,404 |
+| mia_personality_state | 191 |
+| mia_relationship_context | 68 |
+| mia_growth_runs | 1,128 |
+| mia_growth_state_versions | 122 |
+| mia_exploration_runs | 74 |
+| mia_virtual_spaces | 41 |
+| mia_forest_autonomy_runs | 31 |
+| mia_forest_autonomy_control | 1 |
+| mia_import_batches | 9 |
+| mia_world_action_audit | 7 |
+| mia_evolution_candidates | 0 |
+| mia_evolution_candidate_events | 0 |
+| mia_evolution_rollback_events | 0 |
+| zhi_world_builder_config | 1 |
+| zhi_world_builder_proposals | 0 |
+| zhi_world_builder_region_health | 0 |
+| zhi_world_builder_compute_ledger | 0 |
+| zhi_world_builder_region_samples | 0 |
+| mia_growth_admin_audit | 0 |
+
+## Frozen manifest drift
+
+The batch manifest was captured at `2026-11-03T23:12:47Z`. Six live counts have since changed:
+
+| Table | Frozen manifest | Live |
+|---|---:|---:|
+| mia_messages | 5,904 | 5,908 |
+| mia_memories | 3,340 | 3,342 |
+| mia_life_events | 2,403 | 2,404 |
+| mia_emotion_events | 1,523 | 1,524 |
+| mia_personality_state | 190 | 191 |
+| mia_growth_runs | 1,127 | 1,128 |
+
+The existing manifest and hashes cannot certify the live source. Also, separate PostgREST requests do not form one atomic multi-table snapshot.
+
+## Import endpoint behavior
+
+- The Edge Function accepts only the fixed batch ID and fixed target agent ID.
+- It allowlists the 25 source table names.
+- It strips secret-like object keys recursively before storage.
+- It computes SHA-256 over the sanitized JSON payload and stores it as `source_sha256`.
+- The batch RPC upserts by `(batch_id, source_schema, source_table, source_pk)`, making repeated imports idempotent at that key.
+- `finalize_archive_batch` checks per-table expected/imported row counts and moves the batch to `staged`; it does **not** independently compare source and target row content.
+
+## Blocking issues before any transfer
+
+1. Replace OFFSET pagination with stable keyset pagination.
+2. Refresh the frozen source manifest and define a consistent snapshot strategy. Counts alone cannot detect updates/deletes that preserve row totals.
+3. Compute the same canonical sanitized-row digest at source and target, then compare per-row or per-table digest sets.
+4. Add a read-only target verification operation that returns target row counts and stored digests to the workflow.
+5. Call `finalize_archive_batch` only after count and checksum verification succeeds.
+6. Confirm the source table primary-key and relationship mapping for every table, including the differing source/target identity and session column names.
+7. Keep archive import separate from normalized runtime activation.
+
+## Safety gate
+
+The GitHub Actions workflow is deliberately manual and currently exits before reading secrets or writing data unless both a CLI `--execute` flag and the `MIA_TRANSFER_APPROVAL` secret are supplied. The checked-in workflow supplies neither execution flag, so dispatching it is a safe no-op.
+
+Do not add the execution flag or approval secret until all blockers above are implemented, tested against a disposable batch, and reviewed.
+
+## Scope not covered by this archive stage
+
+Storage object bytes, source Edge Function code, environment configuration, AGNES credentials, runtime adapters, forest/scene runtime integration, and Aurora ecosystem event perception are separate migration stages. No service-role credential belongs in Git or browser code.
+
+
+## 2026-11-04 deployment increment: archive verifier
+
+- Deployed `mia-private-import` as ACTIVE version 2 on the target project; JWT verification remains enabled and the function performs its own exact service-role bearer check.
+- Import hashing now uses recursive key-sorted canonical JSON after secret-like keys are stripped. This makes the payload digest independent of JSON object key order.
+- Added a read-only `{ "action": "verify" }` operation. It pages through the target batch archive, recalculates each payload digest, reports per-table counts and a deterministic rowset SHA-256, and reports any stored-row hash mismatch.
+- Import now requires explicit `{ "action": "import", "batch_id": ..., "rows": [...] }`; unknown actions are rejected.
+- Tracked the exact deployed function source and import map in `supabase/functions/mia-private-import/` on this PR branch to reduce deployed/repository drift.
+- Deployment was confirmed ACTIVE v2. The verification route has not yet been invoked with the service-role credential; this environment does not expose that secret to the assistant. Archive remains empty and batch remains planned.
+- **Important:** this is the target-side verification half only. The source exporter still needs matching canonical sanitization, keyset pagination, stable source snapshot/upper-bound policy, source rowset digests, and a fail-closed comparison before any import run. No transfer was started by this deployment.
+
+
+## 2026-11-04 deployment increment: keyset exporter and fail-closed digest gate
+
+- Updated `scripts/mia-clone-transfer.mjs` to use each table's declared primary key with keyset pagination and a per-table maximum-PK upper bound; OFFSET pagination has been removed.
+- The exporter now strips the same secret-like keys and computes recursively key-sorted canonical JSON SHA-256 row hashes before transfer.
+- The exporter sends an explicit `action: "import"`, then calls the target's read-only `action: "verify"` route and compares every table's row count and deterministic sorted rowset digest. Any mismatch fails the run.
+- Added a second execution gate: `MIA_SOURCE_SNAPSHOT_CONFIRMED=CONFIRMED_STABLE_SOURCE_SNAPSHOT`, in addition to the existing CLI flag and approval secret.
+- Target function is ACTIVE version 4. The matching deployed source is tracked under `supabase/functions/mia-private-import/` in this PR branch.
+- The exporter has **not** been executed. The GitHub workflow still does not pass `--execute`; archive row count remains 0 and batch status remains `planned`.
+- **Consistency limitation:** keyset paging plus a maximum-PK bound prevents later inserts from extending the scan and avoids OFFSET drift, but it is not itself a database-wide repeatable-read snapshot. Before execution, a stable source snapshot/maintenance window must be established and independently confirmed. Do not set the snapshot confirmation variable while source rows can still be updated or deleted.
+- The verifier has not been called with the service-role credential yet. A post-deploy authenticated verification smoke test is still required before the first import.
+
+
+## 2026-11-04 increment: authenticated verifier smoke workflow
+
+- Added `scripts/mia-target-verify.mjs` and `.github/workflows/mia-target-verify.yml` on the migration branch.
+- This workflow calls only `action: "verify"` on the target `mia-private-import` function. It does not contact the source project and cannot import, finalize, or activate Mia.
+- The workflow uses only the target URL and target service-role GitHub Actions secrets. It prints a sanitized summary (batch ID, number of tables, archive row count, invalid row-hash count) and never prints credentials or raw response bodies.
+- The workflow is manual (`workflow_dispatch`) and checks out `migration/mia-archive-transfer`. It has been committed but has **not** been dispatched; therefore authenticated verifier smoke-test status remains pending.
+- Before dispatch, confirm the repository Actions secrets `ZHIMA_SUPABASE_URL` and `ZHIMA_SUPABASE_SERVICE_ROLE_KEY` are configured. Then run **Actions → Mia target verifier smoke test → Run workflow** on branch `migration/mia-archive-transfer`.
+- Expected current result, if the target state is unchanged: PASS, 25 allowlisted table entries may be absent/zero depending on verifier response shape, archive rows 0, invalid row hashes 0. The workflow validates the actual response contract and reports the number of tables returned; it does not mistake an empty archive for a completed migration.
+- This is a read-only smoke test, not a migration approval. Source snapshot consistency and native runtime adaptation remain separate blockers.
+
+
+## 2026-11-04 source primary-key audit and snapshot decision
+
+- Read-only inspection of source `information_schema` confirmed a primary key exists for every one of the 25 allowlisted tables, and the column names match the exporter map.
+- Primary-key types are: UUID for 22 tables; bigint for `mia_growth_state_versions.version`; boolean for `mia_forest_autonomy_control.singleton`; text for `zhi_world_builder_config.config_key` and `zhi_world_builder_region_health.region_key`.
+- This confirms the declared cursor columns, but it does **not** establish a consistent snapshot. In particular, UUID/text/boolean key ordering is only a deterministic traversal order, not a transaction snapshot, and updates/deletes to already-scanned rows can still escape the exporter digest.
+- Target recheck on 2026-11-04: `mia_private.mia_archive_records` has 0 rows for this batch; `mia_private.mia_migration_batches.status` remains `planned`.
+- Snapshot approach selected for the next design stage: an additive, source-side immutable snapshot batch created within one PostgreSQL `REPEATABLE READ` transaction, covering all 25 tables and recording source PK, sanitized payload, and per-table row count. The exporter computes canonical payload and rowset digests while reading only the frozen snapshot. This avoids pausing Mia's live runtime and avoids pretending separate REST requests are one snapshot.
+- No source-side DDL or data writes were made during this audit. The snapshot staging schema/function is not yet deployed; its exact permissions, secret-field sanitization, retention, and rollback path must be reviewed before creating it.
+
+
+## Snapshot SQL draft
+
+- Added `ops/sql/mia-source-repeatable-read-snapshot.sql` as a review-only source-side snapshot design for the 25-table allowlist.
+- The script uses one explicit `REPEATABLE READ` transaction, records a frozen batch and per-table counts, and restricts ordinary client-role access.
+- It has not been executed. No source database schema or rows were changed.
+- The private schema is not intended for browser access. A service-role-only export path must be designed before adapting the exporter to read these records.
+- Validate the script on a disposable clone, inspect sanitized sample payloads, and verify rollback before source deployment. Snapshot retention and cleanup require a separate review.
+
+
+
+## Frozen snapshot export channel draft
+
+- Added `ops/sql/mia-source-snapshot-export-rpc.sql` as a review-only, read-only PostgREST RPC for the source snapshot.
+- The RPC is `SECURITY INVOKER`, accepts only the fixed migration batch, checks both the active Postgres role and signed JWT role for `service_role`, requires a frozen batch, and uses the frozen manifest as the table allowlist.
+- It returns bounded keyset pages (maximum 500 rows) from `mia_transfer_private.snapshot_records`; it does not expose the private tables as REST resources. Function execution is revoked from `PUBLIC`, `anon`, and `authenticated`, and granted only to `service_role`.
+- Updated `scripts/mia-clone-transfer.mjs` to read only through this frozen-snapshot RPC. It no longer reads live source tables or computes live-table upper bounds. It checks the frozen manifest count for every table before proceeding to target verification.
+- These are repository changes only. Neither source SQL draft has been executed, no source schema was changed, and no source/target archive rows were transferred.
+- Before source deployment: validate both SQL files on a disposable clone; verify the Data API exposes the function but not the private tables; test anon/authenticated denial and service-role paging; compare snapshot counts and digests; test rollback and retention. Current Supabase Data API defaults require explicit function/table grants to be reviewed rather than assuming new objects are automatically exposed.
