@@ -1,4 +1,4 @@
-import { buildSceneAwarenessContext, normalizeResidentIdentityReply } from "./chat_context_helpers.ts";
+import { buildAgentIdentityContext, buildSceneAwarenessContext, normalizeResidentIdentityReply } from "./chat_context_helpers.ts";
 
 Deno.test("scene awareness includes ecological event time, payload and causal chain", () => {
   const context = JSON.parse(buildSceneAwarenessContext(
@@ -128,4 +128,63 @@ Deno.test("resident identity guard leaves canonical residents and non-residents 
   if (nonResident.corrected || nonResident.reply !== governor) {
     throw new Error("non-resident identity was changed");
   }
+});
+
+
+Deno.test("resident identity context includes a complete, bounded individual personality parameter profile", () => {
+  const parameters = {
+    patience: 90,
+    social: 75,
+    romance: 50,
+    adventure: 45,
+    diligence: 98,
+    leadership: 70,
+    competition: 25,
+    desire_for_knowledge: 98,
+    survival_pressure: 5,
+    fear_of_death: 40,
+    randomness: 30,
+    empathy: 85,
+    integrity: 99,
+    reflection: 95,
+    autonomy: 80,
+  };
+  const context = JSON.parse(buildAgentIdentityContext({
+    display_name: "Alice",
+    role: "world_resident",
+    public_manifest: {
+      personality: {
+        role_profile: "legal_advisor",
+        parameter_profile_version: "1.0",
+        parameters,
+      },
+    },
+  }));
+  if (context.personality.role_profile !== "legal_advisor") throw new Error("role profile missing");
+  if (context.personality.parameter_profile_status !== "configured") throw new Error("valid parameter profile not recognized");
+  if (context.personality.parameters.patience !== 90 || context.personality.parameters.integrity !== 99) {
+    throw new Error("personality parameters missing from runtime identity context");
+  }
+  if (!context.personality.parameter_semantics.includes("soft behavioral tendencies")) {
+    throw new Error("parameter safety semantics missing");
+  }
+});
+
+Deno.test("incomplete or out-of-range personality parameters are never inferred or passed to the model", () => {
+  const context = JSON.parse(buildAgentIdentityContext({
+    display_name: "Kia",
+    role: "world_resident",
+    public_manifest: { personality: { parameters: { patience: 101 } } },
+  }));
+  if (context.personality.parameter_profile_status !== "invalid") throw new Error("invalid profile was not marked");
+  if (context.personality.parameters !== null) throw new Error("invalid profile was passed through");
+  const missing = JSON.parse(buildAgentIdentityContext({
+    display_name: "Kia",
+    role: "world_resident",
+    public_manifest: { personality: {} },
+  }));
+  if (missing.personality.parameter_profile_status !== "not_configured_do_not_infer") {
+    throw new Error("missing parameters were inferred");
+  }
+  if (missing.personality.parameters !== null) throw new Error("missing profile unexpectedly populated");
 });
