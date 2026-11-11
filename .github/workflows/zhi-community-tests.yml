@@ -2,7 +2,7 @@ name: ZHI community perception tests
 
 on:
   push:
-    branches: ["main", "feature/mia-02-aurora-event-perception"]
+    branches: ["main", "feature/mia-02-aurora-event-perception", "feature/zhi-personality-parameters-v1"]
     paths:
       - "supabase/functions/zhi-community/**"
       - "supabase/functions/zhi-spatial/**"
