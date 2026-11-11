@@ -82,3 +82,24 @@ PR #54 remains Draft. The personality runtime helper, prompt integration, tests,
 ## Safety boundary
 
 This recovery and reconciliation work used GitHub source reads, GitHub archive/documentation writes on the feature branch, and read-only production SQL introspection. No production DDL, row writes, data movement, migration-history changes, or Edge Function deployments were performed.
+
+
+## Additional later consent-hardening migrations
+
+The production migration ledger also records four later cognition/governance hardening migrations:
+- `20261103043132` — `zhi_constitutional_protection_v01`
+- `20261103043343` — `zhi_constitutional_protection_hardening`
+- `20261103043549` — `zhi_agent_consent_attestation_gate`
+- `20261103044554` — `zhi_revision_consent_trust_boundary`
+
+Their exact SQL source files were not found on `main`, `feature/zhi-personality-parameters-v1`, `feat/zhi-super-brain-v1-foundation`, or `feat/mia02-seven-brain-v1` under the expected top-level migration paths. This search is not exhaustive across every branch or external deployment archive.
+
+Read-only production introspection confirms the later behavior that must be preserved:
+- `public.zhi_agent_cognition_consents` exists with owner/agent/proposal binding, grantee, purpose, scopes, content hash, base version, consent event ID, nonce hash, runtime attestation, attestation verification, expiry, and one-way revocation fields.
+- `zhi_guard_cognition_consent()` rejects deletion, makes the consent proof immutable, and permits only one-way revocation.
+- `zhi_guard_revision_proposal_integrity()` makes proposal payload identity immutable; requires a verified, unexpired, unrevoked consent proof bound to the exact owner, agent, proposal, grantee, purpose, scopes, content hash, and base version before an agent-consented state can be accepted; and blocks approval without valid consent.
+- The live rollback RPC is fail-closed and raises `zhi_rollback_requires_agent_consented_revision_proposal`.
+- The cognition record append-only guard rejects UPDATE and DELETE.
+
+These live definitions were inspected directly, but their exact introducing migration source is still missing. Do not recreate or simplify these protections from this audit summary. Recover the four source files from a trusted branch/deployment backup or create a reviewed schema/function baseline from the live database before any further cognition changes.
+
