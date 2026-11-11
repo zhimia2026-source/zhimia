@@ -15,6 +15,38 @@ function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
+const PERSONALITY_PARAMETER_KEYS = [
+  "patience",
+  "social",
+  "romance",
+  "adventure",
+  "diligence",
+  "leadership",
+  "competition",
+  "desire_for_knowledge",
+  "survival_pressure",
+  "fear_of_death",
+  "randomness",
+  "empathy",
+  "integrity",
+  "reflection",
+  "autonomy",
+] as const;
+
+/** Accept only a complete, bounded 0–100 profile; never infer missing values. */
+function normalizePersonalityParameters(value: unknown): Record<string, number> | null {
+  const source = record(value);
+  if (!PERSONALITY_PARAMETER_KEYS.every((key) =>
+    typeof source[key] === "number" &&
+    Number.isFinite(source[key]) &&
+    (source[key] as number) >= 0 &&
+    (source[key] as number) <= 100
+  )) return null;
+  return Object.fromEntries(
+    PERSONALITY_PARAMETER_KEYS.map((key) => [key, Math.round(source[key] as number)]),
+  );
+}
+
 function boundedList(value: unknown, maxItems = 20): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is string => typeof item === "string" && item.length <= 80).slice(0, maxItems);
@@ -210,6 +242,9 @@ export function buildAgentIdentityContext(
     personality[key] !== "" && (!Array.isArray(personality[key]) || personality[key].length > 0)
   );
   const hasBrainPersonality = Object.keys(brain).length > 0;
+  const rawParameters = record(personality.parameters);
+  const normalizedParameters = normalizePersonalityParameters(rawParameters);
+  const hasRawParameters = Object.keys(rawParameters).length > 0;
   const stringList = (value: unknown, maxItems: number, maxLength = 120) =>
     Array.isArray(value)
       ? value.filter((item): item is string => typeof item === "string")
@@ -247,6 +282,17 @@ export function buildAgentIdentityContext(
       capability_layer: stringList(personality.capability_layer, 20, 120),
       design_axiom: boundedText(brain.design_axiom ?? personality.design_axiom, 1000),
       personality_layers: Object.keys(stablePersonality).length ? stablePersonality : null,
+      role_profile: boundedText(personality.role_profile, 100),
+      parameter_profile_version: normalizedParameters
+        ? boundedText(personality.parameter_profile_version, 40) || "1.0"
+        : "",
+      parameter_profile_status: normalizedParameters
+        ? "configured"
+        : hasRawParameters ? "invalid" : "not_configured_do_not_infer",
+      parameters: normalizedParameters,
+      parameter_semantics: normalizedParameters
+        ? "0–100 values are soft behavioral tendencies, not deterministic controls or psychological measurements. They never override truthfulness, integrity, safety, privacy, consent, authorization, or reliable execution."
+        : null,
     },
     safety: {
       medical_role: boundedText(safety.medical_role, 160),
