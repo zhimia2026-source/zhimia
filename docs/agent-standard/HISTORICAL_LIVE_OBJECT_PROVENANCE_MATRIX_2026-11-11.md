@@ -35,3 +35,21 @@ The migration labels are not all table names. The previous exact-name inventory 
 ## Reconciliation decision
 
 The source-recovery blocker is **partially resolved**: repository historical SQL has been recovered and archived. The exact production-applied SQL bodies and all later hardening migrations are not yet fully mapped. Do not replay archived SQL, alter the production migration ledger, or overwrite live definitions. Next compare complete current schema/function definitions against the recovered baseline and locate the later consent/runtime hardening source commits. Only prepare a forward-only migration if a real gap is demonstrated.
+
+
+## Later hardening layer: source files not yet recovered
+
+Production migration ledger also contains:
+- `20261103043132_zhi_constitutional_protection_v01`
+- `20261103043343_zhi_constitutional_protection_hardening`
+- `20261103043549_zhi_agent_consent_attestation_gate`
+- `20261103044554_zhi_revision_consent_trust_boundary`
+
+The exact SQL files were not found on the checked refs (`main`, this personality branch, `feat/zhi-super-brain-v1-foundation`, and `feat/mia02-seven-brain-v1`). Current production behavior is nevertheless directly observable:
+- `zhi_agent_cognition_consents` stores owner/agent/proposal-bound consent proofs, runtime attestation, attestation verification, nonce hash, scopes, content hash, base version, expiry and revocation.
+- `zhi_guard_cognition_consent` makes consent proof fields immutable and revocation one-way; deletion is rejected.
+- `zhi_guard_revision_proposal_integrity` makes proposal payload immutable and verifies exact consent binding before approval.
+- `zhi_guard_append_only_record` blocks cognition record updates/deletes.
+- `zhi_rollback_cognition_version` is intentionally fail-closed until an agent-consented revision proposal is used.
+
+These later protections are production-critical. Recover their exact source or establish a reviewed live-schema/function baseline before changing cognition or consent logic.
