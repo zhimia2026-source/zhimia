@@ -26,7 +26,10 @@ create table if not exists zhi_security.agent_runtime_signing_keys (
     and public_jwk ? 'x'
     and not (public_jwk ? 'd')
   ),
-  constraint agent_runtime_key_validity check (valid_until is null or valid_until > valid_from)
+  constraint agent_runtime_key_validity check (valid_until is null or valid_until > valid_from),
+  constraint agent_runtime_key_agent_owner_fk
+    foreign key (agent_id, owner_user_id)
+    references public.zhi_agents(id, owner_user_id) on delete cascade
 );
 
 create index if not exists agent_runtime_signing_keys_agent_idx
@@ -38,7 +41,9 @@ create table if not exists zhi_security.consumed_agent_consent_nonces (
   key_id text not null references zhi_security.agent_runtime_signing_keys(key_id),
   agent_id uuid not null,
   consent_event_id text not null,
-  consumed_at timestamptz not null default now()
+  consumed_at timestamptz not null default now(),
+  constraint consumed_consent_nonce_agent_fk
+    foreign key (agent_id) references public.zhi_agents(id) on delete cascade
 );
 
 create table if not exists zhi_security.gateway_secrets (
