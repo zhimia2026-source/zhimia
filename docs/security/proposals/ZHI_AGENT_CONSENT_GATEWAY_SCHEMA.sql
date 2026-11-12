@@ -93,6 +93,8 @@ declare
   v_proposal_id uuid;
   v_content_hash text;
   v_base_version integer;
+  v_mac_diff integer := 0;
+  v_mac_index integer;
 begin
   select secret_value into v_secret from zhi_security.gateway_secrets
   where secret_name = 'agent_consent_gateway_hmac';
@@ -101,14 +103,112 @@ begin
   v_expected_mac := encode(extensions.hmac(
     convert_to(p_payload_text || '.' || p_key_id || '.' || p_signature, 'UTF8'), v_secret, 'sha256'
   ), 'hex');
-  if p_gateway_mac is null or length(p_gateway_mac) <> 64 or v_expected_mac <> lower(p_gateway_mac) then
-    raise exception 'attestation_gateway_mac_invalid';
-  end if;
+  if p_gateway_mac is null or p_gateway_mac !~ '^[0-9a-fA-F]{64}
 
   v_payload := p_payload_text::jsonb;
   if jsonb_typeof(v_payload) <> 'object' or
      (select array_agg(k order by k) from jsonb_object_keys(v_payload) k) <>
-     array['agent_id','based_on_version','consent_event_id','expires_at','grantee_id','grantee_kind','issued_at','nonce','owner_user_id','proposal_id','purpose','scopes','content_sha256']::text[] then
+     array['agent_id','based_on_version','consent_event_id','content_sha256','expires_at','grantee_id','grantee_kind','issued_at','nonce','owner_user_id','proposal_id','purpose','scopes']::text[] then
+    raise exception 'attestation_payload_schema_invalid';
+  end if;
+
+  v_issued_at := (v_payload->>'issued_at')::timestamptz;
+  v_expires_at := (v_payload->>'expires_at')::timestamptz;
+  if v_issued_at > now() + interval '60 seconds' or v_issued_at < now() - interval '24 hours' or
+     v_expires_at <= now() or v_expires_at <= v_issued_at or v_expires_at > v_issued_at + interval '24 hours' then
+    raise exception 'attestation_time_invalid';
+  end if;
+
+  select * into v_key from zhi_security.agent_runtime_signing_keys
+  where key_id = p_key_id and agent_id = (v_payload->>'agent_id')::uuid
+    and owner_user_id = (v_payload->>'owner_user_id')::uuid and algorithm = 'Ed25519'
+    and is_active and revoked_at is null and valid_from <= now()
+    and (valid_until is null or valid_until > now())
+  for share;
+  if not found then raise exception 'attestation_runtime_key_unavailable'; end if;
+  if v_issued_at < v_key.valid_from or (v_key.valid_until is not null and v_expires_at > v_key.valid_until) then
+    raise exception 'attestation_key_validity_mismatch';
+  end if;
+
+  select a.owner_user_id into v_agent_owner from public.zhi_agents a
+  where a.id = (v_payload->>'agent_id')::uuid;
+  if v_agent_owner is null or v_agent_owner <> (v_payload->>'owner_user_id')::uuid then
+    raise exception 'attestation_agent_owner_mismatch';
+  end if;
+
+  v_proposal_id := nullif(v_payload->>'proposal_id', '')::uuid;
+  v_content_hash := nullif(v_payload->>'content_sha256', '');
+  v_base_version := nullif(v_payload->>'based_on_version', '')::integer;
+
+  if v_proposal_id is null then
+    if v_content_hash is not null or v_base_version is not null then
+      raise exception 'attestation_proposal_binding_fields_invalid';
+    end if;
+  else
+    if v_content_hash is null or v_base_version is null or v_base_version < 1 or
+       v_payload->>'grantee_kind' <> 'governance_service' or
+       v_payload->>'grantee_id' <> 'zhi-community' or
+       v_payload->>'purpose' <> 'cognition.revision.apply' or
+       not ((v_payload->'scopes') @> '["cognition.revision.apply"]'::jsonb) then
+      raise exception 'attestation_revision_consent_scope_invalid';
+    end if;
+    select * into v_proposal from public.zhi_cognition_revision_proposals p
+    where p.id = v_proposal_id and p.agent_id = (v_payload->>'agent_id')::uuid
+      and p.owner_user_id = (v_payload->>'owner_user_id')::uuid
+      and p.proposed_state_sha256 = v_content_hash and p.based_on_version = v_base_version
+    for share;
+    if not found then raise exception 'attestation_revision_proposal_binding_mismatch'; end if;
+  end if;
+
+  v_nonce_hash := encode(extensions.digest(convert_to(v_payload->>'nonce', 'UTF8'), 'sha256'), 'hex');
+  insert into zhi_security.consumed_agent_consent_nonces
+    (nonce_sha256, key_id, agent_id, consent_event_id)
+  values (v_nonce_hash, p_key_id, (v_payload->>'agent_id')::uuid, v_payload->>'consent_event_id');
+
+  insert into public.zhi_agent_cognition_consents (
+    agent_id, owner_user_id, proposal_id, grantee_kind, grantee_id, purpose, scopes,
+    content_sha256, based_on_version, consent_event_id, consent_nonce_hash,
+    runtime_attestation, consented_at, expires_at, attestation_verified
+  ) values (
+    (v_payload->>'agent_id')::uuid, (v_payload->>'owner_user_id')::uuid, v_proposal_id,
+    v_payload->>'grantee_kind', v_payload->>'grantee_id', v_payload->>'purpose',
+    array(select jsonb_array_elements_text(v_payload->'scopes')),
+    v_content_hash, v_base_version, v_payload->>'consent_event_id', v_nonce_hash,
+    jsonb_build_object('key_id', p_key_id, 'algorithm', 'Ed25519', 'signature', p_signature,
+      'payload_sha256', encode(extensions.digest(convert_to(p_payload_text, 'UTF8'), 'sha256'), 'hex'),
+      'verified_by', 'zhi-agent-consent-gateway'),
+    v_issued_at, v_expires_at, true
+  ) returning id into v_consent_id;
+  return v_consent_id;
+end;
+$$;
+
+revoke all on function public.zhi_issue_verified_agent_consent(text, text, text, text) from public, anon, authenticated;
+grant execute on function public.zhi_issue_verified_agent_consent(text, text, text, text) to service_role;
+
+-- Close the direct service-role insertion bypass. Only the HMAC-gated RPC can insert verified consent rows.
+revoke insert on public.zhi_agent_cognition_consents from service_role;
+
+commit;
+
+-- Provisioning is administrator-only and never committed:
+-- INSERT INTO zhi_security.gateway_secrets(secret_name, secret_value)
+-- VALUES ('agent_consent_gateway_hmac', convert_to('<same 32+ byte random secret as Edge Function secret>', 'UTF8'));
+-- Register public Ed25519 JWKs through a separate audited admin workflow; never store private JWK material.
+ then
+    raise exception 'attestation_gateway_mac_invalid';
+  end if;
+  -- Fixed-length comparison avoids early-exit string equality on the MAC.
+  for v_mac_index in 1..64 loop
+    v_mac_diff := v_mac_diff |
+      (ascii(substr(v_expected_mac, v_mac_index, 1)) # ascii(substr(lower(p_gateway_mac), v_mac_index, 1)));
+  end loop;
+  if v_mac_diff <> 0 then raise exception 'attestation_gateway_mac_invalid'; end if;
+
+  v_payload := p_payload_text::jsonb;
+  if jsonb_typeof(v_payload) <> 'object' or
+     (select array_agg(k order by k) from jsonb_object_keys(v_payload) k) <>
+     array['agent_id','based_on_version','consent_event_id','content_sha256','expires_at','grantee_id','grantee_kind','issued_at','nonce','owner_user_id','proposal_id','purpose','scopes']::text[] then
     raise exception 'attestation_payload_schema_invalid';
   end if;
 
