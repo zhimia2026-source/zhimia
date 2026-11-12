@@ -47,6 +47,10 @@ create table if not exists zhi_security.gateway_secrets (
   updated_at timestamptz not null default now()
 );
 
+alter table zhi_security.agent_runtime_signing_keys enable row level security;
+alter table zhi_security.consumed_agent_consent_nonces enable row level security;
+alter table zhi_security.gateway_secrets enable row level security;
+
 revoke all on all tables in schema zhi_security from public, anon, authenticated, service_role;
 
 create or replace function public.zhi_get_agent_runtime_signing_key(
