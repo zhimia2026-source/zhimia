@@ -246,13 +246,9 @@ begin
       raise exception 'attestation_proposal_binding_fields_invalid';
     end if;
 
-    if v_payload->>'grantee_kind' = 'user'
-       and v_payload->>'grantee_id' <> v_payload->>'owner_user_id' then
-      raise exception 'attestation_user_grantee_must_be_owner';
-    end if;
-
-    if v_payload->>'grantee_kind' = 'governance_service' then
-      raise exception 'attestation_governance_service_requires_proposal';
+    if v_payload->>'grantee_kind' <> 'user'
+       or v_payload->>'grantee_id' <> v_payload->>'owner_user_id' then
+      raise exception 'attestation_non_proposal_consent_must_bind_owner_user';
     end if;
   else
     if v_content_hash is null
