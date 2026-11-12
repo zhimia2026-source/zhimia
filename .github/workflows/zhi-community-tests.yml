@@ -11,6 +11,7 @@ on:
       - "supabase/functions/zhi-federated-movement/**"
       - "supabase/functions/zhi-federation/**"
       - "supabase/functions/zhi-agent-consent-gateway/**"
+      - "docs/security/**"
       - ".github/workflows/zhi-community-tests.yml"
   pull_request:
     paths:
