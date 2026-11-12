@@ -15,3 +15,8 @@ verify_jwt = false
 # zhi-python-worker authenticates ZHI personal tokens and a separate worker callback secret.
 [functions.zhi-python-worker]
 verify_jwt = false
+
+# The consent gateway authenticates Runtime identities with Ed25519 signatures
+# and its database handoff with a separate HMAC secret.
+[functions.zhi-agent-consent-gateway]
+verify_jwt = false
