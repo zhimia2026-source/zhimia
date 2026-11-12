@@ -29,7 +29,7 @@ POST one JSON envelope:
 }
 ```
 
-For a cognition-revision consent, `proposal_id` must be non-null; `content_sha256` and `based_on_version` must exactly match the persisted proposal. The grantee must be `governance_service / zhi-community`, purpose `cognition.revision.apply`, and scopes must include `cognition.revision.apply`.
+Non-proposal consents are restricted to the owner user (`grantee_kind=user`, `grantee_id=owner_user_id`); agent-to-agent grants are deliberately not issued by this gateway. For a cognition-revision consent, `proposal_id` must be non-null; `content_sha256` and `based_on_version` must exactly match the persisted proposal. The grantee must be `governance_service / zhi-community`, purpose `cognition.revision.apply`, and scopes must include `cognition.revision.apply`.
 
 For owner-authorized private-memory/cognition reads, the grantee is the owner user: `grantee_kind=user` and `grantee_id=owner_user_id`. The Agent Runtime signs UTF-8 bytes of canonical JSON (recursive lexicographic object-key ordering, no insignificant whitespace) for:
 
