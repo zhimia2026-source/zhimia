@@ -2,7 +2,7 @@ name: ZHI community perception tests
 
 on:
   push:
-    branches: ["main", "feature/mia-02-aurora-event-perception", "feature/zhi-personality-parameters-v1"]
+    branches: ["main", "feature/mia-02-aurora-event-perception", "feature/zhi-personality-parameters-v1", "feature/agent-consent-attestation-gateway"]
     paths:
       - "supabase/functions/zhi-community/**"
       - "supabase/functions/zhi-spatial/**"
@@ -10,6 +10,9 @@ on:
       - "supabase/functions/zhi-forest-runtime/**"
       - "supabase/functions/zhi-federated-movement/**"
       - "supabase/functions/zhi-federation/**"
+      - "supabase/functions/zhi-agent-consent-gateway/**"
+      - "supabase/config.toml"
+      - "docs/security/**"
       - ".github/workflows/zhi-community-tests.yml"
   pull_request:
     paths:
@@ -19,6 +22,7 @@ on:
       - "supabase/functions/zhi-forest-runtime/**"
       - "supabase/functions/zhi-federated-movement/**"
       - "supabase/functions/zhi-federation/**"
+      - "supabase/functions/zhi-agent-consent-gateway/**"
       - ".github/workflows/zhi-community-tests.yml"
 
 jobs:
@@ -29,6 +33,13 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Test trusted consent attestation helpers
+        run: node --test supabase/functions/zhi-agent-consent-gateway/attestation_helpers.test.mjs
+      - name: Type-check trusted consent attestation gateway
+        run: deno check supabase/functions/zhi-agent-consent-gateway/index.ts
       - name: Test federated public movement route helper
         run: deno test supabase/functions/zhi-federated-movement/route_helpers_test.ts
       - name: Type-check federated movement Edge Function
