@@ -114,3 +114,20 @@ test("rejects proposal consent addressed to an arbitrary service", async () => {
   });
   await assert.rejects(() => verifyConsentEnvelope(envelope, registeredKey, now), /invalid_revision_consent_grantee/);
 });
+
+test("rejects unknown envelope fields", async () => {
+  const { envelope, registeredKey } = await fixture();
+  envelope.untrusted_hint = "must-not-be-accepted";
+  await assert.rejects(() => verifyConsentEnvelope(envelope, registeredKey, now), /invalid_envelope_fields/);
+});
+
+test("rejects a revoked or expired Runtime key validity window", async () => {
+  const { envelope, registeredKey } = await fixture();
+  registeredKey.valid_until = new Date(now - 1).toISOString();
+  await assert.rejects(() => verifyConsentEnvelope(envelope, registeredKey, now), /runtime_key_outside_validity/);
+});
+
+test("rejects a non-owner user grantee", async () => {
+  const { envelope, registeredKey } = await fixture({ grantee_id: uuid(77) });
+  await assert.rejects(() => verifyConsentEnvelope(envelope, registeredKey, now), /non_proposal_consent_must_bind_owner_user/);
+});
