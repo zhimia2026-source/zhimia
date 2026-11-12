@@ -10,7 +10,7 @@ Status: **implementation branch only; not deployed; no production schema changes
 4. The Edge Function verifies Ed25519 using WebCrypto, checks key status and exact identity binding, strict schema, time window, scopes, content hash, and expiry.
 5. The Edge Function computes a second HMAC using a dedicated secret unavailable to other clients. The database verifies this HMAC before accepting issuance.
 6. The database RPC rechecks key status and Agent ownership, binds revision consent to the exact persisted proposal hash and base version, consumes the nonce under a unique constraint, and inserts the consent row with `attestation_verified=true` in the same transaction.
-7. Direct `service_role` INSERT on the consent table is revoked. Only the gateway RPC may create verified consent rows.
+7. Direct `service_role` INSERT, TRUNCATE, TRIGGER, and REFERENCES privileges on the consent table are revoked. This prevents direct forged inserts, wholesale truncation of append-only history, and unauthorized trigger installation. Existing UPDATE remains for the one-way revocation path; DELETE remains blocked by the append-only trigger.
 
 The HMAC is a service-to-database trust handoff; it does not replace the Runtime's Ed25519 signature. The database trusts the gateway only because the HMAC secret is provisioned in two protected locations and is not exposed to clients or ordinary Edge Functions.
 
