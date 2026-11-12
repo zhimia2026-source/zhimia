@@ -86,3 +86,31 @@ test("gateway HMAC is deterministic and secret length is enforced", async () => 
   assert.match(mac, /^[0-9a-f]{64}$/);
   await assert.rejects(() => createGatewayMac("{}", "key-1", "signature", "short"), /gateway_hmac_secret_too_short/);
 });
+
+test("accepts a correctly scoped proposal-bound revision consent", async () => {
+  const { envelope, registeredKey } = await fixture({
+    proposal_id: uuid(5),
+    grantee_kind: "governance_service",
+    grantee_id: "zhi-community",
+    purpose: "cognition.revision.apply",
+    scopes: ["cognition.revision.apply"],
+    content_sha256: "b".repeat(64),
+    based_on_version: 7,
+  });
+  const result = await verifyConsentEnvelope(envelope, registeredKey, now);
+  assert.equal(result.payloadText, canonicalJson(envelope.payload));
+});
+
+test("rejects owner-read consent addressed to another user", async () => {
+  const { envelope, registeredKey } = await fixture({ grantee_id: uuid(77) });
+  await assert.rejects(() => verifyConsentEnvelope(envelope, registeredKey, now), /user_consent_must_bind_owner/);
+});
+
+test("rejects proposal consent addressed to an arbitrary service", async () => {
+  const { envelope, registeredKey } = await fixture({
+    proposal_id: uuid(5), grantee_kind: "governance_service", grantee_id: "other-service",
+    purpose: "cognition.revision.apply", scopes: ["cognition.revision.apply"],
+    content_sha256: "b".repeat(64), based_on_version: 7,
+  });
+  await assert.rejects(() => verifyConsentEnvelope(envelope, registeredKey, now), /invalid_revision_consent_grantee/);
+});
