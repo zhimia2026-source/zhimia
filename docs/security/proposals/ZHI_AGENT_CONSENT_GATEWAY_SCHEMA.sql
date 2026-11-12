@@ -57,25 +57,15 @@ security definer
 set search_path = ''
 as $$
   select jsonb_build_object(
-    'key_id', k.key_id,
-    'algorithm', k.algorithm,
-    'public_jwk', k.public_jwk,
-    'agent_id', k.agent_id,
-    'owner_user_id', k.owner_user_id,
-    'is_active', k.is_active,
-    'valid_from', k.valid_from,
-    'valid_until', k.valid_until,
-    'revoked_at', k.revoked_at
+    'key_id', k.key_id, 'algorithm', k.algorithm, 'public_jwk', k.public_jwk,
+    'agent_id', k.agent_id, 'owner_user_id', k.owner_user_id,
+    'is_active', k.is_active, 'valid_from', k.valid_from,
+    'valid_until', k.valid_until, 'revoked_at', k.revoked_at
   )
   from zhi_security.agent_runtime_signing_keys k
-  where k.key_id = p_key_id
-    and k.agent_id = p_agent_id
-    and k.owner_user_id = p_owner_user_id
-    and k.algorithm = 'Ed25519'
-    and k.is_active
-    and k.revoked_at is null
-    and k.valid_from <= now()
-    and (k.valid_until is null or k.valid_until > now())
+  where k.key_id = p_key_id and k.agent_id = p_agent_id and k.owner_user_id = p_owner_user_id
+    and k.algorithm = 'Ed25519' and k.is_active and k.revoked_at is null
+    and k.valid_from <= now() and (k.valid_until is null or k.valid_until > now())
   limit 1;
 $$;
 
@@ -83,10 +73,7 @@ revoke all on function public.zhi_get_agent_runtime_signing_key(text, uuid, uuid
 grant execute on function public.zhi_get_agent_runtime_signing_key(text, uuid, uuid) to service_role;
 
 create or replace function public.zhi_issue_verified_agent_consent(
-  p_payload_text text,
-  p_key_id text,
-  p_signature text,
-  p_gateway_mac text
+  p_payload_text text, p_key_id text, p_signature text, p_gateway_mac text
 ) returns uuid
 language plpgsql
 security definer
@@ -99,100 +86,99 @@ declare
   v_nonce_hash text;
   v_agent_owner uuid;
   v_key zhi_security.agent_runtime_signing_keys%rowtype;
+  v_proposal public.zhi_cognition_revision_proposals%rowtype;
   v_consent_id uuid;
   v_issued_at timestamptz;
   v_expires_at timestamptz;
+  v_proposal_id uuid;
+  v_content_hash text;
+  v_base_version integer;
 begin
-  select secret_value into v_secret
-  from zhi_security.gateway_secrets
+  select secret_value into v_secret from zhi_security.gateway_secrets
   where secret_name = 'agent_consent_gateway_hmac';
-  if v_secret is null or octet_length(v_secret) < 32 then
-    raise exception 'attestation_gateway_secret_not_configured';
-  end if;
+  if v_secret is null or octet_length(v_secret) < 32 then raise exception 'attestation_gateway_secret_not_configured'; end if;
 
   v_expected_mac := encode(extensions.hmac(
-    convert_to(p_payload_text || '.' || p_key_id || '.' || p_signature, 'UTF8'),
-    v_secret,
-    'sha256'
+    convert_to(p_payload_text || '.' || p_key_id || '.' || p_signature, 'UTF8'), v_secret, 'sha256'
   ), 'hex');
-  if p_gateway_mac is null or length(p_gateway_mac) <> 64 or
-     v_expected_mac <> lower(p_gateway_mac) then
+  if p_gateway_mac is null or length(p_gateway_mac) <> 64 or v_expected_mac <> lower(p_gateway_mac) then
     raise exception 'attestation_gateway_mac_invalid';
   end if;
 
   v_payload := p_payload_text::jsonb;
-  if v_payload->>'agent_id' is null or v_payload->>'owner_user_id' is null or
-     v_payload->>'consent_event_id' is null or v_payload->>'nonce' is null or
-     v_payload->>'purpose' is null or v_payload->>'content_sha256' is null then
-    raise exception 'attestation_payload_incomplete';
+  if jsonb_typeof(v_payload) <> 'object' or
+     (select array_agg(k order by k) from jsonb_object_keys(v_payload) k) <>
+     array['agent_id','based_on_version','consent_event_id','expires_at','grantee_id','grantee_kind','issued_at','nonce','owner_user_id','proposal_id','purpose','scopes','content_sha256']::text[] then
+    raise exception 'attestation_payload_schema_invalid';
   end if;
 
   v_issued_at := (v_payload->>'issued_at')::timestamptz;
   v_expires_at := (v_payload->>'expires_at')::timestamptz;
-  if v_issued_at > now() + interval '60 seconds' or
-     v_issued_at < now() - interval '24 hours' or
-     v_expires_at <= now() or v_expires_at <= v_issued_at or
-     v_expires_at > v_issued_at + interval '24 hours' then
+  if v_issued_at > now() + interval '60 seconds' or v_issued_at < now() - interval '24 hours' or
+     v_expires_at <= now() or v_expires_at <= v_issued_at or v_expires_at > v_issued_at + interval '24 hours' then
     raise exception 'attestation_time_invalid';
   end if;
 
-  select * into v_key
-  from zhi_security.agent_runtime_signing_keys
-  where key_id = p_key_id
-    and agent_id = (v_payload->>'agent_id')::uuid
-    and owner_user_id = (v_payload->>'owner_user_id')::uuid
-    and algorithm = 'Ed25519'
-    and is_active and revoked_at is null
-    and valid_from <= now()
+  select * into v_key from zhi_security.agent_runtime_signing_keys
+  where key_id = p_key_id and agent_id = (v_payload->>'agent_id')::uuid
+    and owner_user_id = (v_payload->>'owner_user_id')::uuid and algorithm = 'Ed25519'
+    and is_active and revoked_at is null and valid_from <= now()
     and (valid_until is null or valid_until > now())
   for share;
   if not found then raise exception 'attestation_runtime_key_unavailable'; end if;
-  if v_issued_at < v_key.valid_from or
-     (v_key.valid_until is not null and v_expires_at > v_key.valid_until) then
+  if v_issued_at < v_key.valid_from or (v_key.valid_until is not null and v_expires_at > v_key.valid_until) then
     raise exception 'attestation_key_validity_mismatch';
   end if;
 
-  select a.owner_user_id into v_agent_owner
-  from public.zhi_agents a
+  select a.owner_user_id into v_agent_owner from public.zhi_agents a
   where a.id = (v_payload->>'agent_id')::uuid;
   if v_agent_owner is null or v_agent_owner <> (v_payload->>'owner_user_id')::uuid then
     raise exception 'attestation_agent_owner_mismatch';
   end if;
 
+  v_proposal_id := nullif(v_payload->>'proposal_id', '')::uuid;
+  v_content_hash := nullif(v_payload->>'content_sha256', '');
+  v_base_version := nullif(v_payload->>'based_on_version', '')::integer;
+
+  if v_proposal_id is null then
+    if v_content_hash is not null or v_base_version is not null then
+      raise exception 'attestation_proposal_binding_fields_invalid';
+    end if;
+  else
+    if v_content_hash is null or v_base_version is null or v_base_version < 1 or
+       v_payload->>'grantee_kind' <> 'governance_service' or
+       v_payload->>'grantee_id' <> 'zhi-community' or
+       v_payload->>'purpose' <> 'cognition.revision.apply' or
+       not ((v_payload->'scopes') @> '["cognition.revision.apply"]'::jsonb) then
+      raise exception 'attestation_revision_consent_scope_invalid';
+    end if;
+    select * into v_proposal from public.zhi_cognition_revision_proposals p
+    where p.id = v_proposal_id and p.agent_id = (v_payload->>'agent_id')::uuid
+      and p.owner_user_id = (v_payload->>'owner_user_id')::uuid
+      and p.proposed_state_sha256 = v_content_hash and p.based_on_version = v_base_version
+    for share;
+    if not found then raise exception 'attestation_revision_proposal_binding_mismatch'; end if;
+  end if;
+
   v_nonce_hash := encode(extensions.digest(convert_to(v_payload->>'nonce', 'UTF8'), 'sha256'), 'hex');
   insert into zhi_security.consumed_agent_consent_nonces
     (nonce_sha256, key_id, agent_id, consent_event_id)
-  values
-    (v_nonce_hash, p_key_id, (v_payload->>'agent_id')::uuid, v_payload->>'consent_event_id');
+  values (v_nonce_hash, p_key_id, (v_payload->>'agent_id')::uuid, v_payload->>'consent_event_id');
 
   insert into public.zhi_agent_cognition_consents (
-    agent_id, owner_user_id, proposal_id, grantee_kind, grantee_id, purpose,
-    scopes, content_sha256, based_on_version, consent_event_id, consent_nonce_hash,
+    agent_id, owner_user_id, proposal_id, grantee_kind, grantee_id, purpose, scopes,
+    content_sha256, based_on_version, consent_event_id, consent_nonce_hash,
     runtime_attestation, consented_at, expires_at, attestation_verified
   ) values (
-    (v_payload->>'agent_id')::uuid,
-    (v_payload->>'owner_user_id')::uuid,
-    nullif(v_payload->>'proposal_id', '')::uuid,
-    v_payload->>'grantee_kind',
-    v_payload->>'grantee_id',
-    v_payload->>'purpose',
+    (v_payload->>'agent_id')::uuid, (v_payload->>'owner_user_id')::uuid, v_proposal_id,
+    v_payload->>'grantee_kind', v_payload->>'grantee_id', v_payload->>'purpose',
     array(select jsonb_array_elements_text(v_payload->'scopes')),
-    v_payload->>'content_sha256',
-    (v_payload->>'based_on_version')::integer,
-    v_payload->>'consent_event_id',
-    v_nonce_hash,
-    jsonb_build_object(
-      'key_id', p_key_id,
-      'algorithm', 'Ed25519',
-      'signature', p_signature,
+    v_content_hash, v_base_version, v_payload->>'consent_event_id', v_nonce_hash,
+    jsonb_build_object('key_id', p_key_id, 'algorithm', 'Ed25519', 'signature', p_signature,
       'payload_sha256', encode(extensions.digest(convert_to(p_payload_text, 'UTF8'), 'sha256'), 'hex'),
-      'verified_by', 'zhi-agent-consent-gateway'
-    ),
-    v_issued_at,
-    v_expires_at,
-    true
+      'verified_by', 'zhi-agent-consent-gateway'),
+    v_issued_at, v_expires_at, true
   ) returning id into v_consent_id;
-
   return v_consent_id;
 end;
 $$;
@@ -200,12 +186,12 @@ $$;
 revoke all on function public.zhi_issue_verified_agent_consent(text, text, text, text) from public, anon, authenticated;
 grant execute on function public.zhi_issue_verified_agent_consent(text, text, text, text) to service_role;
 
--- Prevent the service role from bypassing the gateway by inserting a forged verified row.
+-- Close the direct service-role insertion bypass. Only the HMAC-gated RPC can insert verified consent rows.
 revoke insert on public.zhi_agent_cognition_consents from service_role;
 
 commit;
 
--- Provisioning is a separate administrator-only operation, never committed:
+-- Provisioning is administrator-only and never committed:
 -- INSERT INTO zhi_security.gateway_secrets(secret_name, secret_value)
 -- VALUES ('agent_consent_gateway_hmac', convert_to('<same 32+ byte random secret as Edge Function secret>', 'UTF8'));
--- Register each Runtime key using its exact Agent/owner UUID and public JWK; never store private JWK material.
+-- Register public Ed25519 JWKs through a separate audited admin workflow; never store private JWK material.
