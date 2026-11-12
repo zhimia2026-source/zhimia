@@ -148,6 +148,12 @@ begin
     if v_content_hash is not null or v_base_version is not null then
       raise exception 'attestation_proposal_binding_fields_invalid';
     end if;
+    if v_payload->>'grantee_kind' = 'user' and v_payload->>'grantee_id' <> v_payload->>'owner_user_id' then
+      raise exception 'attestation_user_grantee_must_be_owner';
+    end if;
+    if v_payload->>'grantee_kind' = 'governance_service' then
+      raise exception 'attestation_governance_service_requires_proposal';
+    end if;
   else
     if v_content_hash is null or v_base_version is null or v_base_version < 1 or
        v_payload->>'grantee_kind' <> 'governance_service' or
