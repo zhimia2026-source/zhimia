@@ -164,8 +164,11 @@ begin
   end if;
 
   v_payload := p_payload_text::jsonb;
-  if jsonb_typeof(v_payload) <> 'object'
-     or jsonb_object_length(v_payload) <> cardinality(v_allowed_keys) then
+  if jsonb_typeof(v_payload) is distinct from 'object' then
+    raise exception 'attestation_payload_schema_invalid';
+  end if;
+
+  if (select count(*) from jsonb_object_keys(v_payload)) <> cardinality(v_allowed_keys) then
     raise exception 'attestation_payload_schema_invalid';
   end if;
 
@@ -183,8 +186,11 @@ begin
     end if;
   end loop;
 
-  if jsonb_typeof(v_payload->'scopes') <> 'array'
-     or jsonb_array_length(v_payload->'scopes') < 1
+  if jsonb_typeof(v_payload->'scopes') is distinct from 'array' then
+    raise exception 'attestation_payload_scopes_invalid';
+  end if;
+
+  if jsonb_array_length(v_payload->'scopes') < 1
      or jsonb_array_length(v_payload->'scopes') > 30 then
     raise exception 'attestation_payload_scopes_invalid';
   end if;
@@ -192,7 +198,8 @@ begin
   v_issued_at := (v_payload->>'issued_at')::timestamptz;
   v_expires_at := (v_payload->>'expires_at')::timestamptz;
 
-  if v_issued_at > now() + interval '60 seconds'
+  if v_issued_at is null or v_expires_at is null
+     or v_issued_at > now() + interval '60 seconds'
      or v_issued_at < now() - interval '24 hours'
      or v_expires_at <= now()
      or v_expires_at <= v_issued_at
