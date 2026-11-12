@@ -50,6 +50,8 @@ export function validateConsentPayload(payload, nowMs = Date.now()) {
   if (new Set(payload.scopes).size !== payload.scopes.length || payload.scopes.join("|") !== [...payload.scopes].sort().join("|")) throw new Error("scopes_must_be_sorted_unique");
   if (payload.proposal_id === null) {
     if (payload.content_sha256 !== null || payload.based_on_version !== null) throw new Error("proposal_binding_fields_must_be_null");
+    if (payload.grantee_kind === "user" && payload.grantee_id !== payload.owner_user_id) throw new Error("user_consent_must_bind_owner");
+    if (payload.grantee_kind === "governance_service") throw new Error("governance_service_requires_revision_proposal");
   } else {
     if (typeof payload.content_sha256 !== "string" || !HEX_256_RE.test(payload.content_sha256) ||
         !Number.isSafeInteger(payload.based_on_version) || payload.based_on_version < 1) {
