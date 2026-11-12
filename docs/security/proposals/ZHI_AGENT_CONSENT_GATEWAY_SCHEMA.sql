@@ -160,6 +160,8 @@ begin
     where p.id = v_proposal_id and p.agent_id = (v_payload->>'agent_id')::uuid
       and p.owner_user_id = (v_payload->>'owner_user_id')::uuid
       and p.proposed_state_sha256 = v_content_hash and p.based_on_version = v_base_version
+      and p.status = 'shadow_proposed'
+      and p.agent_consent_status in ('awaiting_agent_consent', 'expired', 'revoked')
     for share;
     if not found then raise exception 'attestation_revision_proposal_binding_mismatch'; end if;
   end if;
