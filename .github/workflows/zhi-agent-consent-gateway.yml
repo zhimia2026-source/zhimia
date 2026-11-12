@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "supabase/functions/zhi-agent-consent-gateway/**"
+      - "supabase/config.toml"
       - "docs/security/**"
       - ".github/workflows/zhi-agent-consent-gateway.yml"
   push:
