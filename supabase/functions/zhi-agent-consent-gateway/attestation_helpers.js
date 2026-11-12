@@ -42,13 +42,24 @@ export function validateConsentPayload(payload, nowMs = Date.now()) {
   if (Object.keys(payload).sort().join("|") !== required.slice().sort().join("|")) throw new Error("unexpected_payload_fields");
   if (!UUID_RE.test(payload.agent_id) || !UUID_RE.test(payload.owner_user_id)) throw new Error("invalid_identity_binding");
   if (payload.proposal_id !== null && !UUID_RE.test(payload.proposal_id)) throw new Error("invalid_proposal_id");
-  if (!isNonEmptyText(payload.grantee_kind, 64) || !isNonEmptyText(payload.grantee_id, 256)) throw new Error("invalid_grantee");
-  if (!isNonEmptyText(payload.purpose, 128) || !/^[a-z][a-z0-9._:-]*$/.test(payload.purpose)) throw new Error("invalid_purpose");
-  if (!Array.isArray(payload.scopes) || payload.scopes.length < 1 || payload.scopes.length > 32) throw new Error("invalid_scopes");
+  if (!["user", "agent", "governance_service"].includes(payload.grantee_kind) ||
+      !isNonEmptyText(payload.grantee_id, 200)) throw new Error("invalid_grantee");
+  if (!isNonEmptyText(payload.purpose, 200) || !/^[a-z][a-z0-9._:-]*$/.test(payload.purpose)) throw new Error("invalid_purpose");
+  if (!Array.isArray(payload.scopes) || payload.scopes.length < 1 || payload.scopes.length > 30) throw new Error("invalid_scopes");
   if (payload.scopes.some((scope) => !isNonEmptyText(scope, 128) || !/^[a-z][a-z0-9._:-]*$/.test(scope))) throw new Error("invalid_scope");
   if (new Set(payload.scopes).size !== payload.scopes.length || payload.scopes.join("|") !== [...payload.scopes].sort().join("|")) throw new Error("scopes_must_be_sorted_unique");
-  if (typeof payload.content_sha256 !== "string" || !HEX_256_RE.test(payload.content_sha256)) throw new Error("invalid_content_hash");
-  if (!Number.isSafeInteger(payload.based_on_version) || payload.based_on_version < 0) throw new Error("invalid_base_version");
+  if (payload.proposal_id === null) {
+    if (payload.content_sha256 !== null || payload.based_on_version !== null) throw new Error("proposal_binding_fields_must_be_null");
+  } else {
+    if (typeof payload.content_sha256 !== "string" || !HEX_256_RE.test(payload.content_sha256) ||
+        !Number.isSafeInteger(payload.based_on_version) || payload.based_on_version < 1) {
+      throw new Error("invalid_proposal_binding");
+    }
+    if (payload.grantee_kind !== "governance_service" || payload.grantee_id !== "zhi-community" ||
+        payload.purpose !== "cognition.revision.apply" || !payload.scopes.includes("cognition.revision.apply")) {
+      throw new Error("invalid_revision_consent_grantee");
+    }
+  }
   if (!UUID_RE.test(payload.consent_event_id)) throw new Error("invalid_consent_event_id");
   const nonce = decodeBase64Url(payload.nonce);
   if (nonce.length !== 32) throw new Error("invalid_nonce");
@@ -69,7 +80,7 @@ export async function verifyConsentEnvelope(envelope, registeredKey, nowMs = Dat
   const validFrom = Date.parse(registeredKey.valid_from);
   const validUntil = registeredKey.valid_until ? Date.parse(registeredKey.valid_until) : Number.POSITIVE_INFINITY;
   if (!Number.isFinite(validFrom) || nowMs < validFrom || nowMs >= validUntil) throw new Error("runtime_key_outside_validity");
-  const { nonceBytes, issuedAt, expiresAt } = validateConsentPayload(payload, nowMs);
+  const { issuedAt, expiresAt } = validateConsentPayload(payload, nowMs);
   if (payload.agent_id !== registeredKey.agent_id || payload.owner_user_id !== registeredKey.owner_user_id) throw new Error("runtime_identity_mismatch");
   if (issuedAt < validFrom || expiresAt > validUntil) throw new Error("consent_outside_key_validity");
   const publicKey = await crypto.subtle.importKey("jwk", registeredKey.public_jwk, { name: "Ed25519" }, false, ["verify"]);
@@ -78,9 +89,7 @@ export async function verifyConsentEnvelope(envelope, registeredKey, nowMs = Dat
   if (signatureBytes.length !== 64) throw new Error("invalid_signature_length");
   const valid = await crypto.subtle.verify({ name: "Ed25519" }, publicKey, signatureBytes, signedBytes);
   if (!valid) throw new Error("invalid_runtime_signature");
-  const nonceDigest = await crypto.subtle.digest("SHA-256", nonceBytes);
-  const nonceHash = [...new Uint8Array(nonceDigest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-  return { payloadText: canonicalJson(payload), nonceHash, issuedAt, expiresAt };
+  return { payloadText: canonicalJson(payload), issuedAt, expiresAt };
 }
 
 export async function createGatewayMac(payloadText, keyId, signature, secret) {
