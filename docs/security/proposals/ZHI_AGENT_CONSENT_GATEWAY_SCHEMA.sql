@@ -207,6 +207,11 @@ grant execute on function public.zhi_issue_verified_agent_consent(text, text, te
 -- This also protects id/created_at and every immutable proof field from direct UPDATE.
 revoke insert, update, delete, truncate, trigger, references
   on public.zhi_agent_cognition_consents from service_role;
+revoke update (
+  id, agent_id, owner_user_id, proposal_id, grantee_kind, grantee_id, purpose, scopes,
+  content_sha256, based_on_version, consent_event_id, consent_nonce_hash,
+  runtime_attestation, consented_at, expires_at, attestation_verified, created_at
+) on public.zhi_agent_cognition_consents from service_role;
 grant update (revoked_at) on public.zhi_agent_cognition_consents to service_role;
 
 commit;
