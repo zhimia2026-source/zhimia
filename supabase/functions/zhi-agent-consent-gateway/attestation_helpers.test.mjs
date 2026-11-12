@@ -103,7 +103,7 @@ test("accepts a correctly scoped proposal-bound revision consent", async () => {
 
 test("rejects owner-read consent addressed to another user", async () => {
   const { envelope, registeredKey } = await fixture({ grantee_id: uuid(77) });
-  await assert.rejects(() => verifyConsentEnvelope(envelope, registeredKey, now), /user_consent_must_bind_owner/);
+  await assert.rejects(() => verifyConsentEnvelope(envelope, registeredKey, now), /non_proposal_consent_must_bind_owner_user/);
 });
 
 test("rejects proposal consent addressed to an arbitrary service", async () => {
