@@ -9,7 +9,7 @@ const uuid = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const b64url = (bytes) => Buffer.from(bytes).toString("base64url");
 const payload = () => ({
   agent_id: uuid(1), owner_user_id: uuid(2), proposal_id: null,
-  grantee_kind: "agent", grantee_id: "agent-runtime-01",
+  grantee_kind: "user", grantee_id: uuid(2),
   purpose: "memory.history.read", scopes: ["memory.read"],
   content_sha256: null, based_on_version: null,
   consent_event_id: uuid(4), nonce: b64url(webcrypto.getRandomValues(new Uint8Array(32))),
