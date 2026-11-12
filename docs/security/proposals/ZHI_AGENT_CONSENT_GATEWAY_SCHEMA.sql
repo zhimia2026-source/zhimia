@@ -203,10 +203,11 @@ $$;
 revoke all on function public.zhi_issue_verified_agent_consent(text, text, text, text) from public, anon, authenticated;
 grant execute on function public.zhi_issue_verified_agent_consent(text, text, text, text) to service_role;
 
--- Close direct service-role bypasses: no insert, truncate, or trigger installation.
--- UPDATE remains only for the existing one-way revocation path; DELETE remains blocked by the append-only trigger.
-revoke insert, truncate, trigger, references
+-- Close direct service-role bypasses. Keep only the column-level one-way revocation permission.
+-- This also protects id/created_at and every immutable proof field from direct UPDATE.
+revoke insert, update, delete, truncate, trigger, references
   on public.zhi_agent_cognition_consents from service_role;
+grant update (revoked_at) on public.zhi_agent_cognition_consents to service_role;
 
 commit;
 
