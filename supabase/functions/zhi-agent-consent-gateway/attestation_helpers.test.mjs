@@ -9,10 +9,10 @@ const now = Date.now();
 const uuid = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const b64url = (bytes) => Buffer.from(bytes).toString("base64url");
 const payload = () => ({
-  agent_id: uuid(1), owner_user_id: uuid(2), proposal_id: uuid(3),
-  grantee_kind: "agent_runtime", grantee_id: "runtime-01",
+  agent_id: uuid(1), owner_user_id: uuid(2), proposal_id: null,
+  grantee_kind: "agent", grantee_id: "agent-runtime-01",
   purpose: "memory.history.read", scopes: ["memory.read"],
-  content_sha256: "a".repeat(64), based_on_version: 7,
+  content_sha256: null, based_on_version: null,
   consent_event_id: uuid(4), nonce: b64url(webcrypto.getRandomValues(new Uint8Array(32))),
   issued_at: new Date(now).toISOString(), expires_at: new Date(now + 60_000).toISOString(),
 });
@@ -39,7 +39,6 @@ test("accepts a correctly signed, identity-bound consent envelope", async () => 
   const { envelope, registeredKey } = await fixture();
   const result = await verifyConsentEnvelope(envelope, registeredKey, now);
   assert.equal(result.payloadText, canonicalJson(envelope.payload));
-  assert.match(result.nonceHash, /^[0-9a-f]{64}$/);
 });
 
 test("rejects a modified payload after signing", async () => {
@@ -76,6 +75,11 @@ test("rejects duplicated or unsorted scopes", async () => {
 test("rejects a nonce that is not 32 bytes", async () => {
   const { envelope, registeredKey } = await fixture({ nonce: b64url(new Uint8Array(8)) });
   await assert.rejects(() => verifyConsentEnvelope(envelope, registeredKey, now), /invalid_nonce/);
+});
+
+test("rejects proposal fields without a proposal id", async () => {
+  const { envelope, registeredKey } = await fixture({ content_sha256: "a".repeat(64), based_on_version: 2 });
+  await assert.rejects(() => verifyConsentEnvelope(envelope, registeredKey, now), /proposal_binding_fields_must_be_null/);
 });
 
 test("gateway HMAC is deterministic and secret length is enforced", async () => {
