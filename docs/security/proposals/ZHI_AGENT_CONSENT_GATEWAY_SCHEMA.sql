@@ -203,8 +203,10 @@ $$;
 revoke all on function public.zhi_issue_verified_agent_consent(text, text, text, text) from public, anon, authenticated;
 grant execute on function public.zhi_issue_verified_agent_consent(text, text, text, text) to service_role;
 
--- Close the direct service-role insertion bypass. Only the HMAC-gated RPC can insert verified consent rows.
-revoke insert on public.zhi_agent_cognition_consents from service_role;
+-- Close direct service-role bypasses: no insert, truncate, or trigger installation.
+-- UPDATE remains only for the existing one-way revocation path; DELETE remains blocked by the append-only trigger.
+revoke insert, truncate, trigger, references
+  on public.zhi_agent_cognition_consents from service_role;
 
 commit;
 
