@@ -1,0 +1,29 @@
+name: ZHI agent consent attestation gateway
+
+on:
+  pull_request:
+    paths:
+      - "supabase/functions/zhi-agent-consent-gateway/**"
+      - "docs/security/**"
+      - ".github/workflows/zhi-agent-consent-gateway.yml"
+  push:
+    branches:
+      - feature/agent-consent-attestation-gateway
+    paths:
+      - "supabase/functions/zhi-agent-consent-gateway/**"
+      - "docs/security/**"
+      - ".github/workflows/zhi-agent-consent-gateway.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  attestation-helper-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run WebCrypto attestation tests
+        run: node --test supabase/functions/zhi-agent-consent-gateway/attestation_helpers.test.mjs
