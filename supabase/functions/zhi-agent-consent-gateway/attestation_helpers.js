@@ -50,8 +50,7 @@ export function validateConsentPayload(payload, nowMs = Date.now()) {
   if (new Set(payload.scopes).size !== payload.scopes.length || payload.scopes.join("|") !== [...payload.scopes].sort().join("|")) throw new Error("scopes_must_be_sorted_unique");
   if (payload.proposal_id === null) {
     if (payload.content_sha256 !== null || payload.based_on_version !== null) throw new Error("proposal_binding_fields_must_be_null");
-    if (payload.grantee_kind === "user" && payload.grantee_id !== payload.owner_user_id) throw new Error("user_consent_must_bind_owner");
-    if (payload.grantee_kind === "governance_service") throw new Error("governance_service_requires_revision_proposal");
+    if (payload.grantee_kind !== "user" || payload.grantee_id !== payload.owner_user_id) throw new Error("non_proposal_consent_must_bind_owner_user");
   } else {
     if (typeof payload.content_sha256 !== "string" || !HEX_256_RE.test(payload.content_sha256) ||
         !Number.isSafeInteger(payload.based_on_version) || payload.based_on_version < 1) {
@@ -75,6 +74,7 @@ export function validateConsentPayload(payload, nowMs = Date.now()) {
 
 export async function verifyConsentEnvelope(envelope, registeredKey, nowMs = Date.now()) {
   if (!envelope || typeof envelope !== "object" || Array.isArray(envelope)) throw new Error("invalid_envelope");
+  if (Object.keys(envelope).sort().join("|") !== ["algorithm", "key_id", "payload", "signature"].join("|")) throw new Error("invalid_envelope_fields");
   const { key_id, algorithm, signature, payload } = envelope;
   if (!isNonEmptyText(key_id, 128) || algorithm !== "Ed25519" || typeof signature !== "string") throw new Error("invalid_attestation_header");
   if (!registeredKey || registeredKey.key_id !== key_id || registeredKey.algorithm !== "Ed25519") throw new Error("unregistered_runtime_key");
