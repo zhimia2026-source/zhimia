@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { webcrypto } from "node:crypto";
 import { canonicalJson, createGatewayMac, verifyConsentEnvelope } from "./attestation_helpers.js";
 
-globalThis.crypto = webcrypto;
 
 const now = Date.now();
 const uuid = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
