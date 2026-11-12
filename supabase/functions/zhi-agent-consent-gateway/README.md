@@ -15,8 +15,8 @@ POST one JSON envelope:
     "agent_id": "<uuid>",
     "owner_user_id": "<uuid>",
     "proposal_id": null,
-    "grantee_kind": "agent",
-    "grantee_id": "agent-runtime-01",
+    "grantee_kind": "user",
+    "grantee_id": "<same owner_user_id UUID>",
     "purpose": "memory.history.read",
     "scopes": ["memory.read"],
     "content_sha256": null,
@@ -31,7 +31,7 @@ POST one JSON envelope:
 
 For a cognition-revision consent, `proposal_id` must be non-null; `content_sha256` and `based_on_version` must exactly match the persisted proposal. The grantee must be `governance_service / zhi-community`, purpose `cognition.revision.apply`, and scopes must include `cognition.revision.apply`.
 
-The Agent Runtime signs UTF-8 bytes of canonical JSON (recursive lexicographic object-key ordering, no insignificant whitespace) for:
+For owner-authorized private-memory/cognition reads, the grantee is the owner user: `grantee_kind=user` and `grantee_id=owner_user_id`. The Agent Runtime signs UTF-8 bytes of canonical JSON (recursive lexicographic object-key ordering, no insignificant whitespace) for:
 
 ```json
 {"domain":"ZHI_AGENT_CONSENT_V1","key_id":"...","payload":{...}}
