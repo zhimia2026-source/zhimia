@@ -230,7 +230,8 @@ begin
 
   select a.owner_user_id into v_agent_owner
   from public.zhi_agents a
-  where a.id = (v_payload->>'agent_id')::uuid;
+  where a.id = (v_payload->>'agent_id')::uuid
+  for share;
 
   if v_agent_owner is null
      or v_agent_owner <> (v_payload->>'owner_user_id')::uuid then
