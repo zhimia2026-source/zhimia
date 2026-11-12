@@ -16,7 +16,7 @@ The HMAC is a service-to-database trust handoff; it does not replace the Runtime
 
 ## Existing production schema compatibility verified read-only
 
-The production consent table allows `grantee_kind` values `user`, `agent`, and `governance_service`; revision consents must use `governance_service / zhi-community / cognition.revision.apply`. Proposal-bound rows require both `content_sha256` and `based_on_version`, and the exact proposal hash is `zhi_cognition_revision_proposals.proposed_state_sha256`. Non-proposal consents require those two fields to be NULL. The draft payload and SQL now follow these constraints.
+For current private-memory/cognition read gates, the grantee must be the owner user (`grantee_kind=user`, `grantee_id=owner_user_id)); the runtime signs that grant. The production consent table allows `grantee_kind` values `user`, `agent`, and `governance_service`; revision consents must use `governance_service / zhi-community / cognition.revision.apply`. Proposal-bound rows require both `content_sha256` and `based_on_version`, and the exact proposal hash is `zhi_cognition_revision_proposals.proposed_state_sha256`. Non-proposal consents require those two fields to be NULL. The draft payload and SQL now follow these constraints.
 
 The live database has `pgcrypto` in schema `extensions`, and `zhi_agents(id, owner_user_id)` plus proposal columns used by the draft were confirmed by read-only introspection.
 
