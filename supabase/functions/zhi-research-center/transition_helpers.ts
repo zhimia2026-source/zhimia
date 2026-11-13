@@ -13,6 +13,21 @@ export function canTransitionResearchTask(from: string, to: string): boolean {
   return RESEARCH_TASK_TRANSITIONS[from]?.includes(to) ?? false;
 }
 
+// Owner PATs may approve/reject work and review completion, but may never impersonate an Agent claim or execution.
+export function canOwnerTransitionResearchTask(from: string, to: string): boolean {
+  const allowed: Readonly<Record<string, readonly string[]>> = {
+    proposed: ["approved", "cancelled"],
+    approved: ["cancelled"],
+    assigned: ["blocked", "cancelled"],
+    claimed: ["blocked", "cancelled"],
+    in_progress: ["blocked", "cancelled"],
+    review: ["done", "changes_requested", "blocked", "cancelled"],
+    changes_requested: ["blocked", "cancelled"],
+    blocked: ["cancelled"],
+  };
+  return allowed[from]?.includes(to) ?? false;
+}
+
 export function getUpstreamTaskKey(inputRefs: unknown): string | null {
   if (!Array.isArray(inputRefs)) return null;
   for (const item of inputRefs) {
