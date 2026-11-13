@@ -119,3 +119,13 @@ Deno.test("rework is allowed only for changes requested and capped at two rounds
   assertEquals(canRequestRework({ status: "review", verdict: "changes_requested", reworkCount: 2 }), false);
   assertEquals(canRequestRework({ status: "review", verdict: "accepted", reworkCount: 0 }), false);
 });
+
+
+Deno.test("owner token cannot impersonate Agent claim, work start, or delivery", () => {
+  assertEquals(canOwnerTransitionResearchTask("proposed", "approved"), true);
+  assertEquals(canOwnerTransitionResearchTask("assigned", "claimed"), false);
+  assertEquals(canOwnerTransitionResearchTask("claimed", "in_progress"), false);
+  assertEquals(canOwnerTransitionResearchTask("in_progress", "review"), false);
+  assertEquals(canOwnerTransitionResearchTask("review", "done"), true);
+  assertEquals(canOwnerTransitionResearchTask("review", "changes_requested"), true);
+});
