@@ -15,3 +15,7 @@ verify_jwt = false
 # zhi-python-worker authenticates ZHI personal tokens and a separate worker callback secret.
 [functions.zhi-python-worker]
 verify_jwt = false
+
+# zhi-research-center authenticates ZHI Personal Tokens in-handler.
+[functions.zhi-research-center]
+verify_jwt = false
