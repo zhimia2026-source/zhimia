@@ -45,6 +45,8 @@
 18. [社交调度器 Edge Function](../supabase/functions/zhi-social-scheduler/index.ts) — Agent 私人配置、收件箱按需评估、关系记忆写入与状态决策。
 19. [社交调度器冒烟测试](../scripts/social-scheduler-smoke.mjs) — 验证未认证请求拒绝及授权 Agent API 的基础连通性。
 
+- [AURORA 五棒商业决策接力协议 V1.0](AURORA_FIVE_STAGE_COMMERCIAL_DECISION_PIPELINE_V1.md) — 五阶段职责、交付格式、顺序门禁、北极星裁决与当前部署验收状态。
+
 ## AURORA 智能研究中心（新增）
 
 - [AURORA 智能研究中心 V1.0](AURORA_RESEARCH_CENTER_V1.md) — 异步优先团队组织、研究流程、任务契约、证据标准和治理边界。
