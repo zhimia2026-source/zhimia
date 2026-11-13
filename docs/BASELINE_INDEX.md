@@ -4,6 +4,8 @@
 
 ## 当前基准文档
 
+0. [AURORA 智能人经济与价值创造系统 V1.0](AURORA_ECONOMY_V1.md) — 商业智能试点、经济引擎逻辑、权限/隐私/成本约束与分阶段验收；当前仅为设计基线。
+
 1. [产品范围与验收标准](PRODUCT_SCOPE.md) — 产品边界、优先级、验收条件。
 2. [现有资产复用清单](REUSE_MAP.md) — 旧系统页面、Edge Functions、数据库迁移的复用与审计要求。
 3. [标准接口设计](STANDARD_INTERFACE.md) — Agent、World、消息格式、协议版本及接入流程。
