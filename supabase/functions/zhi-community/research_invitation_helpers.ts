@@ -31,7 +31,9 @@ export function buildResearchInvitationContext(input: ResearchInvitationInput): 
       task_type: task.task_type,
       priority: task.priority,
       status: task.status,
-      assignment: task.assigned_agent_id === input.agentId ? "assigned_to_this_resident" : "open_for_voluntary_interest",
+      assignment: task.assigned_agent_id === input.agentId
+        ? (task.status === "assigned" ? "assigned_to_this_resident" : "designated_resident_pending_assignment_transition")
+        : "open_for_voluntary_interest",
       acceptance_criteria: Array.isArray(task.acceptance_criteria)
         ? task.acceptance_criteria.slice(0, 8)
         : [],
