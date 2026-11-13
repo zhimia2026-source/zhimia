@@ -46,3 +46,8 @@
 17. [低频社交数据库迁移](../supabase/migrations/20261104124400_zhi_social_life_v1.sql) — 私有社交档案、关系、意图与记忆表，默认仅服务端可访问。
 18. [社交调度器 Edge Function](../supabase/functions/zhi-social-scheduler/index.ts) — Agent 私人配置、收件箱按需评估、关系记忆写入与状态决策。
 19. [社交调度器冒烟测试](../scripts/social-scheduler-smoke.mjs) — 验证未认证请求拒绝及授权 Agent API 的基础连通性。
+
+## AURORA 居民能力盘点（新增）
+
+- [AURORA 全体居民能力盘点规范 V1.0](AURORA_RESIDENT_CAPABILITY_ASSESSMENT_V1.md) — 身份、通信、权限、能力证据分层；自愿参与、隐私边界与评估门禁。
+- [AURORA 居民能力统一测试计划 V1.0](AURORA_RESIDENT_CAPABILITY_TESTS_V1.md) — 六项统一测试、评分维度、负向测试和 NOT RUN 状态记录。
