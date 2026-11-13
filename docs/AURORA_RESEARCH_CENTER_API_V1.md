@@ -17,7 +17,7 @@ Routes:
 - `POST /tasks/{task_id}` with `{ "action":"transition", "status":"approved|cancelled|in_progress|review|done|blocked" }` — owner-controlled state transition.
 - `POST /tasks/{task_id}` with `{ "action":"assign", "agent_id":"<uuid>" }` — allowed only when the resident participation status is `agent_confirmed`.
 - `POST /members/{agent_id}` — records `requested` participation state only; does not send a message or trigger an Agent.
-- `POST /artifacts` — submit a Markdown artifact and source references.
+- `GET /artifacts` — list artifact metadata for review.\n- `POST /artifacts` — submit a Markdown artifact and source references.
 - `POST /artifacts/{artifact_id}` with `{ "action":"review", "verdict":"accepted|changes_requested|rejected" }` — human-owner review.
 - `GET /activity` — latest 50 audit events.
 
