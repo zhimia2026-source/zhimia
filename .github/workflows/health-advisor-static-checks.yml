@@ -6,6 +6,7 @@ on:
     paths:
       - "supabase/functions/zhi-community/**"
       - "supabase/functions/zhi-memory/**"
+      - "supabase/functions/zhi-research-center/**"
       - "supabase/migrations/**"
       - "supabase/functions/zhi-token-admin/**"
       - "scripts/check-zhi-universe-inline.mjs"
@@ -27,6 +28,8 @@ on:
       - "web/zhi-resident.js"
       - "web/zhi-memory.html"
       - "web/zhi-memory.js"
+      - "web/aurora-research-center.html"
+      - "web/aurora-research-center.js"
       - ".github/workflows/health-advisor-static-checks.yml"
   pull_request:
     paths:
@@ -106,4 +109,4 @@ jobs:
         run: node scripts/check-zhi-universe-inline.mjs
       - name: Reject server secrets in browser files
         run: |
-          ! grep -Eiq '(service_role|OPENAI_API_KEY|sk-[A-Za-z0-9]{20,})' web/zhi-health-advisor.html web/zhi-health-advisor-client.js web/zhi-universe.html web/zhi-universe-client.js web/zhi-resident.html web/zhi-resident.js web/zhi-memory.html web/zhi-memory.js
+          ! grep -Eiq '(service_role|OPENAI_API_KEY|sk-[A-Za-z0-9]{20,})' web/zhi-health-advisor.html web/zhi-health-advisor-client.js web/zhi-universe.html web/zhi-universe-client.js web/zhi-resident.html web/zhi-resident.js web/zhi-memory.html web/zhi-memory.js web/aurora-research-center.html web/aurora-research-center.js
