@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { canTransitionResearchTask } from "./transition_helpers.ts";
 
 type Actor = { userId: string; tokenId: string; capabilities: string[] };
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -84,14 +85,6 @@ async function audit(db: SupabaseClient, actor: Actor, workspaceId: string, even
   if (error) throw new Error("audit_write_failed");
 }
 function jsonArray(value: unknown) { return JSON.stringify(list(value)); }
-const transitions: Record<string,string[]> = {
-  proposed:["approved","cancelled"],
-  approved:["cancelled"],
-  assigned:["in_progress","blocked","cancelled"],
-  in_progress:["review","blocked","cancelled"],
-  review:["done","blocked","cancelled"],
-  blocked:["cancelled"],
-};
 
 Deno.serve(async (req: Request) => {
   const headers = cors(req);
@@ -196,7 +189,7 @@ Deno.serve(async (req: Request) => {
         const {data:current,error:readError}=await db.from("zhi_research_tasks").select("id,status,title")
           .eq("id",taskId).eq("workspace_id",ws.id).eq("owner_user_id",actor.userId).maybeSingle();
         if(readError||!current)return reply({error:"task_not_found"},404,headers);
-        if(!(transitions[current.status]??[]).includes(next))return reply({error:"invalid_task_transition",from:current.status,to:next},409,headers);
+        if(!canTransitionResearchTask(current.status,next))return reply({error:"invalid_task_transition",from:current.status,to:next},409,headers);
         if(next==="done"){
           const {data:accepted,error:artifactError}=await db.from("zhi_research_artifacts").select("id")
             .eq("task_id",taskId).eq("workspace_id",ws.id).eq("status","accepted").limit(1);
