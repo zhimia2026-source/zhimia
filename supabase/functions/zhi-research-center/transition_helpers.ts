@@ -1,9 +1,11 @@
 export const RESEARCH_TASK_TRANSITIONS: Readonly<Record<string, readonly string[]>> = Object.freeze({
   proposed: ["approved", "cancelled"],
   approved: ["cancelled"],
-  assigned: ["in_progress", "blocked", "cancelled"],
+  assigned: ["claimed", "blocked", "cancelled"],
+  claimed: ["in_progress", "blocked", "cancelled"],
   in_progress: ["review", "blocked", "cancelled"],
-  review: ["done", "blocked", "cancelled"],
+  review: ["done", "changes_requested", "blocked", "cancelled"],
+  changes_requested: ["in_progress", "blocked", "cancelled"],
   blocked: ["cancelled"],
 });
 
@@ -53,4 +55,45 @@ export function validateStageArtifact(taskKey: string, content: string): string[
   const required = checks[taskKey];
   if (!required) return [];
   return required.filter(([, pattern]) => !pattern.test(content)).map(([key]) => key);
+}
+
+
+export type ResearchActor = { type: "agent" | "owner"; agentId?: string };
+
+export function canClaimResearchTask(input: {
+  status: string; assignedAgentId: string | null; actor: ResearchActor; participationStatus: string; upstreamComplete: boolean;
+}): boolean {
+  return input.status === "assigned"
+    && input.actor.type === "agent"
+    && typeof input.actor.agentId === "string"
+    && input.actor.agentId.length > 0
+    && input.assignedAgentId === input.actor.agentId
+    && input.participationStatus === "agent_confirmed"
+    && input.upstreamComplete;
+}
+
+export function canSubmitResearchArtifact(input: {
+  status: string; assignedAgentId: string | null; actor: ResearchActor; contentLength: number; version: number;
+}): boolean {
+  return input.status === "in_progress"
+    && input.actor.type === "agent"
+    && !!input.actor.agentId
+    && input.assignedAgentId === input.actor.agentId
+    && Number.isInteger(input.version) && input.version > 0
+    && Number.isInteger(input.contentLength) && input.contentLength >= 20;
+}
+
+export function canReviewResearchArtifact(input: { actor: ResearchActor; submitterAgentId: string | null; verdict: string }): boolean {
+  return input.actor.type === "owner"
+    && (!input.submitterAgentId || input.actor.agentId !== input.submitterAgentId)
+    && ["accepted", "changes_requested", "rejected"].includes(input.verdict);
+}
+
+export function canCompleteResearchTask(input: { status: string; acceptedArtifactCount: number }): boolean {
+  return input.status === "review" && Number.isInteger(input.acceptedArtifactCount) && input.acceptedArtifactCount > 0;
+}
+
+export function canRequestRework(input: { status: string; verdict: string; reworkCount: number }): boolean {
+  return input.status === "review" && input.verdict === "changes_requested"
+    && Number.isInteger(input.reworkCount) && input.reworkCount >= 0 && input.reworkCount < 2;
 }
