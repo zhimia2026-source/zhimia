@@ -96,3 +96,31 @@ Deno.test("resident cognition profile remains absent when not configured", () =>
   assert(value.cognition_profile_status === "not_configured", "missing cognition must not be inferred");
   assert(value.cognition_profile === null, "missing cognition must remain null");
 });
+
+
+import { buildResidentCognitionDiagnostics } from "./chat_context_helpers.ts";
+
+Deno.test("resident cognition diagnostics prove profile injection without logging profile contents", () => {
+  const result = buildResidentCognitionDiagnostics(JSON.stringify({
+    cognition_profile_status: "configured",
+    cognition_profile: {
+      architecture: "aurora_integrated_cognition_v2",
+      brains: { personality: "private", perception: "private", memory: "private", emotion: "private", thinking: "private", creativity: "private", self: "private" },
+      dimensions: { a: "private", b: "private", c: "private", d: "private", e: "private", f: "private", g: "private", h: "private" },
+      decision_process: ["step 1", "step 2"],
+      sources: [{ title: "source" }],
+    },
+  }));
+  assert(result.cognition_profile_present, "profile presence missing");
+  assert(result.cognition_architecture === "aurora_integrated_cognition_v2", "architecture missing");
+  assert(result.cognition_brain_count === 7 && result.cognition_dimension_count === 8, "brain/dimension counts wrong");
+  assert(result.cognition_decision_step_count === 2 && result.cognition_source_count === 1, "provenance metadata missing");
+  assert(!JSON.stringify(result).includes("private"), "diagnostics must not leak profile contents");
+});
+
+Deno.test("resident cognition diagnostics fail closed for missing or invalid context", () => {
+  const missing = buildResidentCognitionDiagnostics("{}");
+  assert(!missing.cognition_profile_present && missing.cognition_brain_count === 0, "missing profile must be false");
+  const invalid = buildResidentCognitionDiagnostics("not-json");
+  assert(!invalid.cognition_profile_present && invalid.cognition_architecture === "invalid_context", "invalid context must fail closed");
+});
