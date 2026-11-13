@@ -302,6 +302,6 @@ Deno.serve(async (req: Request) => {
     const message=error instanceof Error?error.message:"internal_error";
     const safe=["payload_too_large","invalid_json","workspace_lookup_failed","workspace_not_available","workspace_data_unavailable","task_list_failed","task_create_failed","task_assignment_failed","task_transition_failed","audit_write_failed","participation_request_record_failed","artifact_submit_failed","review_record_failed","artifact_review_update_failed","activity_read_failed","server_configuration_missing"];
     const status=message==="payload_too_large"?413:message==="invalid_json"?400:message==="workspace_not_available"?404:500;
-    return reply({error:safe.includes(message)?message:"internal_error"},status,{"content-type":"application/json; charset=utf-8","cache-control":"no-store"});
+    return reply({error:safe.includes(message)?message:"internal_error"},status,headers);
   }
 });
