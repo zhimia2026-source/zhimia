@@ -52,3 +52,4 @@
 - [研究中心页面](../web/aurora-research-center.html) — 通过现有 ZHI Personal Token 登录的研究工作区页面。
 - [研究中心 Edge Function](../supabase/functions/zhi-research-center/index.ts) — PAT 哈希认证、权限校验、任务状态机、成果审核与审计。
 - [研究中心数据库迁移](../supabase/migrations/20261113160000_aurora_research_center_v1.sql) — 私有工作区、居民参与状态、项目、任务、成果、审核和活动表。
+- [研究中心 V1 验收记录](AURORA_RESEARCH_CENTER_TESTS_V1.md) — 生产结构核验、权限边界、当前待验收项与已知限制。\n
