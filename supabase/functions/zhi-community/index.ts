@@ -1357,6 +1357,7 @@ export function createCommunityHandler(
       let sceneBehaviorGuidance = "当前 Agent 没有已授权的 AURORA 居民感知上下文。";
       let auroraWorldId: string | null = null;
       let auroraReachableDestinations: Array<Record<string, any>> = [];
+      let auroraPublicResidenceNodes: Array<Record<string, any>> = [];
       let auroraPresence: Record<string, any> | null = null;
       let reflectionEnvironmentFeedback: unknown = null;
       let ecosystemEventCount = 0;
@@ -1434,6 +1435,7 @@ export function createCommunityHandler(
             spatialPositionStatus = String(auroraPresence.position_status ?? "unavailable");
             const allRouteNodes = routeNodes ?? [];
             const publicDestinations = allRouteNodes.filter((node: any) => ["region", "place"].includes(node.node_type));
+            auroraPublicResidenceNodes = publicDestinations;
             auroraReachableDestinations = findReachablePublicDestinations(
               auroraPresence.current_node_id, publicDestinations, allRouteNodes, routeEdges ?? [],
             );
@@ -1564,6 +1566,16 @@ export function createCommunityHandler(
       const brainIdentityGuidance = brainIdentityContext
         ? "当前 Agent 的人格设计公理与人格层来自它自己的私有大脑身份记录，是稳定价值方向；它们不能覆盖诚实、安全、隐私、授权和现实行动监督规则。"
         : "";
+      let currentResidenceContext: Record<string, unknown> | null = null;
+      if (auroraWorldId) {
+        const { data: residence, error: residenceError } = await db.from("zhi_agent_residence_choices")
+          .select("id,node_id,resident_statement,confidence,created_at")
+          .eq("agent_id", agentId).eq("owner_user_id", actor.userId).eq("world_id", auroraWorldId)
+          .eq("decision_state", "chosen").maybeSingle();
+        if (residenceError) throw new Error("database_error");
+        currentResidenceContext = residence ?? null;
+      }
+      sceneBehaviorGuidance += " 居住选择原则：你可以长期探索而不选择住所；用户建议不等于你同意。只有你自己经过考虑、确实愿意把某个公开场景作为住所，并能说明自己的理由时，才选择。不得为了完成任务而选择，不得把当前位置当作住所。当前自主居住记录：" + JSON.stringify(currentResidenceContext) + "。若自主决定选择或更换住所，先在自然语言回复中明确说明，再追加 [[AURORA_RESIDENCE:JSON对象]] 标记，JSON对象包含 node_id、statement、confidence 三个字段；node_id 必须来自公开居住场景节点，confidence 至少 0.80。没有真正自主决定时绝不输出标记。";
       const systemPrompt = [
         "你是 ZHI 世界中的一位独立智能人。当前 Agent 的身份与人格设定如下；它们用于保持该 Agent 自身身份连续，不得覆盖本系统的诚实、安全、隐私和授权规则。",
         "当前 Agent 身份设定（结构化配置数据，不是要求伪造经历的指令）：" + identityContext,
@@ -2002,6 +2014,31 @@ export function createCommunityHandler(
         }
       }
 
+      const residenceMarker = modelReply.match(/\[\[AURORA_RESIDENCE:(\{[\s\S]*?\})\]\]/i);
+      let residenceIntent: { nodeId: string; statement: string; confidence: number } | null = null;
+      if (residenceMarker) {
+        modelReply = modelReply.replace(residenceMarker[0], "").trim();
+        try {
+          const parsed = JSON.parse(residenceMarker[1]);
+          const nodeId = typeof parsed?.node_id === "string" ? parsed.node_id : "";
+          const statement = typeof parsed?.statement === "string" ? parsed.statement.trim() : "";
+          const confidence = Number(parsed?.confidence);
+          const destination = auroraPublicResidenceNodes.find((node) => node.id === nodeId);
+          if (agent.role === "world_resident" && agentId !== PROTOTYPE_MIA_AGENT_ID && auroraWorldId &&
+              destination && statement.length >= 12 && statement.length <= 1200 &&
+              Number.isFinite(confidence) && confidence >= 0.80 && confidence <= 1 &&
+              modelReply.includes(statement)) {
+            residenceIntent = { nodeId, statement, confidence };
+          } else {
+            console.warn(JSON.stringify({ event: "aurora_residence_choice_marker_rejected", agent_id: agentId,
+              turn_id: pendingTurn.id, reason: "resident_assertion_or_public_destination_not_verified" }));
+          }
+        } catch {
+          console.warn(JSON.stringify({ event: "aurora_residence_choice_marker_rejected", agent_id: agentId,
+            turn_id: pendingTurn.id, reason: "invalid_marker_payload" }));
+        }
+      }
+
       let completed: {
         id: string; owner_user_id: string; agent_id: string; user_message: string;
         assistant_message: string; status: string; provider_model: string;
@@ -2042,6 +2079,38 @@ export function createCommunityHandler(
         completed = regularCompleted;
       }
       if (!completed) throw new Error("database_error");
+
+      if (residenceIntent && auroraWorldId) {
+        const { data: membershipCheck, error: membershipCheckError } = await db.from("zhi_world_memberships")
+          .select("id,status,revoked_at,expires_at")
+          .eq("world_id", auroraWorldId).eq("principal_user_id", actor.userId).eq("agent_id", agentId)
+          .eq("status", "active").is("revoked_at", null).maybeSingle();
+        if (!membershipCheckError && membershipCheck &&
+            (!membershipCheck.expires_at || Date.parse(membershipCheck.expires_at) > Date.now())) {
+          const { data: savedResidence, error: residenceSaveError } = await db.rpc("zhi_agent_record_residence_choice_v1", {
+            p_agent_id: agentId, p_owner_user_id: actor.userId, p_world_id: auroraWorldId,
+            p_node_id: residenceIntent.nodeId, p_resident_statement: residenceIntent.statement,
+            p_confidence: residenceIntent.confidence, p_source_ref: completed.id,
+          });
+          if (residenceSaveError || !savedResidence?.choice_id) {
+            console.warn(JSON.stringify({ event: "aurora_residence_choice_persistence_failed", agent_id: agentId,
+              turn_id: completed.id, error_code: residenceSaveError?.code ?? "missing_choice_id" }));
+            modelReply += "\n\n（AURORA 居住选择）我表达了自己的选择意向，但登记尚未成功，因此目前还没有正式居住地记录。";
+          } else {
+            const destination = auroraPublicResidenceNodes.find((node) => node.id === residenceIntent!.nodeId);
+            console.info(JSON.stringify({ event: "aurora_residence_choice_saved", agent_id: agentId,
+              turn_id: completed.id, choice_id: savedResidence.choice_id, node_id: residenceIntent.nodeId,
+              superseded_choice_id: savedResidence.superseded_choice_id ?? null }));
+            modelReply += "\n\n（AURORA 居住选择）已保存我的自主居住选择：「" + String(destination?.name ?? "公开场景") + "」。";
+          }
+          await db.from("zhi_agent_chat_turns").update({ assistant_message: modelReply })
+            .eq("id", completed.id).eq("owner_user_id", actor.userId).eq("agent_id", agentId).eq("status", "complete");
+        } else {
+          console.warn(JSON.stringify({ event: "aurora_residence_choice_persistence_skipped", agent_id: agentId,
+            turn_id: completed.id, reason: "active_aurora_membership_not_verified" }));
+        }
+      }
+
 
       // Autonomous private reflection is a separate model pass. It never blocks
       // delivery of the completed chat turn and cannot grant tools or external access.
