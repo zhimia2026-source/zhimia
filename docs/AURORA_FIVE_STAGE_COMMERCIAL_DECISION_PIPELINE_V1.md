@@ -129,8 +129,8 @@
 截至 2026-11-13：
 
 - 五阶段协议 V1.1 已写入 AURORA 智能研究中心工作区 `operating_model.decision_pipeline_v1`，Elon 与 Jensen 的硬性验收字段已明确。
-- 已登记五个阶段任务 `PIPE-01` 至 `PIPE-05`，并指定各阶段负责人；状态均为 `proposed`。
-- 五位居民已列入研究中心名册，参与状态为 `requested`，不是 `agent_confirmed`。
+- 已登记五个阶段任务 `PIPE-01` 至 `PIPE-05`，均为 `approved`，并已写入指定负责人；五项任务的 `started_at` 均为空，尚未分配执行或开始。
+- 五位居民已列入研究中心名册，参与状态仍为 `requested`，不是 `agent_confirmed`；未触发唤醒或通知。
 - `zhi-research-center` Edge Function V4 已部署，阶段依赖检查要求上游任务 `done` 且有 `accepted` 成果；V1.1 的 Elon/Jensen 成果字段校验待代码合并后部署。
 - 研究中心页面已加入五阶段看板，GitHub Pages 部署成功。
 - CI 的 Edge Function 检查、状态门禁测试和前端静态检查已通过。
