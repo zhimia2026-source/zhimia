@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zhimia2026-source.github.io/zhimia/schemas/aurora-triad-decision.schema.json",
+  "title": "AURORA Triad Decision Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["decision_id", "strategic_anchor_version", "scope", "evidence", "scenarios", "adjudication", "approval_state"],
+  "properties": {
+    "decision_id": {"type": "string", "minLength": 1},
+    "strategic_anchor_version": {"type": "string", "minLength": 1},
+    "scope": {"type": "string", "minLength": 1},
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["evidence_id", "label", "statement", "source", "as_of", "confidence"],
+        "properties": {
+          "evidence_id": {"type": "string"},
+          "label": {"const": "FACT"},
+          "statement": {"type": "string"},
+          "source": {"type": "string", "format": "uri"},
+          "as_of": {"type": "string", "format": "date"},
+          "confidence": {"enum": ["high", "medium", "low"]},
+          "limitations": {"type": "string"}
+        }
+      }
+    },
+    "inferences": {"type": "array", "items": {"type": "string"}},
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["scenario_id", "assumptions", "possible_outcomes", "risks"],
+        "properties": {
+          "scenario_id": {"type": "string"},
+          "assumptions": {"type": "array", "items": {"type": "string"}},
+          "possible_outcomes": {"type": "array", "items": {"type": "string"}},
+          "risks": {"type": "array", "items": {"type": "string"}},
+          "probability": {"enum": ["not_estimated", "low", "medium", "high"]}
+        }
+      }
+    },
+    "unknowns": {"type": "array", "items": {"type": "string"}},
+    "adjudication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recommendation", "supporting_evidence_ids", "rejected_assumptions", "reasons", "stop_conditions"],
+      "properties": {
+        "recommendation": {"type": "string"},
+        "supporting_evidence_ids": {"type": "array", "items": {"type": "string"}},
+        "rejected_assumptions": {"type": "array", "items": {"type": "string"}},
+        "reasons": {"type": "array", "items": {"type": "string"}},
+        "stop_conditions": {"type": "array", "items": {"type": "string"}},
+        "human_approval_required": {"type": "boolean", "const": true}
+      }
+    },
+    "dissent": {"type": "array", "items": {"type": "string"}},
+    "approval_state": {"enum": ["draft", "awaiting_human_approval", "approved", "rejected"]},
+    "execution_state": {"enum": ["not_authorized", "authorized", "in_progress", "completed", "blocked"]}
+  }
+}
