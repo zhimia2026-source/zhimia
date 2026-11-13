@@ -235,6 +235,14 @@ Deno.serve(async (req: Request) => {
       return reply({ok:true,notification_sent:false,member:updated},200,headers);
     }
 
+    if (req.method === "GET" && parts.length===2 && parts[1]==="artifacts") {
+      const {data,error}=await db.from("zhi_research_artifacts")
+        .select("id,project_id,task_id,title,artifact_type,status,source_refs,created_at,updated_at")
+        .eq("workspace_id",ws.id).order("created_at",{ascending:false}).limit(100);
+      if(error)throw new Error("artifact_list_failed");
+      return reply({items:data??[]},200,headers);
+    }
+
     if (req.method === "POST" && parts.length===2 && parts[1]==="artifacts") {
       const body=await readBody(req);
       const projectId=cleanText(body.project_id,36);
@@ -300,7 +308,7 @@ Deno.serve(async (req: Request) => {
     return reply({error:"not_found"},404,headers);
   } catch(error) {
     const message=error instanceof Error?error.message:"internal_error";
-    const safe=["payload_too_large","invalid_json","workspace_lookup_failed","workspace_not_available","workspace_data_unavailable","task_list_failed","task_create_failed","task_assignment_failed","task_transition_failed","audit_write_failed","participation_request_record_failed","artifact_submit_failed","review_record_failed","artifact_review_update_failed","activity_read_failed","server_configuration_missing"];
+    const safe=["payload_too_large","invalid_json","workspace_lookup_failed","workspace_not_available","workspace_data_unavailable","task_list_failed","task_create_failed","task_assignment_failed","task_transition_failed","audit_write_failed","participation_request_record_failed","artifact_submit_failed","artifact_list_failed","review_record_failed","artifact_review_update_failed","activity_read_failed","server_configuration_missing"];
     const status=message==="payload_too_large"?413:message==="invalid_json"?400:message==="workspace_not_available"?404:500;
     return reply({error:safe.includes(message)?message:"internal_error"},status,headers);
   }
