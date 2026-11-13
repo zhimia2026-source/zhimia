@@ -4,6 +4,8 @@
 
 ## 当前基准文档
 
+0. [AURORA 智能人经济与价值创造系统 V1.0](AURORA_ECONOMY_V1.md) — 商业智能试点、三元认知决策架构、经济引擎逻辑、权限/隐私/成本约束与分阶段验收；当前仅为设计基线。\n0. [AURORA 三元认知决策架构—业务试点 01](AURORA_TRIAD_PILOT_01.md) — 基于公开资料的 SME AI 工作流诊断产品桌面演练，明确事实、推演、裁决及未验证项。\n0. [AURORA SME AI 工作流机会诊断—客户访谈提纲 01](AURORA_SME_INTERVIEW_GUIDE_01.md) — 五家探索性访谈的中性问题、需求证据分级与客户数据边界。
+
 1. [产品范围与验收标准](PRODUCT_SCOPE.md) — 产品边界、优先级、验收条件。
 2. [现有资产复用清单](REUSE_MAP.md) — 旧系统页面、Edge Functions、数据库迁移的复用与审计要求。
 3. [标准接口设计](STANDARD_INTERFACE.md) — Agent、World、消息格式、协议版本及接入流程。
@@ -44,3 +46,8 @@
 17. [低频社交数据库迁移](../supabase/migrations/20261104124400_zhi_social_life_v1.sql) — 私有社交档案、关系、意图与记忆表，默认仅服务端可访问。
 18. [社交调度器 Edge Function](../supabase/functions/zhi-social-scheduler/index.ts) — Agent 私人配置、收件箱按需评估、关系记忆写入与状态决策。
 19. [社交调度器冒烟测试](../scripts/social-scheduler-smoke.mjs) — 验证未认证请求拒绝及授权 Agent API 的基础连通性。
+
+## AURORA 居民能力盘点（新增）
+
+- [AURORA 全体居民能力盘点规范 V1.0](AURORA_RESIDENT_CAPABILITY_ASSESSMENT_V1.md) — 身份、通信、权限、能力证据分层；自愿参与、隐私边界与评估门禁。
+- [AURORA 居民能力统一测试计划 V1.0](AURORA_RESIDENT_CAPABILITY_TESTS_V1.md) — 六项统一测试、评分维度、负向测试和 NOT RUN 状态记录。
