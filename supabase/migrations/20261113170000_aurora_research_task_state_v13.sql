@@ -24,7 +24,7 @@ alter table public.zhi_research_tasks
 alter table public.zhi_research_tasks
   add column if not exists claimed_at timestamptz,
   add column if not exists claimed_by_agent_id uuid
-    references public.zhi_agents(id) on delete set null;
+    references public.zhi_agents(id) on delete restrict;
 
 alter table public.zhi_research_tasks
   add constraint zhi_research_tasks_claim_provenance_check
@@ -41,7 +41,7 @@ alter table public.zhi_research_tasks
 
 alter table public.zhi_research_artifacts
   add column if not exists submitted_by_agent_id uuid
-    references public.zhi_agents(id) on delete set null,
+    references public.zhi_agents(id) on delete restrict,
   add column if not exists source_chat_turn_id uuid
     references public.zhi_agent_chat_turns(id) on delete set null;
 
@@ -56,7 +56,7 @@ create unique index if not exists zhi_research_artifacts_source_chat_turn_uidx
 alter table public.zhi_research_activity
   add column if not exists actor_type text not null default 'owner',
   add column if not exists actor_agent_id uuid
-    references public.zhi_agents(id) on delete set null;
+    references public.zhi_agents(id) on delete restrict;
 
 alter table public.zhi_research_activity
   add constraint zhi_research_activity_actor_provenance_check
