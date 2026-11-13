@@ -131,9 +131,9 @@
 - 五阶段协议 V1.1 已写入 AURORA 智能研究中心工作区 `operating_model.decision_pipeline_v1`，Elon 与 Jensen 的硬性验收字段已明确。
 - 已登记五个阶段任务 `PIPE-01` 至 `PIPE-05`，均为 `approved`，并已写入指定负责人；五项任务的 `started_at` 均为空，尚未分配执行或开始。
 - 五位居民已列入研究中心名册，参与状态仍为 `requested`，不是 `agent_confirmed`；未触发唤醒或通知。
-- `zhi-research-center` Edge Function V4 已部署，阶段依赖检查要求上游任务 `done` 且有 `accepted` 成果；V1.1 的 Elon/Jensen 成果字段校验待代码合并后部署。
+- `zhi-research-center` Edge Function V5 已部署；阶段依赖检查要求上游任务 `done` 且有 `accepted` 成果，PIPE-03/PIPE-04 成果接受前另有 V1.1 结构字段校验。
 - 研究中心页面已加入五阶段看板，GitHub Pages 部署成功。
-- CI 的 Edge Function 检查、状态门禁测试和前端静态检查已通过。
-- 尚未发生居民真实执行、自然交付、同行评审或商业裁决；没有任何任务被自动启动。
+- PR #63 已合并；CI 对研究中心 Edge Function 执行 Deno 类型检查，并运行 10 项任务状态/成果门禁测试，均通过；健康顾问静态检查工作流亦通过。
+- 生产复核：五项任务仍为 `approved`，`started_at` 全为空；当前研究成果为 0，`agent_confirmed` 居民为 0。既有批准状态保留，但分配 API 仍要求居民真实确认，且阶段依赖未满足时拒绝分配。尚未发生居民真实执行、自然交付、同行评审或商业裁决；没有任何任务被自动启动。
 - 当前北极星量化阈值仍待创造者确认，因此 Stage 5 最终裁决保持阻塞，直到指标明确。
 
