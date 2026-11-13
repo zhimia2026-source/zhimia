@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { canTransitionResearchTask, getUpstreamTaskKey, isUpstreamStageComplete, validateStageArtifact } from "./transition_helpers.ts";
+import { canTransitionResearchTask, canClaimResearchTask, canSubmitResearchArtifact, canReviewResearchArtifact, canCompleteResearchTask, canRequestRework, getUpstreamTaskKey, isUpstreamStageComplete, validateStageArtifact } from "./transition_helpers.ts";
 
 Deno.test("proposed task can only be approved or cancelled", () => {
   assertEquals(canTransitionResearchTask("proposed", "approved"), true);
@@ -78,4 +78,42 @@ Deno.test("stage acceptance rejects headings without substantive field values", 
     "付费客户：", "付费意愿：", "收入模式：", "成本结构：", "毛利率：",
     "现金流：", "盈亏平衡：", "边际成本：", "伙伴收益：",
   ].join("\n")).length, 9);
+});
+
+
+Deno.test("claim requires authenticated assigned agent, confirmed participation and accepted upstream", () => {
+  const base = { status: "assigned", assignedAgentId: "agent-a", actor: { type: "agent" as const, agentId: "agent-a" }, participationStatus: "agent_confirmed", upstreamComplete: true };
+  assertEquals(canClaimResearchTask(base), true);
+  assertEquals(canClaimResearchTask({ ...base, actor: { type: "agent", agentId: "agent-b" } }), false);
+  assertEquals(canClaimResearchTask({ ...base, actor: { type: "owner" } }), false);
+  assertEquals(canClaimResearchTask({ ...base, participationStatus: "requested" }), false);
+  assertEquals(canClaimResearchTask({ ...base, upstreamComplete: false }), false);
+});
+
+Deno.test("only assigned agent may submit a substantive versioned deliverable while working", () => {
+  const base = { status: "in_progress", assignedAgentId: "agent-a", actor: { type: "agent" as const, agentId: "agent-a" }, contentLength: 120, version: 1 };
+  assertEquals(canSubmitResearchArtifact(base), true);
+  assertEquals(canSubmitResearchArtifact({ ...base, actor: { type: "agent", agentId: "agent-b" } }), false);
+  assertEquals(canSubmitResearchArtifact({ ...base, status: "assigned" }), false);
+  assertEquals(canSubmitResearchArtifact({ ...base, contentLength: 5 }), false);
+  assertEquals(canSubmitResearchArtifact({ ...base, version: 0 }), false);
+});
+
+Deno.test("review is owner-only, verdict-constrained and separate from delivery", () => {
+  assertEquals(canReviewResearchArtifact({ actor: { type: "owner" }, submitterAgentId: "agent-a", verdict: "accepted" }), true);
+  assertEquals(canReviewResearchArtifact({ actor: { type: "agent", agentId: "agent-a" }, submitterAgentId: "agent-a", verdict: "accepted" }), false);
+  assertEquals(canReviewResearchArtifact({ actor: { type: "owner" }, submitterAgentId: null, verdict: "auto_accept" }), false);
+});
+
+Deno.test("task completion requires accepted artifact and review state", () => {
+  assertEquals(canCompleteResearchTask({ status: "review", acceptedArtifactCount: 1 }), true);
+  assertEquals(canCompleteResearchTask({ status: "review", acceptedArtifactCount: 0 }), false);
+  assertEquals(canCompleteResearchTask({ status: "in_progress", acceptedArtifactCount: 1 }), false);
+});
+
+Deno.test("rework is allowed only for changes requested and capped at two rounds", () => {
+  assertEquals(canRequestRework({ status: "review", verdict: "changes_requested", reworkCount: 0 }), true);
+  assertEquals(canRequestRework({ status: "review", verdict: "changes_requested", reworkCount: 1 }), true);
+  assertEquals(canRequestRework({ status: "review", verdict: "changes_requested", reworkCount: 2 }), false);
+  assertEquals(canRequestRework({ status: "review", verdict: "accepted", reworkCount: 0 }), false);
 });
