@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
-import { canOwnerTransitionResearchTask, canTransitionResearchTask, getUpstreamTaskKey, isUpstreamStageComplete, validateStageArtifact } from "./transition_helpers.ts";
+import { canOwnerTransitionResearchTask, getUpstreamTaskKey, isUpstreamStageComplete, validateStageArtifact } from "./transition_helpers.ts";
 
 type Actor = { userId: string; tokenId: string; capabilities: string[] };
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
