@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { canTransitionResearchTask, canClaimResearchTask, canSubmitResearchArtifact, canReviewResearchArtifact, canCompleteResearchTask, canRequestRework, getUpstreamTaskKey, isUpstreamStageComplete, validateStageArtifact } from "./transition_helpers.ts";
+import { canOwnerTransitionResearchTask, canTransitionResearchTask, canClaimResearchTask, canSubmitResearchArtifact, canReviewResearchArtifact, canCompleteResearchTask, canRequestRework, getUpstreamTaskKey, isUpstreamStageComplete, validateStageArtifact } from "./transition_helpers.ts";
 
 Deno.test("proposed task can only be approved or cancelled", () => {
   assertEquals(canTransitionResearchTask("proposed", "approved"), true);
