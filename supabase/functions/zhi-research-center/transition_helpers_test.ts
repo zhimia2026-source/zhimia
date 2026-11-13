@@ -12,8 +12,10 @@ Deno.test("approval does not silently assign or execute a task", () => {
   assertEquals(canTransitionResearchTask("approved", "in_progress"), false);
 });
 
-Deno.test("assigned task may enter work or be blocked", () => {
-  assertEquals(canTransitionResearchTask("assigned", "in_progress"), true);
+Deno.test("assigned task must be claimed before work starts", () => {
+  assertEquals(canTransitionResearchTask("assigned", "claimed"), true);
+  assertEquals(canTransitionResearchTask("assigned", "in_progress"), false);
+  assertEquals(canTransitionResearchTask("claimed", "in_progress"), true);
   assertEquals(canTransitionResearchTask("assigned", "blocked"), true);
 });
 
