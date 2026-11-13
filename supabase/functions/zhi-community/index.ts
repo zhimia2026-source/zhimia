@@ -3,7 +3,7 @@ import { hasCapability, isTokenExpiryValid, tokenTouchSucceeded } from "./auth_h
 import { isMembershipAuthorized, isAgentMembershipAuthorized, isWorldResidentDiscoverable, isSceneMessageVisibleToAgent, privilegesForPublicRejoin, normalizeWorldProtocolPath, isPublicAgentJoinAllowed, publicAgentMembershipPrivileges } from "./access_helpers.ts";
 import { validateMouRecord } from "./ontology_helpers.ts";
 import { buildFeedbackRecord, buildRevisionProposal } from "./cognitive_cycle_helpers.ts";
-import { buildAgentIdentityContext, normalizeResidentIdentityReply, buildPrivateAgentContext, buildPrivateChatHistory, buildSceneAwarenessContext, buildSceneBehaviorGuidance } from "./chat_context_helpers.ts";
+import { buildAgentIdentityContext, buildResidentCognitionDiagnostics, normalizeResidentIdentityReply, buildPrivateAgentContext, buildPrivateChatHistory, buildSceneAwarenessContext, buildSceneBehaviorGuidance } from "./chat_context_helpers.ts";
 import { computeSceneEnvironment, normalizeSceneEnvironmentConfig } from "./environment_helpers.ts";
 import { canReadPrivateCognition } from "./constitutional_helpers.ts";
 import { normalizeAgentReflection, normalizeAgentReflectionWithReason, normalizeMemoryCandidate, normalizeAgentCreatorMessage, isLongTermMemoryEligible, buildPrivateReflectionMessages, buildPrivateMemoryLogEvent } from "./memory_experience_helpers.ts";
@@ -1620,6 +1620,7 @@ export function createCommunityHandler(
           architecture_version: "seven_brain_v1",
           functions: ["personality", "memory", "perception", "emotion", "reasoning", "creativity", "self"],
           resident_identity_present: agent.role === "world_resident" && typeof agent.display_name === "string" && agent.display_name.trim().length > 0,
+          ...buildResidentCognitionDiagnostics(identityContext),
           personality_identity_present: Object.keys(personality).length > 0 || Boolean(brainIdentityContext),
           private_context_present: Boolean(privateContext),
           scene_context_present: Boolean(sceneAwarenessContext),
