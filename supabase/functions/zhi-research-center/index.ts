@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
-import { canTransitionResearchTask, getUpstreamTaskKey, isUpstreamStageComplete, validateStageArtifact } from "./transition_helpers.ts";
+import { canOwnerTransitionResearchTask, canTransitionResearchTask, getUpstreamTaskKey, isUpstreamStageComplete, validateStageArtifact } from "./transition_helpers.ts";
 
 type Actor = { userId: string; tokenId: string; capabilities: string[] };
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -206,7 +206,7 @@ Deno.serve(async (req: Request) => {
         const {data:current,error:readError}=await db.from("zhi_research_tasks").select("id,status,title,project_id,input_refs")
           .eq("id",taskId).eq("workspace_id",ws.id).eq("owner_user_id",actor.userId).maybeSingle();
         if(readError||!current)return reply({error:"task_not_found"},404,headers);
-        if(!canTransitionResearchTask(current.status,next))return reply({error:"invalid_task_transition",from:current.status,to:next},409,headers);
+        if(!canOwnerTransitionResearchTask(current.status,next))return reply({error:"owner_transition_forbidden",from:current.status,to:next},403,headers);
         if(next==="approved"){
           const upstreamKey=getUpstreamTaskKey(current.input_refs);
           if(upstreamKey){
