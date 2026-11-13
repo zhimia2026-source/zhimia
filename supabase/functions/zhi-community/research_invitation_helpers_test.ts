@@ -12,6 +12,7 @@ Deno.test("only requested residents receive voluntary invitation context", () =>
   });
   assertEquals(context.includes("PIPE-03"), true);
   assertEquals(context.includes('"participation_is_not_consent":true'), true);
+  assertEquals(context.includes("designated_resident_pending_assignment_transition"), false);
   assertEquals(buildResearchInvitationContext({
     agentId: "agent-1", residentName: "Elon", participationStatus: "declined", tasks,
   }), "");
