@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
-import { canTransitionResearchTask, getUpstreamTaskKey, isUpstreamStageComplete } from "./transition_helpers.ts";
+import { canTransitionResearchTask, getUpstreamTaskKey, isUpstreamStageComplete, validateStageArtifact } from "./transition_helpers.ts";
 
 type Actor = { userId: string; tokenId: string; capabilities: string[] };
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -304,10 +304,19 @@ Deno.serve(async (req: Request) => {
       if(!["accepted","changes_requested","rejected"].includes(verdict))return reply({error:"invalid_review_verdict"},400,headers);
       const notes=cleanText(body.notes,4000);
       const findings=list(body.findings,30);
-      const {data:artifact,error:artifactError}=await db.from("zhi_research_artifacts").select("id,title,status")
+      const {data:artifact,error:artifactError}=await db.from("zhi_research_artifacts").select("id,title,status,task_id,content_markdown")
         .eq("id",artifactId).eq("workspace_id",ws.id).eq("owner_user_id",actor.userId).maybeSingle();
       if(artifactError||!artifact)return reply({error:"artifact_not_found"},404,headers);
       if(artifact.status!=="submitted"&&artifact.status!=="changes_requested")return reply({error:"artifact_not_reviewable"},409,headers);
+      if(verdict==="accepted"&&artifact.task_id){
+        const {data:linkedTask,error:linkedTaskError}=await db.from("zhi_research_tasks")
+          .select("task_key").eq("id",artifact.task_id).eq("workspace_id",ws.id).maybeSingle();
+        if(linkedTaskError||!linkedTask)return reply({error:"artifact_task_lookup_failed"},409,headers);
+        const missingRequirements=validateStageArtifact(linkedTask.task_key,artifact.content_markdown??"");
+        if(missingRequirements.length){
+          return reply({error:"stage_artifact_requirements_missing",task_key:linkedTask.task_key,missing_requirements:missingRequirements},409,headers);
+        }
+      }
       const {error:reviewError}=await db.from("zhi_research_reviews").insert({
         workspace_id:ws.id,artifact_id:artifactId,owner_user_id:actor.userId,reviewer_user_id:actor.userId,
         verdict,findings,notes,
