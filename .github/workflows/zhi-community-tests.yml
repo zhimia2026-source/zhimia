@@ -5,6 +5,8 @@ on:
     branches: ["main", "feature/mia-02-aurora-event-perception"]
     paths:
       - "supabase/functions/zhi-community/**"
+      - "supabase/functions/zhi-research-center/**"
+      - "supabase/migrations/20261113170000_zhi_research_task_state_v13.sql"
       - "supabase/functions/zhi-spatial/**"
       - "supabase/functions/zhi-aurora-world-runtime/**"
       - "supabase/functions/zhi-forest-runtime/**"
@@ -29,6 +31,10 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+      - name: Test AURORA research relay state machine
+        run: deno test supabase/functions/zhi-research-center/transition_helpers_test.ts
+      - name: Type-check AURORA research center Edge Function
+        run: deno check supabase/functions/zhi-research-center/index.ts
       - name: Test federated public movement route helper
         run: deno test supabase/functions/zhi-federated-movement/route_helpers_test.ts
       - name: Type-check federated movement Edge Function
