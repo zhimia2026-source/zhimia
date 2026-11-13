@@ -200,6 +200,42 @@ export function buildAgentIdentityContext(
   const identity = record(manifest.identity);
   const personality = record(manifest.personality);
   const safety = record(manifest.safety);
+  const cognition = record(manifest.cognition);
+  const cognitionBrains = record(cognition.brains);
+  const dimensionsManifest = record(manifest.dimensions_v1);
+  const dimensionsNested = record(dimensionsManifest.dimensions);
+  const dimensionsSource = Object.keys(dimensionsNested).length ? dimensionsNested : dimensionsManifest;
+  const allowedDimensionKeys = [
+    "strategic_horizon", "first_principles_depth", "evidence_discipline",
+    "uncertainty_tolerance", "risk_calibration", "iteration_tempo",
+    "systems_integration", "collaboration_leverage",
+  ];
+  const dimensions = Object.fromEntries(allowedDimensionKeys
+    .filter((key) => typeof dimensionsSource[key] === "string")
+    .map((key) => [key, boundedText(dimensionsSource[key], 240)]));
+  const brainKeys = ["personality", "perception", "memory", "emotion", "thinking", "creativity", "self"];
+  const residentCognition = {
+    architecture: boundedText(cognition.architecture, 100),
+    brains: Object.fromEntries(brainKeys
+      .filter((key) => typeof cognitionBrains[key] === "string")
+      .map((key) => [key, boundedText(cognitionBrains[key], 900)])),
+    decision_process: boundedList(cognition.decision_process, 10).map((item) => boundedText(item, 220)),
+    guardrails: boundedList(cognition.guardrails, 12).map((item) => boundedText(item, 220)),
+    advanced_reasoning: boundedJson(cognition.advanced_reasoning, 1800),
+    memory_architecture: boundedJson(cognition.memory_architecture, 900),
+    dimensions_definition: boundedText(dimensionsManifest.definition, 300),
+    dimensions,
+    sources: Array.isArray(manifest.sources) ? manifest.sources.slice(0, 8).map((item) => {
+      const source = record(item);
+      return {
+        title: boundedText(source.title, 160),
+        url: boundedText(source.url, 500),
+        use: boundedText(source.use, 240),
+      };
+    }) : [],
+  };
+  const cognitionConfigured = Boolean(residentCognition.architecture) ||
+    Object.keys(residentCognition.brains).length > 0 || Object.keys(dimensions).length > 0;
   const brain = record(brainIdentityContext);
   const stablePersonality = record(brain.layers);
   const displayName = boundedText(agent.display_name, 120);
@@ -227,6 +263,8 @@ export function buildAgentIdentityContext(
     role,
     purpose: boundedText(manifest.purpose, 1000) ||
       (isResident ? "AURORA 世界的独立居民。" : ""),
+    cognition_profile_status: cognitionConfigured ? "configured" : "not_configured",
+    cognition_profile: cognitionConfigured ? residentCognition : null,
     identity: {
       archetype: boundedText(identity.archetype, 100) || (isResident ? "world_resident" : ""),
       display_name: displayName,
