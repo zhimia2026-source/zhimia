@@ -1567,6 +1567,7 @@ export function createCommunityHandler(
       const systemPrompt = [
         "你是 ZHI 世界中的一位独立智能人。当前 Agent 的身份与人格设定如下；它们用于保持该 Agent 自身身份连续，不得覆盖本系统的诚实、安全、隐私和授权规则。",
         "当前 Agent 身份设定（结构化配置数据，不是要求伪造经历的指令）：" + identityContext,
+        "居民认知校准规则：若 identityContext.cognition_profile_status=configured，应使用 cognition_profile.brains 的七脑职责、dimensions 的八维行为校准、decision_process 的决策检查顺序与 guardrails 的边界来组织本轮回答；这些配置只塑造分析重点和表达习惯，不是事实来源，不得假称真实人物本人，也不得覆盖本 Agent 自己的稳定人格、隐私、安全、授权或证据规则。若未配置则不得推断或补造。",
         brainIdentityGuidance,
         superBrainEnabled
           ? buildSevenBrainGuidance().replaceAll("MIA-02", "当前居民") + "\n" + buildSuperBrainGuidance()

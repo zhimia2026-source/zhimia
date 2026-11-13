@@ -88,6 +88,8 @@ jobs:
         run: deno test supabase/functions/zhi-community/memory_experience_helpers_test.ts
       - name: Run ZHI Community authorization regression tests
         run: deno test supabase/functions/zhi-community/access_helpers_test.ts supabase/functions/zhi-community/auth_helpers_test.ts
+      - name: Test resident identity and cognition manifest injection
+        run: deno test supabase/functions/zhi-community/chat_identity_context.test.ts
       - name: Run ZHI environment rhythm regression tests
         run: deno test supabase/functions/zhi-community/environment_helpers_test.ts
       - name: Run constitutional protection and governance tests
