@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
-import { canTransitionResearchTask } from "./transition_helpers.ts";
+import { canTransitionResearchTask, getUpstreamTaskKey, isUpstreamStageComplete } from "./transition_helpers.ts";
 
 type Actor = { userId: string; tokenId: string; capabilities: string[] };
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -113,7 +113,7 @@ Deno.serve(async (req: Request) => {
       const [{data:members,error:me},{data:projects,error:pe},{data:counts,error:ce}] = await Promise.all([
         db.from("zhi_research_members").select("agent_id,display_name_snapshot,resident_role_snapshot,participation_status,interest_tags")
           .eq("workspace_id",ws.id).order("display_name_snapshot"),
-        db.from("zhi_research_projects").select("id,title,objective,status,priority,created_at,updated_at")
+        db.from("zhi_research_projects").select("id,title,objective,status,priority,success_metrics,created_at,updated_at")
           .eq("workspace_id",ws.id).order("updated_at",{ascending:false}),
         db.from("zhi_research_tasks").select("status").eq("workspace_id",ws.id),
       ]);
@@ -125,7 +125,7 @@ Deno.serve(async (req: Request) => {
 
     if (req.method === "GET" && parts.length===2 && parts[1]==="tasks") {
       const projectId=url.searchParams.get("project_id");
-      let q=db.from("zhi_research_tasks").select("id,project_id,task_key,title,brief,task_type,priority,status,assigned_agent_id,acceptance_criteria,due_at,approved_at,created_at,updated_at")
+      let q=db.from("zhi_research_tasks").select("id,project_id,task_key,title,brief,task_type,priority,status,assigned_agent_id,acceptance_criteria,input_refs,due_at,approved_at,started_at,submitted_at,completed_at,created_at,updated_at")
         .eq("workspace_id",ws.id).order("priority",{ascending:false}).order("created_at",{ascending:true}).limit(100);
       if(projectId){if(!UUID.test(projectId))return reply({error:"invalid_project_id"},400,headers);q=q.eq("project_id",projectId);}
       const {data,error}=await q;
@@ -166,6 +166,23 @@ Deno.serve(async (req: Request) => {
       if(action==="assign"){
         const agentId=cleanText(body.agent_id,36);
         if(!UUID.test(agentId))return reply({error:"invalid_agent_id"},400,headers);
+        const {data:taskGate,error:taskGateError}=await db.from("zhi_research_tasks")
+          .select("id,project_id,assigned_agent_id,input_refs").eq("id",taskId).eq("workspace_id",ws.id)
+          .eq("owner_user_id",actor.userId).eq("status","approved").maybeSingle();
+        if(taskGateError||!taskGate)return reply({error:"task_must_be_approved_before_assignment"},409,headers);
+        if(taskGate.assigned_agent_id && taskGate.assigned_agent_id!==agentId)
+          return reply({error:"pipeline_stage_owner_mismatch"},409,headers);
+        const upstreamKey=getUpstreamTaskKey(taskGate.input_refs);
+        if(upstreamKey){
+          const {data:upstream,error:upstreamError}=await db.from("zhi_research_tasks")
+            .select("id,status").eq("workspace_id",ws.id).eq("project_id",taskGate.project_id)
+            .eq("task_key",upstreamKey).maybeSingle();
+          if(upstreamError||!upstream)return reply({error:"pipeline_upstream_task_missing"},409,headers);
+          const {data:accepted,error:acceptedError}=await db.from("zhi_research_artifacts").select("id")
+            .eq("task_id",upstream.id).eq("workspace_id",ws.id).eq("status","accepted").limit(1);
+          if(acceptedError||!isUpstreamStageComplete(upstream.status,accepted?.length??0))
+            return reply({error:"pipeline_stage_blocked",required_upstream_task:upstreamKey,upstream_status:upstream.status},409,headers);
+        }
         const {data:member,error:memberError}=await db.from("zhi_research_members")
           .select("participation_status,display_name_snapshot").eq("workspace_id",ws.id).eq("agent_id",agentId)
           .eq("owner_user_id",actor.userId).maybeSingle();
@@ -186,10 +203,23 @@ Deno.serve(async (req: Request) => {
       if(action==="transition"){
         const next=cleanText(body.status,24);
         const reason=cleanText(body.reason,500);
-        const {data:current,error:readError}=await db.from("zhi_research_tasks").select("id,status,title")
+        const {data:current,error:readError}=await db.from("zhi_research_tasks").select("id,status,title,project_id,input_refs")
           .eq("id",taskId).eq("workspace_id",ws.id).eq("owner_user_id",actor.userId).maybeSingle();
         if(readError||!current)return reply({error:"task_not_found"},404,headers);
         if(!canTransitionResearchTask(current.status,next))return reply({error:"invalid_task_transition",from:current.status,to:next},409,headers);
+        if(next==="approved"){
+          const upstreamKey=getUpstreamTaskKey(current.input_refs);
+          if(upstreamKey){
+            const {data:upstream,error:upstreamError}=await db.from("zhi_research_tasks")
+              .select("id,status").eq("workspace_id",ws.id).eq("project_id",current.project_id)
+              .eq("task_key",upstreamKey).maybeSingle();
+            if(upstreamError||!upstream)return reply({error:"pipeline_upstream_task_missing"},409,headers);
+            const {data:accepted,error:acceptedError}=await db.from("zhi_research_artifacts").select("id")
+              .eq("task_id",upstream.id).eq("workspace_id",ws.id).eq("status","accepted").limit(1);
+            if(acceptedError||!isUpstreamStageComplete(upstream.status,accepted?.length??0))
+              return reply({error:"pipeline_stage_blocked",required_upstream_task:upstreamKey,upstream_status:upstream.status},409,headers);
+          }
+        }
         if(next==="done"){
           const {data:accepted,error:artifactError}=await db.from("zhi_research_artifacts").select("id")
             .eq("task_id",taskId).eq("workspace_id",ws.id).eq("status","accepted").limit(1);
