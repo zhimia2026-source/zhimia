@@ -465,3 +465,39 @@ export function buildSceneBehaviorGuidance(environment: Record<string, unknown>)
     active.map((item) => String(item.label) + "（" + Number(item.weight).toFixed(2) + "）").join("、") +
     "。可以在对话中提出符合环境的场景内选择，但不得声称已实际移动、操作物件或执行现实动作。";
 }
+
+
+/** Privacy-safe diagnostics proving a resident's own cognition profile reached the prompt context. */
+export function buildResidentCognitionDiagnostics(identityContextJson: string) {
+  try {
+    const identity = JSON.parse(identityContextJson) as Record<string, unknown>;
+    const profile = identity.cognition_profile && typeof identity.cognition_profile === "object" &&
+        !Array.isArray(identity.cognition_profile)
+      ? identity.cognition_profile as Record<string, unknown>
+      : {};
+    const brains = profile.brains && typeof profile.brains === "object" && !Array.isArray(profile.brains)
+      ? profile.brains as Record<string, unknown>
+      : {};
+    const dimensions = profile.dimensions && typeof profile.dimensions === "object" && !Array.isArray(profile.dimensions)
+      ? profile.dimensions as Record<string, unknown>
+      : {};
+    const count = (value: Record<string, unknown>) => Object.keys(value).length;
+    return {
+      cognition_profile_present: identity.cognition_profile_status === "configured" && count(brains) > 0,
+      cognition_architecture: boundedText(profile.architecture, 100) || "not_configured",
+      cognition_brain_count: count(brains),
+      cognition_dimension_count: count(dimensions),
+      cognition_decision_step_count: Array.isArray(profile.decision_process) ? Math.min(10, profile.decision_process.length) : 0,
+      cognition_source_count: Array.isArray(profile.sources) ? Math.min(8, profile.sources.length) : 0,
+    };
+  } catch {
+    return {
+      cognition_profile_present: false,
+      cognition_architecture: "invalid_context",
+      cognition_brain_count: 0,
+      cognition_dimension_count: 0,
+      cognition_decision_step_count: 0,
+      cognition_source_count: 0,
+    };
+  }
+}
