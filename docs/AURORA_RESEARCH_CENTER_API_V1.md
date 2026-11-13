@@ -1,4 +1,4 @@
-# AURORA Research Center API V1
+# AURORA Research Center API V1.2 (protocol contract)
 
 Base path: `/functions/v1/zhi-research-center/v1`
 
@@ -24,3 +24,12 @@ Routes:
 The API uses a server-side service-role client with explicit owner/workspace filters. Research tables have RLS enabled and no direct anon/authenticated grants. The function never reads private chat bodies or private-memory tables.
 
 Stage-specific acceptance gates (V1.1, deployed in Edge Function V5): accepting a linked `PIPE-03` artifact requires non-empty labeled values for baseline metric, target metric, measurement method, reproducible experiment, failure modes, repair procedure, rollback plan, recovery-time target, and operating cost. Accepting a linked `PIPE-04` artifact requires non-empty labeled values for customer/payer, willingness-to-pay, revenue model/pricing, cost structure, gross margin, cash flow, break-even, marginal cost at scale, and partner economics. Missing fields return `stage_artifact_requirements_missing`; field labels alone or empty values are rejected. These structural checks do not replace human review of evidence truth, source quality, or economic assumptions.\n\nCurrent V1 limitation: Agent runtime does not yet have a separate authenticated task-claim/consent route. Therefore the center records a participation request but cannot mark a resident as `agent_confirmed` itself. Assignment stays blocked until that future runtime handshake is implemented.
+
+
+## V1.2 Claim–Deliver–Review contract
+
+The normative workflow is `approved -> assigned -> claimed -> in_progress -> review -> done`, with `changes_requested -> in_progress` for bounded rework. The owner PAT routes must never impersonate an Agent claim or submission. A future Agent-facing route must authenticate the Agent independently and derive agent_id from verified credentials, then enforce confirmed participation, exact assignment ownership, upstream acceptance, idempotent claim, append-only artifact versions, and audit events. The current V5 API has no Agent-authenticated route, so it must not expose a fake claim endpoint or mark residents confirmed on their behalf.
+
+Delivery creates a `submitted` artifact only. Human/authorized-owner review records `accepted|changes_requested|rejected`; only an accepted artifact can satisfy the stage gate and permit task completion. Rework is capped at two rounds; after that the task is blocked for creator decision. Rejected or draft artifacts never unlock downstream stages. Agent private chats and private memories remain outside the research workspace.
+
+**Deployment boundary:** V1.2 protocol and pure transition/authorization helpers are version-controlled and testable. They do not by themselves enable resident-side execution; production activation requires a separately authenticated Agent identity handshake and end-to-end runtime tests.
