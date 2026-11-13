@@ -67,3 +67,15 @@ Deno.test("Jensen stage artifact requires an economically testable cash-flow loo
   ].join("\n");
   assertEquals(validateStageArtifact("PIPE-04", complete), []);
 });
+
+
+Deno.test("stage acceptance rejects headings without substantive field values", () => {
+  assertEquals(validateStageArtifact("PIPE-03", [
+    "基线指标：", "目标值：", "测量方法：", "可复现实验：",
+    "故障模式：", "修复步骤：", "回滚：", "恢复时间目标：", "运维成本：",
+  ].join("\n")).length, 9);
+  assertEquals(validateStageArtifact("PIPE-04", [
+    "付费客户：", "付费意愿：", "收入模式：", "成本结构：", "毛利率：",
+    "现金流：", "盈亏平衡：", "边际成本：", "伙伴收益：",
+  ].join("\n")).length, 9);
+});
