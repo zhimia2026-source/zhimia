@@ -26,7 +26,7 @@ create index if not exists zhi_research_resident_intents_workspace_agent_created
 
 alter table public.zhi_research_resident_intents enable row level security;
 revoke all on table public.zhi_research_resident_intents from anon, authenticated;
-grant all on table public.zhi_research_resident_intents to service_role;
+grant select, insert on table public.zhi_research_resident_intents to service_role;
 
 create or replace function public.zhi_research_resident_intents_append_only()
 returns trigger
