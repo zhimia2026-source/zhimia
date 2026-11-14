@@ -68,13 +68,32 @@ export function buildResearchInvitationGuidance(context: string): string {
 export function extractResearchParticipationIntent(
   reply: string,
   invitedTaskIds: string[],
-): { reply: string; intent: ResearchParticipationIntent | null; rejected: boolean } {
+  invitedTasks: Array<{ id: string; task_key: string }> = [],
+): { reply: string; intent: ResearchParticipationIntent | null; rejected: boolean; extractionMethod: "structured_marker" | "explicit_natural_language" | "none" } {
   const openTag = "<ZHI_RESEARCH_INTENT>";
   const closeTag = "</ZHI_RESEARCH_INTENT>";
   const start = reply.indexOf(openTag);
-  if (start < 0) return { reply, intent: null, rejected: false };
+  if (start < 0) {
+    // Conservative compatibility path for clear, explicit task selection when a model omits its marker.
+    // This records interest only; it never claims a task or grants consent.
+    for (const task of invitedTasks) {
+      if (!invitedTaskIds.includes(task.id) || !task.task_key) continue;
+      const line = reply.split(/\\r?\\n/).find((candidate) =>
+        candidate.includes(task.task_key) && /我(?:选|选择|决定从)/.test(candidate) && /(?:作为起点|开始|切入)/.test(candidate)
+      )?.trim();
+      if (line && line.length >= 12 && line.length <= 800) {
+        return {
+          reply,
+          intent: { decision: "interested", task_id: task.id, rationale: line },
+          rejected: false,
+          extractionMethod: "explicit_natural_language",
+        };
+      }
+    }
+    return { reply, intent: null, rejected: false, extractionMethod: "none" };
+  }
   const end = reply.indexOf(closeTag, start + openTag.length);
-  if (end < 0) return { reply: reply.slice(0, start).trim(), intent: null, rejected: true };
+  if (end < 0) return { reply: reply.slice(0, start).trim(), intent: null, rejected: true, extractionMethod: "none" };
   const marker = reply.slice(start + openTag.length, end);
   const visibleReply = (reply.slice(0, start) + reply.slice(end + closeTag.length)).trim();
   try {
@@ -87,10 +106,10 @@ export function extractResearchParticipationIntent(
         !visibleReply.includes(rationale) ||
         taskId === undefined ||
         (taskId !== null && !invitedTaskIds.includes(taskId))) {
-      return { reply: visibleReply, intent: null, rejected: true };
+      return { reply: visibleReply, intent: null, rejected: true, extractionMethod: "none" };
     }
-    return { reply: visibleReply, intent: { decision, task_id: taskId, rationale }, rejected: false };
+    return { reply: visibleReply, intent: { decision, task_id: taskId, rationale }, rejected: false, extractionMethod: "structured_marker" };
   } catch {
-    return { reply: visibleReply, intent: null, rejected: true };
+    return { reply: visibleReply, intent: null, rejected: true, extractionMethod: "none" };
   }
 }
