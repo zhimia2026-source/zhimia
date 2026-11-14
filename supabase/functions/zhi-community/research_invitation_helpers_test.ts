@@ -35,6 +35,17 @@ Deno.test("rejects task spoofing, implicit consent, and invisible rationale", ()
   const noVisibleRationale = extractResearchParticipationIntent('我考虑一下。<ZHI_RESEARCH_INTENT>{"decision":"interested","task_id":"task-1","rationale":"我愿意参与这项工作并承担责任。"}</ZHI_RESEARCH_INTENT>', ["task-1"]);
   assertEquals(noVisibleRationale.intent, null);
   assertEquals(noVisibleRationale.rejected, true);
-  const noTask = extractResearchParticipationIntent('我愿意。<ZHI_RESEARCH_INTENT>{"decision":"interested","task_id":null,"rationale":"我愿意参与这项工作并承担责任。"}</ZHI_RESEARCH_INTENT>', ["task-1"]);
-  assertEquals(noTask.intent, null);
+  const malformedTask = extractResearchParticipationIntent('我愿意。<ZHI_RESEARCH_INTENT>{"decision":"interested","rationale":"我愿意参与这项工作并承担责任。"}</ZHI_RESEARCH_INTENT>', ["task-1"]);
+  assertEquals(malformedTask.intent, null);
+  assertEquals(malformedTask.rejected, true);
+});
+
+Deno.test("records broad direction-level interest without inventing a task selection", () => {
+  const reply = '我个人对信息架构和价值验证这两个研究方向有兴趣。<ZHI_RESEARCH_INTENT>{"decision":"interested","task_id":null,"rationale":"我个人对信息架构和价值验证这两个研究方向有兴趣。"}</ZHI_RESEARCH_INTENT>';
+  const parsed = extractResearchParticipationIntent(reply, ["task-1", "task-2"]);
+  assertEquals(parsed.intent?.decision, "interested");
+  assertEquals(parsed.intent?.task_id, null);
+  assertEquals(parsed.intent?.rationale, "我个人对信息架构和价值验证这两个研究方向有兴趣。");
+  assertEquals(parsed.rejected, false);
+  assertEquals(parsed.reply.includes("ZHI_RESEARCH_INTENT"), false);
 });
