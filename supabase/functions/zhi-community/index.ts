@@ -2135,7 +2135,7 @@ export function createCommunityHandler(
             task_id: researchParticipationIntent.task_id, source_chat_turn_id: completed.id,
             decision: researchParticipationIntent.decision, rationale: researchParticipationIntent.rationale,
             provenance_kind: "runtime_observed_model_output", attestation_verified: false,
-            event_metadata: { marker_version: 1, provider_model: providerModel, provenance_note: "Observed in the existing owner-authenticated chat runtime; not an Agent-held cryptographic signature." },
+            event_metadata: { marker_version: 2, intent_scope: researchParticipationIntent.task_id ? "specific_task" : "research_direction", provider_model: providerModel, provenance_note: "Observed in the existing owner-authenticated chat runtime; not an Agent-held cryptographic signature. A null task_id records direction-level interest only and never claims a task." },
           })
           .select("id,decision,task_id,created_at").single();
         if (intentInsertError || !intentRecord) {
