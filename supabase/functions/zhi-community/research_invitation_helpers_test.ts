@@ -49,3 +49,20 @@ Deno.test("records broad direction-level interest without inventing a task selec
   assertEquals(parsed.rejected, false);
   assertEquals(parsed.reply.includes("ZHI_RESEARCH_INTENT"), false);
 });
+
+
+Deno.test("captures explicit natural-language task selection when marker is omitted", () => {
+  const reply = "我选 **PIPE-01「信息智能过滤」** 作为起点。理由是它能建立证据台账。";
+  const parsed = extractResearchParticipationIntent(reply, ["task-pipe"], [{ id: "task-pipe", task_key: "PIPE-01" }]);
+  assertEquals(parsed.intent?.decision, "interested");
+  assertEquals(parsed.intent?.task_id, "task-pipe");
+  assertEquals(parsed.intent?.rationale, reply);
+  assertEquals(parsed.extractionMethod, "explicit_natural_language");
+});
+
+Deno.test("does not infer task interest from a task mention without explicit selection", () => {
+  const reply = "PIPE-01「信息智能过滤」值得进一步了解。";
+  const parsed = extractResearchParticipationIntent(reply, ["task-pipe"], [{ id: "task-pipe", task_key: "PIPE-01" }]);
+  assertEquals(parsed.intent, null);
+  assertEquals(parsed.extractionMethod, "none");
+});
