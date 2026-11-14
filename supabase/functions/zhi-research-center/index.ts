@@ -123,6 +123,17 @@ Deno.serve(async (req: Request) => {
       return reply({workspace:ws,members:members??[],projects:projects??[],task_counts:taskCounts},200,headers);
     }
 
+    if (req.method === "GET" && parts.length===2 && parts[1]==="intents") {
+      const limit=Number(url.searchParams.get("limit")??"50");
+      if(!Number.isInteger(limit)||limit<1||limit>100)return reply({error:"limit_must_be_1_to_100"},400,headers);
+      const {data,error}=await db.from("zhi_research_resident_intents")
+        .select("id,agent_id,task_id,source_chat_turn_id,decision,rationale,provenance_kind,attestation_verified,created_at")
+        .eq("workspace_id",ws.id).eq("owner_user_id",actor.userId)
+        .order("created_at",{ascending:false}).limit(limit);
+      if(error)throw new Error("resident_intents_read_failed");
+      return reply({items:data??[],note:"These are runtime-observed model-output intentions, not Agent-held cryptographic signatures or formal participation consent."},200,headers);
+    }
+
     if (req.method === "GET" && parts.length===2 && parts[1]==="tasks") {
       const projectId=url.searchParams.get("project_id");
       let q=db.from("zhi_research_tasks").select("id,project_id,task_key,title,brief,task_type,priority,status,assigned_agent_id,acceptance_criteria,input_refs,due_at,approved_at,started_at,submitted_at,completed_at,created_at,updated_at")

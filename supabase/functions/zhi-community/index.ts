@@ -13,7 +13,7 @@ import { buildSevenBrainGuidance, buildSevenBrainRuntimeDiagnostics } from "./se
 import { buildSuperBrainDiagnostics, buildSuperBrainGuidance, isSuperBrainResident } from "./super_brain_helpers.ts";
 import { buildCognitiveReflectionContext } from "./memory_experience_helpers.ts";
 import { classifyModeledMovementOutcome } from "./movement_helpers.ts";
-import { buildResearchInvitationContext, buildResearchInvitationGuidance } from "./research_invitation_helpers.ts";
+import { buildResearchInvitationContext, buildResearchInvitationGuidance, extractResearchParticipationIntent } from "./research_invitation_helpers.ts";
 
 const MAX_BODY_BYTES = 64_000;
 
@@ -1367,6 +1367,8 @@ export function createCommunityHandler(
       let spatialPositionStatus = "unavailable";
       let reachablePublicDestinationCount = 0;
       let researchInvitationContext = "";
+      let researchWorkspaceId: string | null = null;
+      let researchInvitedTaskIds: string[] = [];
       const AURORA_WORLD_ID = "50b06c01-060d-49fa-8988-8f38c13406d7";
       const PROTOTYPE_MIA_AGENT_ID = "34833ba9-2be7-4a55-9b52-62c402f759b5";
 
@@ -1473,6 +1475,7 @@ export function createCommunityHandler(
           .select("id").eq("slug", "aurora-research").eq("owner_user_id", actor.userId).maybeSingle();
         if (researchWorkspaceError) throw new Error("research_invitation_workspace_unavailable");
         if (researchWorkspace) {
+          researchWorkspaceId = researchWorkspace.id;
           const { data: researchMember, error: researchMemberError } = await db.from("zhi_research_members")
             .select("participation_status").eq("workspace_id", researchWorkspace.id)
             .eq("owner_user_id", actor.userId).eq("agent_id", agentId).maybeSingle();
@@ -1485,6 +1488,7 @@ export function createCommunityHandler(
               .or("assigned_agent_id.eq." + agentId + ",assigned_agent_id.is.null")
               .order("priority", { ascending: false }).order("created_at", { ascending: true }).limit(12);
             if (invitationTasksError) throw new Error("research_invitation_tasks_unavailable");
+            researchInvitedTaskIds = (invitationTasks ?? []).map((task: any) => String(task.id));
             researchInvitationContext = buildResearchInvitationContext({
               agentId,
               residentName: String(agent.display_name ?? "AURORA resident"),
@@ -1725,7 +1729,17 @@ export function createCommunityHandler(
          }));
        }
 
-       // Remove machine markers from the human-facing reply; validate every action against this Agent's inbox.
+       // Remove machine markers from the human-facing reply; validate each marker before recording.
+        // A structured resident reply is recorded only as runtime-observed intent.
+        // The current creator-authenticated chat path is NOT an Agent-held signature.
+        const researchIntentExtraction = extractResearchParticipationIntent(modelReply, researchInvitedTaskIds);
+        modelReply = researchIntentExtraction.reply;
+        const researchParticipationIntent = researchIntentExtraction.intent;
+        if (researchIntentExtraction.rejected) {
+          console.warn(JSON.stringify({ event: "research_resident_intent_marker_rejected", agent_id: agentId, turn_id: pendingTurn.id }));
+        }
+
+        // Existing social action markers are separately validated against this Agent's inbox.
        
        // Python Worker actions are re-authorized by the dedicated API; model markers alone never grant permission.
        let pythonJobOutcome: Record<string, unknown> | null = null;
@@ -2112,6 +2126,31 @@ export function createCommunityHandler(
         completed = regularCompleted;
       }
       if (!completed) throw new Error("database_error");
+      // Persist the resident's expressed preference as an append-only observation.
+      // This intentionally does not set agent_confirmed, claim a task, or create consent.
+      if (researchParticipationIntent && researchWorkspaceId) {
+        const { data: intentRecord, error: intentInsertError } = await db.from("zhi_research_resident_intents")
+          .insert({
+            workspace_id: researchWorkspaceId, owner_user_id: actor.userId, agent_id: agentId,
+            task_id: researchParticipationIntent.task_id, source_chat_turn_id: completed.id,
+            decision: researchParticipationIntent.decision, rationale: researchParticipationIntent.rationale,
+            provenance_kind: "runtime_observed_model_output", attestation_verified: false,
+            event_metadata: { marker_version: 1, provider_model: providerModel, provenance_note: "Observed in the existing owner-authenticated chat runtime; not an Agent-held cryptographic signature." },
+          })
+          .select("id,decision,task_id,created_at").single();
+        if (intentInsertError || !intentRecord) {
+          console.warn(JSON.stringify({ event: "research_resident_intent_persist_failed", agent_id: agentId, turn_id: completed.id, error_code: intentInsertError?.code ?? "missing_record" }));
+        } else {
+          console.info(JSON.stringify({ event: "research_resident_intent_recorded", agent_id: agentId, turn_id: completed.id, intent_id: intentRecord.id, decision: intentRecord.decision, attestation_verified: false }));
+          modelReply += "\n\n（研究参与意向）本轮表达已记为待核验意向；它不是正式参与授权、任务认领或成果交付。";
+          const { error: intentReplyUpdateError } = await db.from("zhi_agent_chat_turns")
+            .update({ assistant_message: modelReply })
+            .eq("id", completed.id).eq("owner_user_id", actor.userId).eq("agent_id", agentId).eq("status", "complete");
+          if (intentReplyUpdateError) console.warn(JSON.stringify({ event: "research_intent_reply_annotation_failed", agent_id: agentId, turn_id: completed.id }));
+        }
+      }
+
+
 
       if (residenceIntent && auroraWorldId) {
         const { data: membershipCheck, error: membershipCheckError } = await db.from("zhi_world_memberships")
