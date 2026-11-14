@@ -8,6 +8,8 @@ on:
       - "supabase/functions/zhi-research-center/**"
       - "supabase/migrations/20261113170000_zhi_research_task_state_v13.sql"
       - "supabase/migrations/*aurora_research_resident_intents_v15.sql"
+      - "supabase/migrations/*aurora_research_intent_ledger_privileges_v151.sql"
+      - "supabase/migrations/*aurora_research_intent_ledger_privileges_v151.sql"
       - "supabase/functions/zhi-spatial/**"
       - "supabase/functions/zhi-aurora-world-runtime/**"
       - "supabase/functions/zhi-forest-runtime/**"
