@@ -7,6 +7,7 @@ on:
       - "supabase/functions/zhi-community/**"
       - "supabase/functions/zhi-research-center/**"
       - "supabase/migrations/20261113170000_zhi_research_task_state_v13.sql"
+      - "supabase/migrations/*aurora_research_resident_intents_v15.sql"
       - "supabase/functions/zhi-spatial/**"
       - "supabase/functions/zhi-aurora-world-runtime/**"
       - "supabase/functions/zhi-forest-runtime/**"
@@ -16,6 +17,7 @@ on:
   pull_request:
     paths:
       - "supabase/functions/zhi-community/**"
+      - "supabase/migrations/*aurora_research_resident_intents_v15.sql"
       - "supabase/functions/zhi-spatial/**"
       - "supabase/functions/zhi-aurora-world-runtime/**"
       - "supabase/functions/zhi-forest-runtime/**"
