@@ -1729,7 +1729,7 @@ export function createCommunityHandler(
          }));
        }
 
-       // 
+       // Remove machine markers from the human-facing reply; validate each marker before recording.
         // A structured resident reply is recorded only as runtime-observed intent.
         // The current creator-authenticated chat path is NOT an Agent-held signature.
         const researchIntentExtraction = extractResearchParticipationIntent(modelReply, researchInvitedTaskIds);
@@ -1739,7 +1739,7 @@ export function createCommunityHandler(
           console.warn(JSON.stringify({ event: "research_resident_intent_marker_rejected", agent_id: agentId, turn_id: pendingTurn.id }));
         }
 
-Remove machine markers from the human-facing reply; validate every action against this Agent's inbox.
+        // Existing social action markers are separately validated against this Agent's inbox.
        
        // Python Worker actions are re-authorized by the dedicated API; model markers alone never grant permission.
        let pythonJobOutcome: Record<string, unknown> | null = null;
