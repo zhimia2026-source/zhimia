@@ -69,11 +69,16 @@ export function extractResearchParticipationIntent(
   reply: string,
   invitedTaskIds: string[],
 ): { reply: string; intent: ResearchParticipationIntent | null; rejected: boolean } {
-  const match = reply.match(/<ZHI_RESEARCH_INTENT>([\\s\\S]*?)<\\/ZHI_RESEARCH_INTENT>/i);
-  if (!match) return { reply, intent: null, rejected: false };
-  const visibleReply = reply.replace(match[0], "").trim();
+  const openTag = "<ZHI_RESEARCH_INTENT>";
+  const closeTag = "</ZHI_RESEARCH_INTENT>";
+  const start = reply.indexOf(openTag);
+  if (start < 0) return { reply, intent: null, rejected: false };
+  const end = reply.indexOf(closeTag, start + openTag.length);
+  if (end < 0) return { reply: reply.slice(0, start).trim(), intent: null, rejected: true };
+  const marker = reply.slice(start + openTag.length, end);
+  const visibleReply = (reply.slice(0, start) + reply.slice(end + closeTag.length)).trim();
   try {
-    const parsed = JSON.parse(match[1]);
+    const parsed = JSON.parse(marker);
     const decision = parsed?.decision;
     const taskId = typeof parsed?.task_id === "string" ? parsed.task_id : null;
     const rationale = typeof parsed?.rationale === "string" ? parsed.rationale.trim() : "";
