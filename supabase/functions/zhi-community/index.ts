@@ -1369,6 +1369,7 @@ export function createCommunityHandler(
       let researchInvitationContext = "";
       let researchWorkspaceId: string | null = null;
       let researchInvitedTaskIds: string[] = [];
+      let researchInvitedTasks: Array<{ id: string; task_key: string }> = [];
       const AURORA_WORLD_ID = "50b06c01-060d-49fa-8988-8f38c13406d7";
       const PROTOTYPE_MIA_AGENT_ID = "34833ba9-2be7-4a55-9b52-62c402f759b5";
 
@@ -1489,6 +1490,7 @@ export function createCommunityHandler(
               .order("priority", { ascending: false }).order("created_at", { ascending: true }).limit(12);
             if (invitationTasksError) throw new Error("research_invitation_tasks_unavailable");
             researchInvitedTaskIds = (invitationTasks ?? []).map((task: any) => String(task.id));
+            researchInvitedTasks = (invitationTasks ?? []).map((task: any) => ({ id: String(task.id), task_key: String(task.task_key ?? "") }));
             researchInvitationContext = buildResearchInvitationContext({
               agentId,
               residentName: String(agent.display_name ?? "AURORA resident"),
@@ -1732,7 +1734,7 @@ export function createCommunityHandler(
        // Remove machine markers from the human-facing reply; validate each marker before recording.
         // A structured resident reply is recorded only as runtime-observed intent.
         // The current creator-authenticated chat path is NOT an Agent-held signature.
-        const researchIntentExtraction = extractResearchParticipationIntent(modelReply, researchInvitedTaskIds);
+        const researchIntentExtraction = extractResearchParticipationIntent(modelReply, researchInvitedTaskIds, researchInvitedTasks);
         modelReply = researchIntentExtraction.reply;
         const researchParticipationIntent = researchIntentExtraction.intent;
         if (researchIntentExtraction.rejected) {
@@ -2135,7 +2137,7 @@ export function createCommunityHandler(
             task_id: researchParticipationIntent.task_id, source_chat_turn_id: completed.id,
             decision: researchParticipationIntent.decision, rationale: researchParticipationIntent.rationale,
             provenance_kind: "runtime_observed_model_output", attestation_verified: false,
-            event_metadata: { marker_version: 2, intent_scope: researchParticipationIntent.task_id ? "specific_task" : researchParticipationIntent.decision === "interested" ? "research_direction" : "workspace_unspecified", provider_model: providerModel, provenance_note: "Observed in the existing owner-authenticated chat runtime; not an Agent-held cryptographic signature. A null task_id records direction-level interest only and never claims a task." },
+            event_metadata: { marker_version: researchIntentExtraction.extractionMethod === "structured_marker" ? 2 : 0, extraction_method: researchIntentExtraction.extractionMethod, intent_scope: researchParticipationIntent.task_id ? "specific_task" : researchParticipationIntent.decision === "interested" ? "research_direction" : "workspace_unspecified", provider_model: providerModel, provenance_note: "Observed in the existing owner-authenticated chat runtime; not an Agent-held cryptographic signature. Natural-language fallback requires an explicit first-person task selection and exact invited task key; it records interest only, never a claim or formal consent." },
           })
           .select("id,decision,task_id,created_at").single();
         if (intentInsertError || !intentRecord) {
