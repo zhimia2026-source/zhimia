@@ -17,7 +17,7 @@ Deno.test("Super Brain 2.0 consolidates seven brains and five capability layers"
     if (!guidance.includes(phrase)) throw new Error("missing integrated guidance: " + phrase);
   }
   if (!guidance.includes(SUPER_BRAIN_GUIDANCE_VERSION)) throw new Error("guidance version missing");
-  if (guidance.includes("后台持续思考")) throw new Error("must state the background-continuity boundary");
+  if (!guidance.includes("没有运行触发时，不宣称后台持续思考")) throw new Error("background-continuity boundary missing");
 });
 
 Deno.test("unified guidance preserves privacy, memory, epistemic, and governance boundaries", () => {
