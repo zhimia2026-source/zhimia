@@ -91,8 +91,18 @@ Deno.test("diagnostics are bounded and allowlist capability names only", () => {
     environmentEventCount: 999,
     environmentRevision: 12,
     capabilityLayersAvailable: ["world_model", "unknown", "world_model", "metacognition"],
+    workspaceSnapshot: buildCognitiveWorkspaceSnapshot({
+      cognitionRecordCount: 2, approvedMemoryCount: 3, recentTurnCount: 4,
+      environmentEventCount: 1, environmentEventKinds: ["rainfall_started"],
+      environmentRevision: 9, spatialPositionStatus: "position_estimated",
+      reachablePublicDestinationCount: 2, socialCandidateCount: 0,
+      researchTaskCount: 1, residenceChosen: false,
+    }),
   });
   if (result.guidance_version !== SUPER_BRAIN_GUIDANCE_VERSION) throw new Error("wrong version");
+  if (result.workspace_version !== SUPER_BRAIN_GUIDANCE_VERSION || result.workspace_attention_signal_count < 1) {
+    throw new Error("workspace activation diagnostics missing");
+  }
   if (result.environment_event_count !== 100) throw new Error("event count was not bounded");
   if (result.capability_layers_available.join(",") !== "metacognition,world_model") {
     throw new Error("capability allowlist or deduplication failed");
