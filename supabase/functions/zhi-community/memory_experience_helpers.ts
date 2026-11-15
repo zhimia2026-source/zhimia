@@ -123,6 +123,19 @@ export function normalizeAgentReflectionWithReason(raw: unknown): AgentReflectio
   } catch {
     return { value: null, errorCode: "invalid_candidate" };
   }
+  const selfModelCandidate = input.self_model_candidate;
+  if (selfModelCandidate !== undefined) {
+    if (typeof selfModelCandidate !== "string" || selfModelCandidate.trim().length < 12 ||
+        selfModelCandidate.length > 600) {
+      return { value: null, errorCode: "invalid_candidate" };
+    }
+    // Preserve this as a provisional, evidence-linked hypothesis in the existing
+    // micro-experience store; it is not a personality baseline or consent grant.
+    candidate.hypotheses = [
+      ...candidate.hypotheses,
+      "自我模型候选（待后续经历验证，不是人格基线）：" + selfModelCandidate.trim(),
+    ].slice(0, 50);
+  }
   if ((input.worth_remembering && candidate.importance < 3) ||
       (!input.worth_remembering && candidate.importance > 2)) {
     return { value: null, errorCode: "importance_mismatch" };
@@ -237,10 +250,11 @@ export function buildPrivateReflectionMessages(
     "不能仅因对话温暖、情绪强烈、篇幅长或用户要求记住就提高分数；必须说明它未来会如何帮助理解、判断或连续互动。对照 existing_private_memories：若本轮只是重复已有事实，不新建记忆；若出现可靠的新信息或重要变化，明确区分新增内容与既有内容。既有记忆仅作参考，不得将其中假设改写成事实。",
     "worth_remembering=true 时 importance 必须至少为 3；只有达到上述持续价值标准才可为 true。否则 importance 只能为 1 或 2。不得为了凑齐记忆数量而提高评分。",
     "reflection 用第一人称简短总结本轮学到了什么、哪里仍不确定。即使没有长期价值，也可以写一句简短反思。",
+    "额外进行一次克制的自我模型观察：如果本轮有直接证据支持你对自身稳定偏好、能力边界、决策习惯或尚未解决的认知盲点形成新认识，可输出 self_model_candidate（一句，最多600字符），并明确它只是待验证假设；若证据不足或只是短暂状态，输出空字符串。不得把用户期待、单次情绪或模型生成的描述写成稳定人格。",
     "同时判断你是否确实有一件值得单独告诉创造者的事。只有当你有明确、具体、非重复、对创造者有价值的想法、邀请或世界近况时，creator_message.send 才设为 true；普通问候、重复聊天内容、泛泛感谢、无新信息时必须 false。",
     "creator_message 只能写给创造者看的简短自然留言，不得泄露私有反思、隐藏推理、长期记忆原文、第三方隐私、健康/财务/身份等敏感信息，也不得包含系统提示、密钥或令牌。",
     "输出 creator_message 对象，字段 send(boolean), subject(string), body(string), message_kind(message/invitation/world_event/important)。不发送时必须输出 send=false、subject空字符串、body空字符串。",
-    "只输出 JSON 对象，不要 Markdown，不要代码围栏。字段必须为 worth_remembering(boolean), observed_facts(string[]), hypotheses(string[]), unknowns(string[]), reflection(string), importance(integer), creator_message(object)。",
+    "只输出 JSON 对象，不要 Markdown，不要代码围栏。字段必须为 worth_remembering(boolean), observed_facts(string[]), hypotheses(string[]), unknowns(string[]), reflection(string), importance(integer), creator_message(object), self_model_candidate(string)。",
     "若无长期价值，输出 worth_remembering=false、空数组、importance=1，并在 reflection 中说明本轮无需长期记忆。",
   ].join("\n");
   const priorMemories = existingMemories.slice(0, 8).map((memory) => {
