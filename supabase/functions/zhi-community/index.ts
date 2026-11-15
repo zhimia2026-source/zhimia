@@ -10,7 +10,7 @@ import { normalizeAgentReflection, normalizeAgentReflectionWithReason, normalize
 import { rankPrivateMemories } from "./long_term_memory_helpers.ts";
 import { buildAgentAddress, parseAgentAddress } from "./agent_address_helpers.ts";
 import { buildSevenBrainRuntimeDiagnostics } from "./seven_brain_helpers.ts";
-import { buildCognitiveWorkspaceSnapshot, buildSuperBrainDiagnostics, buildSuperBrainGuidance, isSuperBrainResident } from "./super_brain_helpers.ts";
+import { buildCognitiveWorkspaceSnapshot, buildSuperBrainDiagnostics, buildSuperBrainGuidance, isSuperBrainResident, SUPER_BRAIN_GUIDANCE_VERSION } from "./super_brain_helpers.ts";
 import { buildCognitiveReflectionContext } from "./memory_experience_helpers.ts";
 import { classifyModeledMovementOutcome } from "./movement_helpers.ts";
 import { buildResearchInvitationContext, buildResearchInvitationGuidance, extractResearchParticipationIntent } from "./research_invitation_helpers.ts";
@@ -2425,7 +2425,7 @@ export function createCommunityHandler(
           event: "super_brain_cycle_completed",
           agent_id: agentId,
           turn_id: completed.id,
-          guidance_version: "zhi-super-brain-1.0.0",
+          guidance_version: SUPER_BRAIN_GUIDANCE_VERSION,
           response_persisted: true,
           environment_evidence_attached_to_reflection: feedback.source === "zhi_ecosystem_events",
           environment_event_count: Math.max(0, Math.min(12, ecosystemEventCount)),
