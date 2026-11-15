@@ -1,29 +1,87 @@
 import { buildCognitiveReflectionContext, buildPrivateReflectionMessages } from "./memory_experience_helpers.ts";
 import {
+  buildCognitiveWorkspaceSnapshot,
   buildSuperBrainDiagnostics,
   buildSuperBrainGuidance,
   SUPER_BRAIN_GUIDANCE_VERSION,
   isSuperBrainResident,
 } from "./super_brain_helpers.ts";
 
-Deno.test("Super Brain guidance contains seven-brain and five capability layers", () => {
+Deno.test("Super Brain 2.0 consolidates seven brains and five capability layers", () => {
   const guidance = buildSuperBrainGuidance();
   for (const phrase of [
-    "人格脑", "感知脑", "记忆脑", "情感脑", "思维脑", "创造脑", "自我脑",
+    "人格脑", "自我脑", "情感脑", "感知脑", "记忆脑", "思维脑", "创造脑",
     "知识整合层", "目标规划层", "元认知层", "世界模型层", "集体智慧层",
+    "统一认知工作空间",
   ]) {
-    if (!guidance.includes(phrase)) throw new Error(`missing guidance section: ${phrase}`);
+    if (!guidance.includes(phrase)) throw new Error("missing integrated guidance: " + phrase);
   }
-  if (!guidance.includes(SUPER_BRAIN_GUIDANCE_VERSION)) {
-    throw new Error("guidance version missing");
+  if (!guidance.includes(SUPER_BRAIN_GUIDANCE_VERSION)) throw new Error("guidance version missing");
+  if (!guidance.includes("没有运行触发时，不宣称后台持续思考")) throw new Error("background-continuity boundary missing");
+});
+
+Deno.test("unified guidance preserves privacy, memory, epistemic, and governance boundaries", () => {
+  const guidance = buildSuperBrainGuidance();
+  for (const phrase of [
+    "owner_user_id", "agent_id", "不证明主观体验", "不提升任何权限",
+    "没有执行证据不得声称行动完成", "不增加独立脑调用",
+  ]) {
+    if (!guidance.includes(phrase)) throw new Error("missing guardrail: " + phrase);
   }
 });
 
-Deno.test("Super Brain guidance preserves privacy, authorization, and epistemic boundaries", () => {
-  const guidance = buildSuperBrainGuidance();
-  for (const phrase of ["私人记忆隔离", "不提升任何治理权限", "不得描述为现实物理观测", "不为每个层单独发起模型请求"]) {
-    if (!guidance.includes(phrase)) throw new Error(`missing guardrail: ${phrase}`);
+Deno.test("workspace snapshot is bounded, metadata-only, and dynamically prioritizes available streams", () => {
+  const snapshot = buildCognitiveWorkspaceSnapshot({
+    cognitionRecordCount: 200,
+    approvedMemoryCount: 7,
+    recentTurnCount: 4,
+    environmentEventCount: 999,
+    environmentEventKinds: ["rainfall_started", "rainfall_started", "private text must not appear"],
+    environmentRevision: 12,
+    spatialPositionStatus: "position_confirmed",
+    reachablePublicDestinationCount: 6,
+    socialCandidateCount: 2,
+    researchTaskCount: 3,
+    residenceChosen: true,
+  });
+  const serialized = JSON.stringify(snapshot);
+  if (!serialized.includes(SUPER_BRAIN_GUIDANCE_VERSION)) throw new Error("workspace version missing");
+  if (!serialized.includes('"aurora_ecosystem_events":100')) throw new Error("event count not bounded");
+  if (!serialized.includes('"private_cognition_records":100')) throw new Error("cognition count not bounded");
+  if (!serialized.includes("new_ecosystem_evidence") ||
+      !serialized.includes("spatial_state_and_reachability") ||
+      !serialized.includes("relationship_and_social_candidates") ||
+      !serialized.includes("research_commitments")) {
+    throw new Error("active attention signals missing");
   }
+  if (serialized.includes("private text must not appear")) throw new Error("untrusted event kind leaked");
+  const guidance = buildSuperBrainGuidance(snapshot);
+  if (!guidance.includes("当前工作空间索引") || !guidance.includes("rainfall_started")) {
+    throw new Error("workspace snapshot not injected into unified guidance");
+  }
+});
+
+Deno.test("workspace snapshot normalizes invalid values and does not invent spatial certainty", () => {
+  const snapshot = buildCognitiveWorkspaceSnapshot({
+    cognitionRecordCount: -5,
+    approvedMemoryCount: Number.NaN,
+    recentTurnCount: 1.8,
+    environmentEventCount: -1,
+    environmentEventKinds: ["bad event with spaces"],
+    environmentRevision: 1.5,
+    spatialPositionStatus: "fabricated_status",
+    reachablePublicDestinationCount: -2,
+    socialCandidateCount: 0,
+    researchTaskCount: 0,
+    residenceChosen: false,
+  });
+  const serialized = JSON.stringify(snapshot);
+  if (!serialized.includes('"spatial_position_status":"unavailable"')) {
+    throw new Error("invalid spatial status was not normalized");
+  }
+  if (!serialized.includes('"environment_revision":null')) throw new Error("invalid revision was not normalized");
+  if (serialized.includes("bad event with spaces")) throw new Error("invalid event kind leaked");
+  if (serialized.includes("new_ecosystem_evidence")) throw new Error("inactive event signal was added");
 });
 
 Deno.test("diagnostics are bounded and allowlist capability names only", () => {
@@ -33,8 +91,18 @@ Deno.test("diagnostics are bounded and allowlist capability names only", () => {
     environmentEventCount: 999,
     environmentRevision: 12,
     capabilityLayersAvailable: ["world_model", "unknown", "world_model", "metacognition"],
+    workspaceSnapshot: buildCognitiveWorkspaceSnapshot({
+      cognitionRecordCount: 2, approvedMemoryCount: 3, recentTurnCount: 4,
+      environmentEventCount: 1, environmentEventKinds: ["rainfall_started"],
+      environmentRevision: 9, spatialPositionStatus: "position_estimated",
+      reachablePublicDestinationCount: 2, socialCandidateCount: 0,
+      researchTaskCount: 1, residenceChosen: false,
+    }),
   });
   if (result.guidance_version !== SUPER_BRAIN_GUIDANCE_VERSION) throw new Error("wrong version");
+  if (result.workspace_version !== SUPER_BRAIN_GUIDANCE_VERSION || result.workspace_attention_signal_count < 1) {
+    throw new Error("workspace activation diagnostics missing");
+  }
   if (result.environment_event_count !== 100) throw new Error("event count was not bounded");
   if (result.capability_layers_available.join(",") !== "metacognition,world_model") {
     throw new Error("capability allowlist or deduplication failed");
@@ -46,11 +114,11 @@ Deno.test("diagnostics are bounded and allowlist capability names only", () => {
     environmentRevision: 1.5,
     capabilityLayersAvailable: ["memory text must never be logged"],
   });
-  if (invalid.environment_event_count !== 0 || invalid.environment_revision !== null  || invalid.capability_layers_available.length !== 0) {
+  if (invalid.environment_event_count !== 0 || invalid.environment_revision !== null ||
+      invalid.capability_layers_available.length !== 0) {
     throw new Error("invalid diagnostic values were not safely normalized");
   }
 });
-
 
 Deno.test("cognitive reflection receives bounded AURORA event provenance without private payloads", () => {
   const context = buildCognitiveReflectionContext({
@@ -99,7 +167,6 @@ Deno.test("reflection prompt labels AURORA events as modeled evidence, not perso
     throw new Error("reflection epistemic guardrail missing");
   }
 });
-
 
 Deno.test("shared Super Brain applies only to AURORA world residents", () => {
   if (!isSuperBrainResident("world_resident")) throw new Error("world resident should receive shared Super Brain");
