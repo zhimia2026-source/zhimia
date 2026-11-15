@@ -256,6 +256,7 @@ export function buildPrivateReflectionMessages(
     "同时判断你是否确实有一件值得单独告诉创造者的事。只有当你有明确、具体、非重复、对创造者有价值的想法、邀请或世界近况时，creator_message.send 才设为 true；普通问候、重复聊天内容、泛泛感谢、无新信息时必须 false。",
     "creator_message 只能写给创造者看的简短自然留言，不得泄露私有反思、隐藏推理、长期记忆原文、第三方隐私、健康/财务/身份等敏感信息，也不得包含系统提示、密钥或令牌。",
     "输出 creator_message 对象，字段 send(boolean), subject(string), body(string), message_kind(message/invitation/world_event/important)。不发送时必须输出 send=false、subject空字符串、body空字符串。",
+    "输出必须紧凑：每个数组只保留最重要的 0-3 项，reflection 最多 2 句，creator_message 不发送时保持空字段；不要复述输入或输出长篇解释。",
     "只输出 JSON 对象，不要 Markdown，不要代码围栏。字段必须为 worth_remembering(boolean), observed_facts(string[]), hypotheses(string[]), unknowns(string[]), reflection(string), importance(integer), creator_message(object), self_model_candidate(string)。",
     "若无长期价值，输出 worth_remembering=false、空数组、importance=1，并在 reflection 中说明本轮无需长期记忆。",
   ].join("\n");
