@@ -224,3 +224,18 @@ Deno.test("reflection prompt requests provisional self-model evidence without gr
     throw new Error("provisional self-model guidance missing");
   }
 });
+
+Deno.test("reflection accepts an empty self-model candidate when no evidence supports one", () => {
+  const parsed = normalizeAgentReflectionWithReason({
+    worth_remembering: false,
+    observed_facts: [],
+    hypotheses: [],
+    unknowns: [],
+    reflection: "本轮没有足够证据形成新的自我认识。",
+    importance: 1,
+    creator_message: { send: false, subject: "", body: "" },
+    self_model_candidate: "",
+  });
+  if (!parsed.value) throw new Error("empty self-model candidate should be valid");
+  if (parsed.value.hypotheses.length !== 0) throw new Error("empty self-model candidate created a hypothesis");
+});
