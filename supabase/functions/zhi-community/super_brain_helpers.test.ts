@@ -1,4 +1,4 @@
-import { buildCognitiveReflectionContext, buildPrivateReflectionMessages } from "./memory_experience_helpers.ts";
+import { buildCognitiveReflectionContext, buildPrivateReflectionMessages, normalizeAgentReflectionWithReason } from "./memory_experience_helpers.ts";
 import {
   buildCognitiveWorkspaceSnapshot,
   buildSuperBrainDiagnostics,
