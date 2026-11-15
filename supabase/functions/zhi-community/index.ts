@@ -9,7 +9,7 @@ import { canReadPrivateCognition } from "./constitutional_helpers.ts";
 import { normalizeAgentReflection, normalizeAgentReflectionWithReason, normalizeMemoryCandidate, normalizeAgentCreatorMessage, isLongTermMemoryEligible, buildPrivateReflectionMessages, buildPrivateMemoryLogEvent } from "./memory_experience_helpers.ts";
 import { rankPrivateMemories } from "./long_term_memory_helpers.ts";
 import { buildAgentAddress, parseAgentAddress } from "./agent_address_helpers.ts";
-import { buildSevenBrainGuidance, buildSevenBrainRuntimeDiagnostics } from "./seven_brain_helpers.ts";
+import { buildSevenBrainRuntimeDiagnostics } from "./seven_brain_helpers.ts";
 import { buildCognitiveWorkspaceSnapshot, buildSuperBrainDiagnostics, buildSuperBrainGuidance, isSuperBrainResident } from "./super_brain_helpers.ts";
 import { buildCognitiveReflectionContext } from "./memory_experience_helpers.ts";
 import { classifyModeledMovementOutcome } from "./movement_helpers.ts";
@@ -1707,6 +1707,7 @@ export function createCommunityHandler(
               "world_model",
               "collective_intelligence",
             ],
+            workspaceSnapshot: cognitiveWorkspaceSnapshot,
           }),
         }));
       }
