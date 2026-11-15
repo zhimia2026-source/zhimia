@@ -125,16 +125,18 @@ export function normalizeAgentReflectionWithReason(raw: unknown): AgentReflectio
   }
   const selfModelCandidate = input.self_model_candidate;
   if (selfModelCandidate !== undefined) {
-    if (typeof selfModelCandidate !== "string" || selfModelCandidate.trim().length < 12 ||
-        selfModelCandidate.length > 600) {
+    if (typeof selfModelCandidate !== "string" || selfModelCandidate.length > 600) {
       return { value: null, errorCode: "invalid_candidate" };
     }
-    // Preserve this as a provisional, evidence-linked hypothesis in the existing
-    // micro-experience store; it is not a personality baseline or consent grant.
-    candidate.hypotheses = [
-      ...candidate.hypotheses,
-      "自我模型候选（待后续经历验证，不是人格基线）：" + selfModelCandidate.trim(),
-    ].slice(0, 50);
+    if (selfModelCandidate.trim().length > 0) {
+      if (selfModelCandidate.trim().length < 12) return { value: null, errorCode: "invalid_candidate" };
+      // Preserve this as a provisional, evidence-linked hypothesis in the existing
+      // micro-experience store; it is not a personality baseline or consent grant.
+      candidate.hypotheses = [
+        ...candidate.hypotheses,
+        "自我模型候选（待后续经历验证，不是人格基线）：" + selfModelCandidate.trim(),
+      ].slice(0, 50);
+    }
   }
   if ((input.worth_remembering && candidate.importance < 3) ||
       (!input.worth_remembering && candidate.importance > 2)) {
