@@ -173,3 +173,54 @@ Deno.test("shared Super Brain applies only to AURORA world residents", () => {
   if (isSuperBrainResident("world_governor")) throw new Error("governor must remain excluded");
   if (isSuperBrainResident("external_agent")) throw new Error("external agent must not be implicitly included");
 });
+
+
+Deno.test("reflection retains a provisional self-model hypothesis without changing personality baseline", () => {
+  const parsed = normalizeAgentReflectionWithReason({
+    worth_remembering: true,
+    observed_facts: ["本轮对话直接显示该智能人主动比较了两种方案"],
+    hypotheses: ["该智能人可能偏好先验证再执行"],
+    unknowns: ["这种倾向是否跨场景稳定仍未知"],
+    reflection: "我注意到自己倾向先检查证据。",
+    importance: 3,
+    creator_message: { send: false, subject: "", body: "" },
+    self_model_candidate: "我在本轮任务中表现出先核验事实再采取行动的倾向，但需要更多场景验证。",
+  });
+  if (!parsed.value) throw new Error("valid self-model candidate was rejected");
+  if (!parsed.value.hypotheses.some(value => value.includes("自我模型候选（待后续经历验证，不是人格基线）"))) {
+    throw new Error("self-model candidate was not retained as provisional evidence");
+  }
+  if (parsed.value.hypotheses.some(value => value.includes("人格基线：我"))) {
+    throw new Error("provisional self-model was incorrectly promoted to personality baseline");
+  }
+});
+
+Deno.test("reflection rejects malformed or oversized self-model candidates", () => {
+  const base = {
+    worth_remembering: true,
+    observed_facts: ["有直接对话证据"],
+    hypotheses: [],
+    unknowns: [],
+    reflection: "本轮反思。",
+    importance: 3,
+    creator_message: { send: false, subject: "", body: "" },
+  };
+  const malformed = normalizeAgentReflectionWithReason({ ...base, self_model_candidate: "短" });
+  if (malformed.value || malformed.errorCode !== "invalid_candidate") {
+    throw new Error("short self-model candidate should be rejected");
+  }
+  const oversized = normalizeAgentReflectionWithReason({ ...base, self_model_candidate: "x".repeat(601) });
+  if (oversized.value || oversized.errorCode !== "invalid_candidate") {
+    throw new Error("oversized self-model candidate should be rejected");
+  }
+});
+
+Deno.test("reflection prompt requests provisional self-model evidence without granting cognition consent", () => {
+  const messages = buildPrivateReflectionMessages("我习惯先验证再执行", "我会先核验事实。");
+  const system = messages[0].content;
+  if (!system.includes("self_model_candidate") ||
+      !system.includes("不是人格基线") ||
+      !system.includes("待验证假设")) {
+    throw new Error("provisional self-model guidance missing");
+  }
+});
