@@ -199,3 +199,14 @@ Deno.test("creator note parser accepts fenced JSON with surrounding prose", () =
   const value = normalizeAgentCreatorMessage(raw);
   if (!value || value.message_kind !== "invitation") throw new Error("wrapped creator message was not accepted");
 });
+
+
+Deno.test("private reflection prompt requires compact JSON to reduce provider truncation", () => {
+  const messages = buildPrivateReflectionMessages("一次重要交流", "我会保留证据边界。");
+  const system = messages[0].content;
+  if (!system.includes("输出必须紧凑") ||
+      !system.includes("reflection 最多 2 句") ||
+      !system.includes("self_model_candidate(string)")) {
+    throw new Error("compact reflection output contract is incomplete");
+  }
+});
