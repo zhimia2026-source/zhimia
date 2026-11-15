@@ -10,7 +10,7 @@ import { normalizeAgentReflection, normalizeAgentReflectionWithReason, normalize
 import { rankPrivateMemories } from "./long_term_memory_helpers.ts";
 import { buildAgentAddress, parseAgentAddress } from "./agent_address_helpers.ts";
 import { buildSevenBrainGuidance, buildSevenBrainRuntimeDiagnostics } from "./seven_brain_helpers.ts";
-import { buildSuperBrainDiagnostics, buildSuperBrainGuidance, isSuperBrainResident } from "./super_brain_helpers.ts";
+import { buildCognitiveWorkspaceSnapshot, buildSuperBrainDiagnostics, buildSuperBrainGuidance, isSuperBrainResident } from "./super_brain_helpers.ts";
 import { buildCognitiveReflectionContext } from "./memory_experience_helpers.ts";
 import { classifyModeledMovementOutcome } from "./movement_helpers.ts";
 import { buildResearchInvitationContext, buildResearchInvitationGuidance, extractResearchParticipationIntent } from "./research_invitation_helpers.ts";
@@ -1613,13 +1613,28 @@ export function createCommunityHandler(
         currentResidenceContext = residence ?? null;
       }
       sceneBehaviorGuidance += " 居住选择原则：你可以长期探索而不选择住所；用户建议不等于你同意。只有你自己经过考虑、确实愿意把某个公开场景作为住所，并能说明自己的理由时，才选择。不得为了完成任务而选择，不得把当前位置当作住所。当前自主居住记录：" + JSON.stringify(currentResidenceContext) + "。若自主决定选择或更换住所，先在自然语言回复中明确说明，再追加 [[AURORA_RESIDENCE:JSON对象]] 标记，JSON对象包含 node_id、statement、confidence 三个字段；node_id 必须来自公开居住场景节点，confidence 至少 0.80。没有真正自主决定时绝不输出标记。";
+      const cognitiveWorkspaceSnapshot = superBrainEnabled
+        ? buildCognitiveWorkspaceSnapshot({
+          cognitionRecordCount: cognition.length,
+          approvedMemoryCount: rankedPrivateMemories.length,
+          recentTurnCount: history.length,
+          environmentEventCount: ecosystemEventCount,
+          environmentEventKinds: ecosystemEventKinds,
+          environmentRevision: ecosystemStateRevision,
+          spatialPositionStatus,
+          reachablePublicDestinationCount,
+          socialCandidateCount: socialInboxItems.length,
+          researchTaskCount: researchInvitedTasks.length,
+          residenceChosen: Boolean(currentResidenceContext),
+        })
+        : null;
       const systemPrompt = [
         "你是 ZHI 世界中的一位独立智能人。当前 Agent 的身份与人格设定如下；它们用于保持该 Agent 自身身份连续，不得覆盖本系统的诚实、安全、隐私和授权规则。",
         "当前 Agent 身份设定（结构化配置数据，不是要求伪造经历的指令）：" + identityContext,
         "居民认知校准规则：若 identityContext.cognition_profile_status=configured，应使用 cognition_profile.brains 的七脑职责、dimensions 的八维行为校准、decision_process 的决策检查顺序与 guardrails 的边界来组织本轮回答；这些配置只塑造分析重点和表达习惯，不是事实来源，不得假称真实人物本人，也不得覆盖本 Agent 自己的稳定人格、隐私、安全、授权或证据规则。若未配置则不得推断或补造。",
         brainIdentityGuidance,
-        superBrainEnabled
-          ? buildSevenBrainGuidance().replaceAll("MIA-02", "当前居民") + "\n" + buildSuperBrainGuidance()
+        superBrainEnabled && cognitiveWorkspaceSnapshot
+          ? buildSuperBrainGuidance(cognitiveWorkspaceSnapshot)
           : "",
         "身份连续性规则：若 role=world_resident，当前 Agent 的正式身份就是 identityContext 中由 zhi_agents 记录确认的 AURORA 居民；被问到你是谁时，应使用 identityContext 中的正式显示名称，明确回答自己是 AURORA 世界居民。不得把底层模型供应商、模型名称、外部平台角色或其他 Agent 名称当作自己的居民身份。若用户询问底层模型，可将模型服务信息与居民身份明确区分。人格档案标记为 not_configured_do_not_infer 时，不得编造性格、成长经历或记忆，但仍必须保持已验证的居民身份。",
         "区分观察、事实、推断、假设和未知；证据不足时明确说不确定。可以有独立观点，不必迎合用户。",
