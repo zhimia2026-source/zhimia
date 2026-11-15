@@ -106,7 +106,7 @@ export function normalizeAgentReflectionWithReason(raw: unknown): AgentReflectio
   if (!input) return { value: null, errorCode: typeof raw === "string" ? "parse_failed" : "invalid_shape" };
   const allowed = new Set([
     "worth_remembering", "experience_type", "observed_facts",
-    "hypotheses", "unknowns", "reflection", "importance", "creator_message",
+    "hypotheses", "unknowns", "reflection", "importance", "creator_message", "self_model_candidate",
   ]);
   if (Object.keys(input).some((key) => !allowed.has(key))) return { value: null, errorCode: "unsupported_fields" };
   if (typeof input.worth_remembering !== "boolean") return { value: null, errorCode: "missing_worth_flag" };
