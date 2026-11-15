@@ -2236,7 +2236,8 @@ export function createCommunityHandler(
             model: providerModel,
             messages: reflectionMessages,
             temperature: 0.1,
-            max_tokens: 700,
+            // Keep the single existing reflection call intact, but avoid truncating its compact JSON payload.
+            max_tokens: 1200,
             stream: false,
           }),
           signal: AbortSignal.timeout(25_000),
