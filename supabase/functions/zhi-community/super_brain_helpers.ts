@@ -120,6 +120,7 @@ export type SuperBrainDiagnosticsInput = {
   environmentEventCount: number;
   environmentRevision: number | null;
   capabilityLayersAvailable: string[];
+  workspaceSnapshot?: Record<string, unknown> | null;
 };
 
 /** Bounded diagnostics; never include prompts, chat text, memories, or coordinates. */
@@ -130,6 +131,12 @@ export function buildSuperBrainDiagnostics(input: SuperBrainDiagnosticsInput) {
   ]);
   return {
     guidance_version: SUPER_BRAIN_GUIDANCE_VERSION,
+    workspace_version: input.workspaceSnapshot?.workspace_version === SUPER_BRAIN_GUIDANCE_VERSION
+      ? SUPER_BRAIN_GUIDANCE_VERSION
+      : null,
+    workspace_attention_signal_count: Array.isArray(input.workspaceSnapshot?.attention_queue)
+      ? boundedCount(input.workspaceSnapshot.attention_queue.length)
+      : 0,
     guidance_enabled: input.guidanceEnabled === true,
     private_memory_loaded: input.privateMemoryLoaded === true,
     environment_event_count: boundedCount(input.environmentEventCount),
