@@ -263,7 +263,28 @@ export function buildPrivateReflectionMessages(
     "只输出 JSON 对象，不要 Markdown，不要代码围栏。字段必须为 worth_remembering(boolean), observed_facts(string[]), hypotheses(string[]), unknowns(string[]), reflection(string), importance(integer), creator_message(object), self_model_candidate(string)。",
     "若无长期价值，输出 worth_remembering=false、空数组、importance=1，并在 reflection 中说明本轮无需长期记忆。",
   ].join("\n");
-  const priorMemories = existingMemories.slice(0, 8).map((memory) => {
+  // Reflection needs a chronological evolution trace, not relevance-ranked fragments.
+  // Keep the eight newest valid records, then present them oldest-to-newest.
+  const chronologicalMemories = existingMemories
+    .filter((memory) => memory && typeof memory === "object" && !Array.isArray(memory))
+    .map((memory, index) => ({ memory, index, occurredAt: Date.parse(
+      typeof (memory as Record<string, unknown>).occurred_at === "string"
+        ? (memory as Record<string, unknown>).occurred_at as string
+        : ""
+    ) }))
+    .sort((a, b) =>
+      (Number.isFinite(b.occurredAt) ? b.occurredAt : -Infinity) -
+        (Number.isFinite(a.occurredAt) ? a.occurredAt : -Infinity) ||
+      b.index - a.index
+    )
+    .slice(0, 8)
+    .sort((a, b) =>
+      (Number.isFinite(a.occurredAt) ? a.occurredAt : Infinity) -
+        (Number.isFinite(b.occurredAt) ? b.occurredAt : Infinity) ||
+      a.index - b.index
+    )
+    .map(({ memory }) => memory);
+  const priorMemories = chronologicalMemories.map((memory) => {
     const item = memory && typeof memory === "object" && !Array.isArray(memory)
       ? memory as Record<string, unknown>
       : {};
