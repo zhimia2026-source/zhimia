@@ -129,3 +129,30 @@ Deno.test("resident identity guard leaves canonical residents and non-residents 
     throw new Error("non-resident identity was changed");
   }
 });
+
+
+Deno.test("private cognition context preserves string evidence and exposes continuity protocols", async () => {
+  const { buildPrivateAgentContext } = await import("./chat_context_helpers.ts");
+  const context = JSON.parse(buildPrivateAgentContext(
+    { display_name: "Hannah", role: "world_resident" },
+    [],
+    [{
+      experience_type: "reflection",
+      source_kind: "agent_reflection",
+      source_ref: "source-turn-123",
+      occurred_at: "2026-11-16T12:59:04Z",
+      observed_facts: ["她明确提出保留演化轨迹"],
+      hypotheses: ["这可能是稳定偏好"],
+      unknowns: ["[HYPOTHESIS_UNCERTAINTY]是否稳定仍待验证"],
+      reflection: "保留证据路径。",
+      importance: 4,
+    }],
+    null,
+  ));
+  const memory = context.approved_micro_experiences[0];
+  if (memory.observed_facts[0] !== "她明确提出保留演化轨迹") throw new Error("string facts were dropped");
+  if (memory.hypotheses[0] !== "这可能是稳定偏好") throw new Error("string hypotheses were dropped");
+  if (memory.source_ref !== "source-turn-123") throw new Error("source lineage was dropped");
+  if (context.evolution_continuity_protocol.preserve_order.length === 0) throw new Error("continuity protocol missing");
+  if (context.uncertainty_resolution_protocol.INTENT_AMBIGUITY.length === 0) throw new Error("uncertainty handling missing");
+});

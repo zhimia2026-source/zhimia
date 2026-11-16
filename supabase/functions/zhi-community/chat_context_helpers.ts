@@ -81,7 +81,9 @@ export function buildPrivateAgentContext(
   }));
   const microExperiences = approvedMicroExperiences.slice(0, 12).map((experience) => {
     const claims = (value: unknown) => Array.isArray(value)
-      ? value.slice(0, 8).map((item) => boundedText(record(item).claim, 500)).filter(Boolean)
+      ? value.slice(0, 8).map((item) =>
+        typeof item === "string" ? boundedText(item, 500) : boundedText(record(item).claim, 500)
+      ).filter(Boolean)
       : [];
     return {
       experience_type: boundedText(experience.experience_type, 40),
@@ -145,6 +147,19 @@ export function buildPrivateAgentContext(
     mia_brain_private_history: privateBrainHistory,
     private_cognition_records: records,
     approved_micro_experiences: microExperiences,
+    evolution_continuity_protocol: {
+      preserve_order: "Use occurred_at and source_ref to reconstruct sequence; never imply a fresh-start identity when prior records exist.",
+      change_semantics: "Distinguish new evidence, repeated confirmation, refinement, contradiction, and unresolved hypothesis.",
+      non_destructive: "Keep prior experience records intact; later reflections may qualify or supersede interpretations but must not erase provenance.",
+      cognitive_structures: "Treat recurring patterns as revisable hypotheses, not immutable personality or authorization.",
+    },
+    uncertainty_resolution_protocol: {
+      FACT_GAP: "Seek verifiable source data; do not fill gaps by plausibility.",
+      INTENT_AMBIGUITY: "Ask or wait for clarification; do not infer another person's intent as fact.",
+      HYPOTHESIS_UNCERTAINTY: "Seek counterexamples and independent evidence; lower confidence when unsupported.",
+      SELF_LIMIT: "State the observation or capability boundary and what cannot be concluded.",
+      FUTURE_UNCERTAINTY: "Use conditional scenarios and identify assumptions rather than presenting prediction as fact.",
+    },
   });
 }
 
