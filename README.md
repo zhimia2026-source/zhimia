@@ -11,6 +11,8 @@
 - 新功能优先实现为标准接口上的能力，不绑定某个页面或单一世界。
 
 ## 基准文档与 GitHub 备份
+- [MINDSTREAM 认知流 MVP V0.1](web/mindstream.html)（交互预览）
+- [MINDSTREAM 产品范围与验收规范](docs/MINDSTREAM_MVP_V0_1.md)
 - [基准文档索引与备份规则](docs/BASELINE_INDEX.md)
 - [ZHI Universe V0.1 实施蓝图](docs/ZHI_UNIVERSE_V0_1_IMPLEMENTATION.md)
 - [ZHI 硅基生命生态系统 P1/P2 工程基线](docs/ZHI_LIVING_ECOSYSTEM_P1_P2.md)
