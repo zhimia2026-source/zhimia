@@ -1,3 +1,4 @@
+export type CueAction = "explore" | "defer" | "dismiss" | "complete";
 export type CueStatus = "available" | "exploring" | "deferred" | "dismissed" | "completed" | "expired";
 export type CueUpdate = {
   status: CueStatus;
