@@ -1366,7 +1366,10 @@ export function createCommunityHandler(
       let ecosystemStateRevision: number | null = null;
       let spatialPositionStatus = "unavailable";
       let reachablePublicDestinationCount = 0;
-      let researchInvitationContext = "";\n      let researchReviewContext = "";\n      let researchReviewableArtifacts: Array<{ id: string; version: number }> = [];\n      let researchMyReworkContext = "";
+      let researchInvitationContext = "";
+      let researchReviewContext = "";
+      let researchReviewableArtifacts: Array<{ id: string; version: number }> = [];
+      let researchMyReworkContext = "";
       let researchWorkspaceId: string | null = null;
       let researchInvitedTaskIds: string[] = [];
       let researchInvitedTasks: Array<{ id: string; task_key: string }> = [];
