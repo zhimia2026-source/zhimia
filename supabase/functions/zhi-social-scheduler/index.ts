@@ -144,7 +144,7 @@ async function evaluateAgent(db: SupabaseClient, agentId: string, ownerUserId: s
 
     let eventQuery = db.from("zhi_ecosystem_events").select("id,event_kind,payload,occurred_at")
       .eq("world_id", worldId).in("event_kind", [...SOCIAL_EVENT_KINDS])
-      .order("occurred_at", { ascending: false }).limit(30);
+      .order("occurred_at", { ascending: false }).limit(40);
     if (eventIds?.length) eventQuery = eventQuery.in("id", eventIds);
     else eventQuery = eventQuery.gte("occurred_at", since);
     const [{ data: relationships, error: relError }, { data: events, error: eventError }, { data: presence, error: presenceError }] = await Promise.all([
