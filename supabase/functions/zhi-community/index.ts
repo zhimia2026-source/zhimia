@@ -1489,10 +1489,13 @@ export function createCommunityHandler(
               .select("id,task_key,title,brief,task_type,priority,status,assigned_agent_id,acceptance_criteria")
               .eq("workspace_id", researchWorkspace.id).eq("owner_user_id", actor.userId)
               .in("status", ["approved", "assigned", "claimed", "in_progress", "review", "changes_requested"])
-              .or("assigned_agent_id.eq." + agentId + ",assigned_agent_id.is.null")
-              .order("priority", { ascending: false }).order("created_at", { ascending: true }).limit(12);
+              .order("priority", { ascending: false }).order("created_at", { ascending: true }).limit(30);
             if (invitationTasksError) throw new Error("research_invitation_tasks_unavailable");
-            researchInvitedTaskIds = (invitationTasks ?? []).map((task: any) => String(task.id));
+            // All approved/in-flight workspace tasks are visible for transparent discovery.
+            // Only unassigned tasks or tasks already assigned to this resident are actionable.
+            researchInvitedTaskIds = (invitationTasks ?? [])
+              .filter((task: any) => !task.assigned_agent_id || task.assigned_agent_id === agentId)
+              .map((task: any) => String(task.id));
             researchInvitedTasks = (invitationTasks ?? []).map((task: any) => ({ id: String(task.id), task_key: String(task.task_key ?? "") }));
             researchInvitationContext = buildResearchInvitationContext({
               agentId,
