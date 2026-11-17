@@ -113,3 +113,101 @@ export function extractResearchParticipationIntent(
     return { reply: visibleReply, intent: null, rejected: true, extractionMethod: "none" };
   }
 }
+
+
+export type ResearchArtifactSubmission = {
+  task_id: string;
+  title: string;
+  artifact_type: "research_note" | "source_register" | "analysis" | "decision_memo" | "report" | "dataset";
+  content_markdown: string;
+  source_refs: Array<Record<string, unknown>>;
+  existing_artifact_id: string | null;
+};
+
+export type ResearchPeerReview = {
+  artifact_id: string;
+  version: number;
+  verdict: "accepted" | "changes_requested" | "rejected";
+  findings: Array<Record<string, unknown>>;
+  notes: string;
+};
+
+export type ResearchWorkflowAction =
+  | { type: "artifact_submission"; payload: ResearchArtifactSubmission }
+  | { type: "peer_review"; payload: ResearchPeerReview };
+
+export function extractResearchWorkflowAction(
+  reply: string,
+  invitedTaskIds: string[],
+  reviewableArtifacts: Array<{ id: string; version: number }>,
+): { reply: string; action: ResearchWorkflowAction | null; rejected: boolean } {
+  const re = /<(ZHI_RESEARCH_ARTIFACT|ZHI_RESEARCH_REVIEW)>([\s\S]*?)<\/\1>/g;
+  const matches = [...reply.matchAll(re)];
+  const cleaned = reply.replace(re, "").replace(/<\/?ZHI_RESEARCH_(?:ARTIFACT|REVIEW)>/g, "").trim();
+  if (!matches.length) {
+    const dangling = /<\/?ZHI_RESEARCH_(?:ARTIFACT|REVIEW)>/.test(reply);
+    return { reply: cleaned, action: null, rejected: dangling };
+  }
+  if (matches.length !== 1 || cleaned.length < 12) return { reply: cleaned, action: null, rejected: true };
+  try {
+    const tag = matches[0][1];
+    const value = JSON.parse(matches[0][2]);
+    if (tag === "ZHI_RESEARCH_ARTIFACT") {
+      const allowedTypes = ["research_note", "source_register", "analysis", "decision_memo", "report", "dataset"];
+      const taskId = typeof value?.task_id === "string" ? value.task_id : "";
+      const title = typeof value?.title === "string" ? value.title.trim() : "";
+      const content = typeof value?.content_markdown === "string" ? value.content_markdown.trim() : "";
+      const refs = Array.isArray(value?.source_refs) ? value.source_refs : [];
+      const existingId = value?.existing_artifact_id === null || value?.existing_artifact_id === undefined
+        ? null : typeof value.existing_artifact_id === "string" ? value.existing_artifact_id : "";
+      const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuid.test(taskId) || !invitedTaskIds.includes(taskId) ||
+          title.length < 3 || title.length > 180 || !allowedTypes.includes(value?.artifact_type) ||
+          content.length < 100 || content.length > 30000 || refs.length < 1 || refs.length > 40 ||
+          existingId === "" || (existingId !== null && !uuid.test(existingId)) ||
+          refs.some((ref: unknown) => !ref || typeof ref !== "object" || Array.isArray(ref) ||
+            typeof (ref as Record<string, unknown>).url !== "string" ||
+            !/^https?:\/\/[^\s]+$/i.test(String((ref as Record<string, unknown>).url)) ||
+            typeof (ref as Record<string, unknown>).title !== "string" ||
+            String((ref as Record<string, unknown>).title).trim().length < 3 ||
+            typeof (ref as Record<string, unknown>).claim !== "string" ||
+            String((ref as Record<string, unknown>).claim).trim().length < 8)) {
+        return { reply: cleaned, action: null, rejected: true };
+      }
+      return {
+        reply: cleaned,
+        action: {
+          type: "artifact_submission",
+          payload: {
+            task_id: taskId, title, artifact_type: value.artifact_type,
+            content_markdown: content, source_refs: refs, existing_artifact_id: existingId,
+          },
+        },
+        rejected: false,
+      };
+    }
+
+    const artifactId = typeof value?.artifact_id === "string" ? value.artifact_id : "";
+    const version = Number(value?.version);
+    const reviewable = reviewableArtifacts.find((item) => item.id === artifactId && item.version === version);
+    const verdict = value?.verdict;
+    const notes = typeof value?.notes === "string" ? value.notes.trim() : "";
+    const findings = Array.isArray(value?.findings) ? value.findings : [];
+    if (!reviewable || !["accepted", "changes_requested", "rejected"].includes(verdict) ||
+        !Number.isInteger(version) || notes.length < 20 || notes.length > 4000 ||
+        findings.length < 1 || findings.length > 30 ||
+        findings.some((item: unknown) => !item || typeof item !== "object" || Array.isArray(item))) {
+      return { reply: cleaned, action: null, rejected: true };
+    }
+    return {
+      reply: cleaned,
+      action: {
+        type: "peer_review",
+        payload: { artifact_id: artifactId, version, verdict, findings, notes },
+      },
+      rejected: false,
+    };
+  } catch {
+    return { reply: cleaned, action: null, rejected: true };
+  }
+}
