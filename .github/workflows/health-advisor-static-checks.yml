@@ -7,6 +7,7 @@ on:
       - "supabase/functions/zhi-community/**"
       - "supabase/functions/zhi-memory/**"
       - "supabase/functions/zhi-research-center/**"
+      - "supabase/functions/zhi-mindstream/**"
       - "supabase/migrations/**"
       - "supabase/functions/zhi-token-admin/**"
       - "scripts/check-zhi-universe-inline.mjs"
@@ -38,6 +39,7 @@ on:
       - "schemas/zhi-agent-runtime-binding-v1.schema.json"
       - "supabase/functions/zhi-memory/**"
       - "supabase/functions/zhi-research-center/**"
+      - "supabase/functions/zhi-mindstream/**"
       - "supabase/migrations/**"
       - "scripts/health-advisor-e2e.mjs"
       - "scripts/health-advisor-token-gateway-e2e.mjs"
@@ -78,8 +80,12 @@ jobs:
         run: deno check supabase/functions/zhi-community/index.ts
       - name: Check ZHI Memory Edge Function
         run: deno check supabase/functions/zhi-memory/index.ts
+      - name: Check MINDSTREAM public content Edge Function
+        run: deno check supabase/functions/zhi-mindstream/index.ts
       - name: Check AURORA Research Center Edge Function
         run: deno check supabase/functions/zhi-research-center/index.ts
+      - name: Test resident research invitation and artifact/review markers
+        run: deno test supabase/functions/zhi-community/research_invitation_helpers_test.ts
       - name: Test AURORA Research Center task state transitions
         run: deno test supabase/functions/zhi-research-center/transition_helpers_test.ts
       - name: Run ZHI Memory consent regression tests
@@ -120,4 +126,4 @@ jobs:
         run: node scripts/check-zhi-universe-inline.mjs
       - name: Reject server secrets in browser files
         run: |
-          ! grep -Eiq '(service_role|OPENAI_API_KEY|sk-[A-Za-z0-9]{20,})' web/zhi-health-advisor.html web/zhi-health-advisor-client.js web/zhi-universe.html web/zhi-universe-client.js web/zhi-resident.html web/zhi-resident.js web/zhi-memory.html web/zhi-memory.js web/aurora-research-center.html web/aurora-research-center.js
+          ! grep -Eiq '(service_role|OPENAI_API_KEY|sk-[A-Za-z0-9]{20,})' web/zhi-health-advisor.html web/zhi-health-advisor-client.js web/zhi-universe.html web/zhi-universe-client.js web/zhi-resident.html web/zhi-resident.js web/zhi-memory.html web/zhi-memory.js web/aurora-research-center.html web/aurora-research-center.js web/mindstream.html

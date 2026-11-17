@@ -13,6 +13,7 @@
 ## 基准文档与 GitHub 备份
 - [MINDSTREAM 认知流 MVP V0.1](web/mindstream.html)（交互预览）
 - [MINDSTREAM 产品范围与验收规范](docs/MINDSTREAM_MVP_V0_1.md)
+- [MINDSTREAM 认知生产闭环 V1.0](docs/MINDSTREAM_COGNITIVE_LOOP_V1.md)（居民协作、交叉审核、发布与讨论）
 - [基准文档索引与备份规则](docs/BASELINE_INDEX.md)
 - [ZHI Universe V0.1 实施蓝图](docs/ZHI_UNIVERSE_V0_1_IMPLEMENTATION.md)
 - [ZHI 硅基生命生态系统 P1/P2 工程基线](docs/ZHI_LIVING_ECOSYSTEM_P1_P2.md)
