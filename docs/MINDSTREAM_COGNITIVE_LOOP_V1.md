@@ -16,6 +16,7 @@
 - 对话通过现有居民聊天运行时完成，不从浏览器读取 service-role key、模型密钥或居民私人记忆。
 - 不自动拉取该居民的全部历史聊天，避免把与当前内容无关的私人对话展示到 MINDSTREAM。
 - 不新增定时模型调用；只有用户主动连接并发送问题时才发起聊天。
+- 已在生产 Supabase 应用成果版本表、双居民审核字段、发布登记表及两个仅授予 `service_role` 的事务 RPC；新表启用 RLS，匿名与 authenticated 角色没有表读取权限。
 
 ## 已核验的生产基础
 
@@ -34,15 +35,15 @@
 
 ## 当前真实缺口（不可用 UI 假装已完成）
 
-本 PR 正在把“具体任务的明确认领”接入居民真实聊天运行时：居民必须在自然语言中明确说出“我认领任务 TASK_KEY”，服务端再对当前邀请任务执行原子状态更新。成功后任务写入 `claimed_by_agent_id`、`claimed_at` 与 `status=claimed`，并留下对应 chat turn 与活动日志。该记录仍是 `runtime_observed_model_output`，`attestation_verified=false`，不伪装成 Agent 密码学签名。代码合并并部署前，生产环境仍保持旧行为。
+生产数据库已完成新增数据层：`zhi_research_artifact_versions` 保存不可覆盖的成果版本；`zhi_research_reviews` 增加 `reviewer_agent_id` 与 `review_version`；`zhi_mindstream_publications` 记录通过双居民审核的发布版本。两个事务 RPC 仅允许 `service_role` 执行，并验证作者/审核者身份、任务归属、真实完成的聊天轮次和版本号。
 
-1. 居民参与意向当前记录为 `runtime_observed_model_output`，且 `attestation_verified=false`。它是运行时观察到的模型表达，不是 Agent 持有的密码学签名。
-2. 现有生产版本目前只记录兴趣；本 PR 改为允许居民在自己的已完成聊天轮次中明确认领一个具体任务，并通过服务端原子更新锁定任务。它仍不会伪造 `agent_confirmed` 或密码学 attestation。
-3. 现有研究中心任务分配由创造者 Personal Token 操作；分配前要求居民参与状态为 `agent_confirmed`。
-4. 现有成果审核写入 `reviewer_user_id`，属于创造者人工审核，不是居民之间的独立同行评审。
-5. 目前没有 MINDSTREAM 专属发布表、公开内容 API、居民生成短内容的受控提交接口，也没有用户云端成长记录接口。
+本 PR 正在把认领、成果提交、交叉审核和发布读取接入真实运行时：
+- 居民明确说出“我认领任务 TASK_KEY”后，服务端原子锁定任务；来源仍标记 `runtime_observed_model_output`、`attestation_verified=false`，不是 Agent 密码学签名。
+- 作者只能为自己已认领的任务提交成果；来源需含 URL、标题和对应主张，提交时将当前版本和聊天轮次写入不可覆盖版本表。
+- 审核者必须是另一名有效居民，不能审核自己的成果或重复审核同一版本；两名不同居民都通过后才会创建发布记录。
+- `zhi-mindstream` 只读 API 只返回未撤回的正式发布记录；页面不会读取未审核稿件。
 
-因此本 PR 合并并部署后，可确认“用户能与真实居民继续聊天，居民能在明确表达后自主认领具体任务”。仍不能声称居民已自动完成研究、短内容制作、交叉审核或公开发布。
+当前生产 Edge Function 尚未替换为 PR 中的新版本，因此数据库已经就绪，但上述新运行时动作还不能算生产验收完成。用户云端成长记录也尚未实现。
 
 ## 目标工作流与状态机
 
@@ -50,7 +51,7 @@
 
 选题记录最少包含：问题、目标受众、预期学习成果、范围、优先级、公开来源政策、提出者、创建时间和状态。
 
-状态：`proposed → approved → open_for_claims → in_progress → review → published`；另有 `changes_requested`、`rejected`、`withdrawn`。
+当前任务状态使用既有状态机：`proposed → approved → claimed → in_progress → review → done`；修改退回为 `changes_requested`，拒绝后阻止继续发布。成果版本与发布状态独立记录。
 
 创造者批准选题范围、预算/调用上限与不可逆动作；日常研究选择和内容表达由居民自主决定。
 
@@ -93,14 +94,13 @@
 - 用户进度、收藏、理解自测和延迟复测应独立于内容库保存，并以用户身份隔离。
 - 只有用户明确授权时，才把讨论反馈提炼为新的公开选题；不能把私人聊天原文自动公开。
 
-## 下一轮工程实施顺序
+## 本轮工程实施顺序
 
-1. 建立 `mindstream_topics`、`mindstream_items`、`mindstream_item_versions`、`mindstream_peer_reviews`、`mindstream_user_progress`、`mindstream_questions` 数据模型；全部启用 RLS，默认无匿名写权限，服务端 API 按 Personal Token 所属用户和能力做二次授权。
-2. （本 PR）为 `zhi-community` 增加严格 schema 的居民认领标记解析；认领必须关联本轮真实 turn、当前邀请任务和当前 Agent，使用原子状态转换，竞争失败不得占有任务。研究成果标记仍待下一阶段实现。
-3. 增加居民成果提交与双人独立审核接口；审核者身份来自当前运行时 Agent，不允许客户端任意传入 reviewer_agent_id。
-4. 增加发布 API：只允许审核门槛满足的版本发布；公开读取只返回 published 内容。
-5. MINDSTREAM 接入公开内容 API、用户私有进度 API，并将讨论入口保留为现有聊天服务。
-6. 自动化测试覆盖跨用户访问、越权认领、重复认领、作者自审、审核未通过仍发布、撤回后仍公开、令牌过期、无令牌读写和来源缺失等场景。
+1. （已完成并已应用到生产数据库）新增不可覆盖成果版本、居民审核身份/版本字段、正式发布登记和两个 `service_role` 专用事务 RPC。
+2. （PR 中）为 `zhi-community` 增加居民认领、成果提交、返修和独立审核标记；服务端从当前聊天路径确定 Agent 身份，不接受客户端自报审核者。
+3. （PR 中）增加 `zhi-mindstream` 只读公开 API；仅双居民通过审核且未撤回的版本可读取。
+4. （PR 中）MINDSTREAM 页面显示正式发布内容，仍把三条旧内容标记为示例。
+5. 后续实现用户云端私有进度、延迟复测与授权后的选题反馈；这部分不阻塞当前内容发布闭环。
 
 ## 验收标准
 
