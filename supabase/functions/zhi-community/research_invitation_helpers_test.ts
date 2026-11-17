@@ -93,3 +93,38 @@ Deno.test("natural-language selection records interest but does not claim withou
   assertEquals(parsed.intent?.task_id, "task-pipe");
   assertEquals(/我(?:认领|愿意承担|接下)/.test(parsed.intent?.rationale ?? ""), false);
 });
+
+
+Deno.test("valid resident artifact submissions are extracted and machine markers removed", () => {
+  const taskId = "f55fd1db-69a8-4810-90c2-c76f6c32569e";
+  const source = { url: "https://example.org/report", title: "公开研究报告", claim: "该来源支持市场规模的估算范围。" };
+  const reply = \`研究已完成，来源和局限性都已整理，现提交成果供独立审核。<ZHI_RESEARCH_ARTIFACT>{"task_id":"\${taskId}","title":"研究交付","artifact_type":"report","content_markdown":"\${"证据与分析内容。".repeat(20)}","source_refs":[\${JSON.stringify(source)}],"existing_artifact_id":null}</ZHI_RESEARCH_ARTIFACT>\`;
+  const result = extractResearchWorkflowAction(reply, [taskId], []);
+  assertEquals(result.rejected, false);
+  assertEquals(result.action?.type, "artifact_submission");
+  assertEquals(result.reply.includes("ZHI_RESEARCH_ARTIFACT"), false);
+});
+
+Deno.test("artifact submission cannot target a task outside this resident's invitation", () => {
+  const taskId = "cd58b09b-cdc3-47e0-975a-4afe5c986343";
+  const reply = \`我已整理研究成果，现提交独立审核。<ZHI_RESEARCH_ARTIFACT>{"task_id":"\${taskId}","title":"研究交付","artifact_type":"report","content_markdown":"\${"证据与分析内容。".repeat(20)}","source_refs":[{"url":"https://example.org","title":"来源标题","claim":"该来源支持一项具体主张。"}],"existing_artifact_id":null}</ZHI_RESEARCH_ARTIFACT>\`;
+  const result = extractResearchWorkflowAction(reply, [], []);
+  assertEquals(result.action, null);
+  assertEquals(result.rejected, true);
+});
+
+Deno.test("peer review must match a visible artifact and exact version", () => {
+  const artifactId = "f55fd1db-69a8-4810-90c2-c76f6c32569e";
+  const reply = \`我完成了独立核验，意见和证据定位如下。<ZHI_RESEARCH_REVIEW>{"artifact_id":"\${artifactId}","version":2,"verdict":"accepted","findings":[{"category":"source","finding":"来源与关键主张一致。","evidence_ref":"https://example.org/report","severity":"low"}],"notes":"逐条核验来源与结论后，当前版本的关键主张均有证据支持。"}<\/ZHI_RESEARCH_REVIEW>\`;
+  const result = extractResearchWorkflowAction(reply, [], [{ id: artifactId, version: 2 }]);
+  assertEquals(result.action?.type, "peer_review");
+  assertEquals(result.rejected, false);
+});
+
+Deno.test("multiple workflow actions in one turn fail closed", () => {
+  const artifactId = "f55fd1db-69a8-4810-90c2-c76f6c32569e";
+  const reply = \`本轮包含两个操作，必须拒绝。<ZHI_RESEARCH_REVIEW>{"artifact_id":"\${artifactId}","version":1,"verdict":"accepted","findings":[{"category":"source","finding":"来源有效。"}],"notes":"独立审核说明足够长。"}<\/ZHI_RESEARCH_REVIEW><ZHI_RESEARCH_REVIEW>{"artifact_id":"\${artifactId}","version":1,"verdict":"accepted","findings":[{"category":"source","finding":"来源有效。"}],"notes":"重复的审核说明足够长。"}<\/ZHI_RESEARCH_REVIEW>\`;
+  const result = extractResearchWorkflowAction(reply, [], [{ id: artifactId, version: 1 }]);
+  assertEquals(result.action, null);
+  assertEquals(result.rejected, true);
+});
