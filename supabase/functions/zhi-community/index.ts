@@ -2182,7 +2182,16 @@ export function createCommunityHandler(
                   intent_id: intentRecord.id, provenance: "runtime_observed_model_output", attestation_verified: false },
               });
             } else {
-              claimStatus = "claim_conflict";
+              const { data: existingClaim, error: existingClaimError } = await db.from("zhi_research_tasks")
+                .select("id,status,assigned_agent_id,claimed_by_agent_id")
+                .eq("id", researchParticipationIntent.task_id).eq("workspace_id", researchWorkspaceId)
+                .eq("owner_user_id", actor.userId).maybeSingle();
+              if (!existingClaimError && existingClaim?.status === "claimed" &&
+                  existingClaim.assigned_agent_id === agentId && existingClaim.claimed_by_agent_id === agentId) {
+                claimStatus = "claimed";
+              } else {
+                claimStatus = "claim_conflict";
+              }
             }
           }
           console.info(JSON.stringify({ event: "research_resident_intent_recorded", agent_id: agentId,
