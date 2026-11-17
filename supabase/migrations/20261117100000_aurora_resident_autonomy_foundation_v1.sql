@@ -56,15 +56,21 @@ begin
      or p_brief is null or char_length(btrim(p_brief)) < 10 or char_length(p_brief) > 5000 then
     raise exception 'resident_research_proposal_invalid_text' using errcode = '22023';
   end if;
-  if p_task_type not in ('research','analysis','synthesis','fact_check','peer_review','decision_memo')
-     or p_priority not in ('low','normal','high') then
+  if p_task_type is null or p_task_type not in ('research','analysis','synthesis','fact_check','peer_review','decision_memo')
+     or p_priority is null or p_priority not in ('low','normal','high') then
     raise exception 'resident_research_proposal_invalid_classification' using errcode = '22023';
   end if;
-  if jsonb_typeof(p_acceptance_criteria) <> 'array'
+  if coalesce(jsonb_typeof(p_acceptance_criteria), 'null') <> 'array'
      or jsonb_array_length(p_acceptance_criteria) < 1
      or jsonb_array_length(p_acceptance_criteria) > 8
      or jsonb_typeof(coalesce(p_input_refs, '[]'::jsonb)) <> 'array'
-     or jsonb_array_length(coalesce(p_input_refs, '[]'::jsonb)) > 12 then
+     or jsonb_array_length(coalesce(p_input_refs, '[]'::jsonb)) > 12
+     or exists (
+       select 1 from jsonb_array_elements(p_acceptance_criteria) as criterion
+       where jsonb_typeof(criterion) <> 'string'
+         or char_length(btrim(criterion #>> '{}')) < 1
+         or char_length(criterion #>> '{}') > 300
+     ) then
     raise exception 'resident_research_proposal_invalid_arrays' using errcode = '22023';
   end if;
 
