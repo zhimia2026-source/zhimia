@@ -41,6 +41,8 @@ jobs:
         run: deno check supabase/functions/zhi-python-worker/index.ts
       - name: Type-check ZHI community chat integration
         run: deno check supabase/functions/zhi-community/index.ts
+      - name: Test resident research invitation and claim markers
+        run: deno test supabase/functions/zhi-community/research_invitation_helpers_test.ts
       - name: Run MIA-02 seven-brain diagnostics tests
         run: deno test supabase/functions/zhi-community/seven_brain_helpers_test.ts
       - name: Type-check ZHI research center Edge Function
