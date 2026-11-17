@@ -566,7 +566,28 @@ Deno.serve(async (req: Request) => {
   });
   if (socialEventError) {
     console.warn(JSON.stringify({ event: "social_event_lookup_failed", world_id: worldId }));
-  } else if (meaningfulSocialEvents.length > 0 && SUPABASE_URL && SERVICE_ROLE_KEY) {
+  } else if (meaningfulSocialEvents.length > 0) {
+    // Enqueue optional observation cues for active AURORA residents.
+    // This is a deterministic database operation: no model call, memory write,
+    // automatic task, or message. A resident must choose whether to explore.
+    const { data: queuedCueCount, error: cueQueueError } = await admin.rpc(
+      "zhi_observatory_enqueue_event_cues",
+      {
+        p_world_id: worldId,
+        p_event_ids: meaningfulSocialEvents.map((event) => event.id),
+      },
+    );
+    if (cueQueueError) {
+      console.warn(JSON.stringify({ event: "observatory_cue_enqueue_failed", world_id: worldId }));
+    } else if (Number(queuedCueCount ?? 0) > 0) {
+      console.info(JSON.stringify({
+        event: "observatory_cues_enqueued",
+        world_id: worldId,
+        count: Number(queuedCueCount),
+      }));
+    }
+  }
+  if (!socialEventError && meaningfulSocialEvents.length > 0 && SUPABASE_URL && SERVICE_ROLE_KEY) {
     try {
       const wakeResponse = await fetch(
         SUPABASE_URL.replace(/\/$/, "") + "/functions/v1/zhi-social-scheduler/internal-evaluate",
