@@ -48,7 +48,7 @@ jobs:
         run: deno test supabase/functions/zhi-community/research_invitation_helpers_test.ts
       - name: Run MIA-02 seven-brain diagnostics tests
         run: deno test supabase/functions/zhi-community/seven_brain_helpers_test.ts
-      - name: Type-check ZHI research center Edge Function
+      - name: Type-check MINDSTREAM public content Edge Function\n        run: deno check supabase/functions/zhi-mindstream/index.ts\n      - name: Type-check ZHI research center Edge Function
         run: deno check supabase/functions/zhi-research-center/index.ts
       - name: Test ZHI research center task and artifact gates
         run: deno test supabase/functions/zhi-research-center/transition_helpers_test.ts
