@@ -43,9 +43,9 @@ export function resolveCueTransition(action: string, status: string, nowMs: numb
 export type AvailableCue = { id: string; status: string };
 
 export function extractObservatoryCueAction(reply: string, cues: AvailableCue[]) {
-  const matches = [...reply.matchAll(/<ZHI_OBSERVATORY_CUE>([\\s\\S]*?)<\\/ZHI_OBSERVATORY_CUE>/gi)];
+  const matches = [...reply.matchAll(/<ZHI_OBSERVATORY_CUE>([\s\\S]*?)<\/ZHI_OBSERVATORY_CUE>/gi)];
   if (!matches.length) return { reply, action: null, rejected: false };
-  const cleaned = reply.replace(/<ZHI_OBSERVATORY_CUE>[\\s\\S]*?<\\/ZHI_OBSERVATORY_CUE>/gi, "").trim();
+  const cleaned = reply.replace(/<ZHI_OBSERVATORY_CUE>[\s\\S]*?<\/ZHI_OBSERVATORY_CUE>/gi, "").trim();
   if (matches.length !== 1) return { reply: cleaned, action: null, rejected: true };
   try {
     const parsed = JSON.parse(matches[0][1]);
