@@ -39,6 +39,7 @@ on:
       - "schemas/zhi-agent-runtime-binding-v1.schema.json"
       - "supabase/functions/zhi-memory/**"
       - "supabase/functions/zhi-research-center/**"
+      - "supabase/functions/zhi-mindstream/**"
       - "supabase/migrations/**"
       - "scripts/health-advisor-e2e.mjs"
       - "scripts/health-advisor-token-gateway-e2e.mjs"
