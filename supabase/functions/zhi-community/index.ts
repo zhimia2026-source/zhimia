@@ -2160,7 +2160,7 @@ export function createCommunityHandler(
           console.warn(JSON.stringify({ event: "research_resident_intent_persist_failed", agent_id: agentId, turn_id: completed.id, error_code: intentInsertError?.code ?? "missing_record" }));
         } else {
           let claimStatus = "not_requested";
-          if (researchParticipationIntent.decision === "interested" && researchParticipationIntent.task_id) {
+          if (researchParticipationIntent.decision === "interested" && researchParticipationIntent.task_id && /我(?:认领|愿意承担|接下)/.test(researchParticipationIntent.rationale)) {
             const claimedAt = new Date().toISOString();
             const { data: claimedTask, error: claimError } = await db.from("zhi_research_tasks")
               .update({ assigned_agent_id: agentId, claimed_by_agent_id: agentId, claimed_at: claimedAt,
