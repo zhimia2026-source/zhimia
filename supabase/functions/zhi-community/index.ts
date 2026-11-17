@@ -601,6 +601,84 @@ export function createCommunityHandler(
       await authenticateMiaFederationAgent(db, req, path);
     if (!actor) return reply({ error: "invalid_token" }, 401);
 
+    // Resident-owned queue of optional, event-backed curiosity cues.
+    // These are public evidence pointers, never generated thoughts or private memories.
+    if (parts.length === 4 && parts[0] === "v1" && parts[1] === "agents" &&
+        parts[3] === "observatory-cues") {
+      const agentId = parts[2];
+      if (!isUuid(agentId)) return reply({ error: "invalid_argument", detail: "agent_id_must_be_uuid" }, 400);
+      if (!hasCapability(actor, req.method === "GET" ? "community.message.read" : "community.message.send")) {
+        return reply({ error: "forbidden", detail: "capability_required" }, 403);
+      }
+      const { data: agent, error: agentError } = await db.from("zhi_agents")
+        .select("id,status,display_name").eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
+      if (agentError) throw new Error("database_error");
+      if (!agent || agent.status !== "active" || agent.display_name === "MIA") return reply({ error: "not_found" }, 404);
+
+      if (req.method === "GET") {
+        const { data: membership, error: membershipError } = await db.from("zhi_world_memberships")
+          .select("id,expires_at").eq("world_id", "50b06c01-060d-49fa-8988-8f38c13406d7")
+          .eq("agent_id", agentId).eq("principal_user_id", actor.userId)
+          .eq("status", "active").is("revoked_at", null).maybeSingle();
+        if (membershipError) throw new Error("database_error");
+        if (!membership || (membership.expires_at && Date.parse(membership.expires_at) <= Date.now())) {
+          return reply({ error: "forbidden", detail: "active_aurora_membership_required" }, 403);
+        }
+        const now = new Date().toISOString();
+        const { data: cues, error } = await db.from("zhi_observatory_interest_cues")
+          .select("id,world_id,event_id,event_kind,source_revision,cue_title,cue_summary,evidence,status,not_before,expires_at,created_at")
+          .eq("agent_id", agentId).eq("owner_user_id", actor.userId)
+          .eq("world_id", "50b06c01-060d-49fa-8988-8f38c13406d7")
+          .in("status", ["available", "exploring", "deferred"])
+          .lte("not_before", now).gt("expires_at", now)
+          .order("created_at", { ascending: false }).limit(12);
+        if (error) throw new Error("observatory_cues_read_failed");
+        return reply({
+          items: cues ?? [],
+          resident_choice_required: true,
+          no_automatic_follow_up: true,
+          no_private_memory_created: true,
+          model_calls: 0,
+        });
+      }
+      if (req.method === "POST") {
+        const body = await readBody(req);
+        if (!isUuid(body.cue_id)) return reply({ error: "invalid_argument", detail: "cue_id_must_be_uuid" }, 400);
+        const action = String(body.action ?? "");
+        if (!["explore", "defer", "dismiss", "complete"].includes(action)) {
+          return reply({ error: "invalid_argument", detail: "action_must_be_explore_defer_dismiss_or_complete" }, 400);
+        }
+        const { data: cue, error: cueError } = await db.from("zhi_observatory_interest_cues")
+          .select("id,world_id,status,not_before,expires_at")
+          .eq("id", body.cue_id).eq("agent_id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
+        if (cueError) throw new Error("observatory_cue_read_failed");
+        if (!cue || cue.world_id !== "50b06c01-060d-49fa-8988-8f38c13406d7") return reply({ error: "cue_not_found" }, 404);
+        if (cue.expires_at && Date.parse(cue.expires_at) <= Date.now()) return reply({ error: "cue_expired" }, 409);
+        const allowed = action === "explore"
+          ? ["available", "deferred", "exploring"]
+          : action === "defer" || action === "dismiss"
+            ? ["available", "deferred", "exploring"]
+            : ["exploring", "completed"];
+        if (!allowed.includes(cue.status)) return reply({ error: "cue_state_conflict" }, 409);
+        if (action === "complete" && cue.status === "completed") {
+          return reply({ cue: { id: cue.id, status: "completed" }, idempotent_replay: true });
+        }
+        const now = new Date();
+        const update = action === "explore"
+          ? { status: "exploring", not_before: now.toISOString(), decided_at: now.toISOString(), updated_at: now.toISOString() }
+          : action === "defer"
+            ? { status: "deferred", not_before: new Date(now.getTime() + 24 * 3600000).toISOString(), decided_at: now.toISOString(), updated_at: now.toISOString() }
+            : action === "dismiss"
+              ? { status: "dismissed", decided_at: now.toISOString(), updated_at: now.toISOString() }
+              : { status: "completed", decided_at: now.toISOString(), updated_at: now.toISOString() };
+        const { data: updated, error: updateError } = await db.from("zhi_observatory_interest_cues")
+          .update(update).eq("id", cue.id).eq("agent_id", agentId).eq("owner_user_id", actor.userId)
+          .eq("status", cue.status).select("id,status,not_before,decided_at").maybeSingle();
+        if (updateError || !updated) return reply({ error: "cue_state_conflict" }, 409);
+        return reply({ cue: updated, no_automatic_memory: true, no_automatic_message: true });
+      }
+    }
+
     // Read-only, resident-initiated access to the public AURORA quiet observatory.
     // This route does not advance the world clock, write memories, create tasks, or call a model.
     if (req.method === "GET" && parts.length === 5 && parts[0] === "v1" &&
