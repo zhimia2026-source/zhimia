@@ -1485,7 +1485,7 @@ export function createCommunityHandler(
             const { data: invitationTasks, error: invitationTasksError } = await db.from("zhi_research_tasks")
               .select("id,task_key,title,brief,task_type,priority,status,assigned_agent_id,acceptance_criteria")
               .eq("workspace_id", researchWorkspace.id).eq("owner_user_id", actor.userId)
-              .in("status", ["approved", "assigned"])
+              .in("status", ["approved", "assigned", "claimed", "in_progress", "review", "changes_requested"])
               .or("assigned_agent_id.eq." + agentId + ",assigned_agent_id.is.null")
               .order("priority", { ascending: false }).order("created_at", { ascending: true }).limit(12);
             if (invitationTasksError) throw new Error("research_invitation_tasks_unavailable");
@@ -2153,14 +2153,50 @@ export function createCommunityHandler(
             task_id: researchParticipationIntent.task_id, source_chat_turn_id: completed.id,
             decision: researchParticipationIntent.decision, rationale: researchParticipationIntent.rationale,
             provenance_kind: "runtime_observed_model_output", attestation_verified: false,
-            event_metadata: { marker_version: researchIntentExtraction.extractionMethod === "structured_marker" ? 2 : 0, extraction_method: researchIntentExtraction.extractionMethod, intent_scope: researchParticipationIntent.task_id ? "specific_task" : researchParticipationIntent.decision === "interested" ? "research_direction" : "workspace_unspecified", provider_model: providerModel, provenance_note: "Observed in the existing owner-authenticated chat runtime; not an Agent-held cryptographic signature. Natural-language fallback requires an explicit first-person task selection and exact invited task key; it records interest only, never a claim or formal consent." },
+            event_metadata: { marker_version: researchIntentExtraction.extractionMethod === "structured_marker" ? 2 : 0, extraction_method: researchIntentExtraction.extractionMethod, intent_scope: researchParticipationIntent.task_id ? "specific_task" : researchParticipationIntent.decision === "interested" ? "research_direction" : "workspace_unspecified", provider_model: providerModel, provenance_note: "Observed in this resident's completed owner-authenticated runtime turn. A specific-task claim is accepted only after explicit first-person claim language and an atomic task-state transition; it is not an Agent-held cryptographic signature or legal commitment." },
           })
           .select("id,decision,task_id,created_at").single();
         if (intentInsertError || !intentRecord) {
           console.warn(JSON.stringify({ event: "research_resident_intent_persist_failed", agent_id: agentId, turn_id: completed.id, error_code: intentInsertError?.code ?? "missing_record" }));
         } else {
-          console.info(JSON.stringify({ event: "research_resident_intent_recorded", agent_id: agentId, turn_id: completed.id, intent_id: intentRecord.id, decision: intentRecord.decision, attestation_verified: false }));
-          modelReply += "\n\n（研究参与意向）本轮表达已记为待核验意向；它不是正式参与授权、任务认领或成果交付。";
+          let claimStatus = "not_requested";
+          if (researchParticipationIntent.decision === "interested" && researchParticipationIntent.task_id) {
+            const claimedAt = new Date().toISOString();
+            const { data: claimedTask, error: claimError } = await db.from("zhi_research_tasks")
+              .update({ assigned_agent_id: agentId, claimed_by_agent_id: agentId, claimed_at: claimedAt,
+                status: "claimed", updated_at: claimedAt })
+              .eq("id", researchParticipationIntent.task_id).eq("workspace_id", researchWorkspaceId)
+              .eq("owner_user_id", actor.userId).in("status", ["approved", "assigned"])
+              .or("assigned_agent_id.is.null,assigned_agent_id.eq." + agentId)
+              .select("id,task_key,title,status,assigned_agent_id,claimed_by_agent_id,claimed_at").maybeSingle();
+            if (claimError) {
+              console.warn(JSON.stringify({ event: "research_resident_task_claim_failed", agent_id: agentId, turn_id: completed.id }));
+              claimStatus = "error";
+            } else if (claimedTask) {
+              claimStatus = "claimed";
+              await db.from("zhi_research_activity").insert({
+                workspace_id: researchWorkspaceId, owner_user_id: actor.userId, actor_type: "agent",
+                actor_agent_id: agentId, event_type: "task.claimed", entity_type: "task",
+                entity_id: claimedTask.id, summary: "居民自主认领研究任务",
+                metadata: { task_key: claimedTask.task_key, source_chat_turn_id: completed.id,
+                  intent_id: intentRecord.id, provenance: "runtime_observed_model_output", attestation_verified: false },
+              });
+            } else {
+              claimStatus = "claim_conflict";
+            }
+          }
+          console.info(JSON.stringify({ event: "research_resident_intent_recorded", agent_id: agentId,
+            turn_id: completed.id, intent_id: intentRecord.id, decision: intentRecord.decision,
+            claim_status: claimStatus, attestation_verified: false }));
+          if (claimStatus === "claimed") {
+            modelReply += "\n\n（研究任务认领）服务端已确认该任务仍开放，并将任务原子分配给我。认领已记录；这不代表研究成果已经完成。";
+          } else if (claimStatus === "claim_conflict") {
+            modelReply += "\n\n（研究任务认领）该任务已被其他居民认领或状态已变化，因此本次没有认领成功。";
+          } else if (claimStatus === "error") {
+            modelReply += "\n\n（研究任务认领）认领记录未能完成保存，因此当前不能视为认领成功。";
+          } else {
+            modelReply += "\n\n（研究参与意向）本轮表达已记录；尚未认领具体任务。";
+          }
           const { error: intentReplyUpdateError } = await db.from("zhi_agent_chat_turns")
             .update({ assistant_message: modelReply })
             .eq("id", completed.id).eq("owner_user_id", actor.userId).eq("agent_id", agentId).eq("status", "complete");
