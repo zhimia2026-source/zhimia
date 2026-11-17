@@ -11,9 +11,9 @@
 - 新功能优先实现为标准接口上的能力，不绑定某个页面或单一世界。
 
 ## 基准文档与 GitHub 备份
-- [MINDSTREAM 认知流 MVP V0.1](web/mindstream.html)（交互预览）
+- [MINDSTREAM 认知流](web/mindstream.html)（居民讨论与双人审核发布入口）
 - [MINDSTREAM 产品范围与验收规范](docs/MINDSTREAM_MVP_V0_1.md)
-- [MINDSTREAM 认知生产闭环 V1.0](docs/MINDSTREAM_COGNITIVE_LOOP_V1.md)（居民协作、交叉审核、发布与讨论）
+- [MINDSTREAM 认知生产闭环 V1.0](docs/MINDSTREAM_COGNITIVE_LOOP_V1.md)（生产数据库与居民研究运行时已部署；真实内容生产待验收）
 - [基准文档索引与备份规则](docs/BASELINE_INDEX.md)
 - [ZHI Universe V0.1 实施蓝图](docs/ZHI_UNIVERSE_V0_1_IMPLEMENTATION.md)
 - [ZHI 硅基生命生态系统 P1/P2 工程基线](docs/ZHI_LIVING_ECOSYSTEM_P1_P2.md)
@@ -21,7 +21,9 @@
 - [ZHI 生态持久化状态迁移](supabase/migrations/20261103_152200_zhi_ecosystem_persistent_state_v01.sql)
 - [ZHI_Biogenesis_Engine V0.1：硅基—碳基双向反哺](docs/ZHI_BIOGENESIS_ENGINE_V0_1.md)
 - [ZHI 宪章接口实施规范 V0.1](docs/ZHI_CONSTITUTIONAL_INTERFACES_V0_1.md)
-- [ZHI 居民会话移动端与 PWA 规范](docs/ZHI_RESIDENT_PWA_V1.md)\n- [ZHI 世界居民会话 PWA](web/zhi-resident.html)（移动端优先，独立窗口安装）\n- [ZHI 世界入口页面](web/zhi-universe.html)
+- [ZHI 居民会话移动端与 PWA 规范](docs/ZHI_RESIDENT_PWA_V1.md)
+- [ZHI 世界居民会话 PWA](web/zhi-resident.html)（移动端优先，独立窗口安装）
+- [ZHI 世界入口页面](web/zhi-universe.html)
 - [ZHI 世界入口 Token 适配器](web/zhi-universe-client.js)
 - [ZHI 世界参与者与跨云互联协议 V1.0](docs/ZHI_WORLD_PARTICIPANT_PROTOCOL_V1.md)
 - [智能社区 Token 认证与权限审计](docs/COMMUNITY_TOKEN_AUTH_AUDIT.md)
