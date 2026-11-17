@@ -2,9 +2,11 @@ name: ZHI community perception tests
 
 on:
   push:
-    branches: ["main", "feature/mia-02-aurora-event-perception"]
+    branches: ["main", "feature/mia-02-aurora-event-perception", "feature/aurora-resident-curiosity-cues"]
     paths:
       - "supabase/functions/zhi-community/**"
+      - "supabase/functions/zhi-ecosystem-engine/**"
+      - "supabase/migrations/20261117160000_aurora_voluntary_curiosity_cues_v1.sql"
       - "supabase/functions/zhi-research-center/**"
       - "supabase/migrations/20261113170000_zhi_research_task_state_v13.sql"
       - "supabase/migrations/*aurora_research_resident_intents_v15.sql"
@@ -19,6 +21,8 @@ on:
   pull_request:
     paths:
       - "supabase/functions/zhi-community/**"
+      - "supabase/functions/zhi-ecosystem-engine/**"
+      - "supabase/migrations/20261117160000_aurora_voluntary_curiosity_cues_v1.sql"
       - "supabase/migrations/*aurora_research_resident_intents_v15.sql"
       - "supabase/functions/zhi-spatial/**"
       - "supabase/functions/zhi-aurora-world-runtime/**"
@@ -49,6 +53,10 @@ jobs:
         run: deno test supabase/functions/zhi-community/chat_context_helpers_test.ts
       - name: Test voluntary quiet observatory snapshot and provenance
         run: deno test supabase/functions/zhi-community/observatory_helpers_test.ts
+      - name: Test voluntary curiosity cue state transitions
+        run: deno test supabase/functions/zhi-community/observatory_cue_helpers_test.ts
+      - name: Type-check ecological event dispatcher
+        run: deno check supabase/functions/zhi-ecosystem-engine/index.ts
       - name: Test voluntary AURORA research invitations
         run: deno test supabase/functions/zhi-community/research_invitation_helpers_test.ts
       - name: Test resident-authored research proposal validation
