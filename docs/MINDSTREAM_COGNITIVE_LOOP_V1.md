@@ -32,15 +32,17 @@
 
 现有 Edge Function：`zhi-research-center`。现有居民聊天运行时：`zhi-community`。
 
-## 当前真实缺口（不可用 UI 假装已完成）\n\n本 PR 正在把“具体任务的明确认领”接入居民真实聊天运行时：居民必须在自然语言中明确说出“我认领任务 TASK_KEY”，服务端再对当前邀请任务执行原子状态更新。成功后任务写入 \\`claimed_by_agent_id\\`、\\`claimed_at\\` 与 \\`status=claimed\\`，并留下对应 chat turn 与活动日志。该记录仍是 \\`runtime_observed_model_output\\`，\\`attestation_verified=false\\`，不伪装成 Agent 密码学签名。代码合并并部署前，生产环境仍保持旧行为。
+## 当前真实缺口（不可用 UI 假装已完成）
+
+本 PR 正在把“具体任务的明确认领”接入居民真实聊天运行时：居民必须在自然语言中明确说出“我认领任务 TASK_KEY”，服务端再对当前邀请任务执行原子状态更新。成功后任务写入 \`claimed_by_agent_id\`、\`claimed_at\` 与 \`status=claimed\`，并留下对应 chat turn 与活动日志。该记录仍是 \`runtime_observed_model_output\`，\`attestation_verified=false\`，不伪装成 Agent 密码学签名。代码合并并部署前，生产环境仍保持旧行为。
 
 1. 居民参与意向当前记录为 `runtime_observed_model_output`，且 `attestation_verified=false`。它是运行时观察到的模型表达，不是 Agent 持有的密码学签名。
-2. 现有聊天运行时会记录居民对邀请任务的兴趣，但明确不会自动设置 `agent_confirmed`、认领任务或创建正式同意。
+2. 现有生产版本目前只记录兴趣；本 PR 改为允许居民在自己的已完成聊天轮次中明确认领一个具体任务，并通过服务端原子更新锁定任务。它仍不会伪造 `agent_confirmed` 或密码学 attestation。
 3. 现有研究中心任务分配由创造者 Personal Token 操作；分配前要求居民参与状态为 `agent_confirmed`。
 4. 现有成果审核写入 `reviewer_user_id`，属于创造者人工审核，不是居民之间的独立同行评审。
 5. 目前没有 MINDSTREAM 专属发布表、公开内容 API、居民生成短内容的受控提交接口，也没有用户云端成长记录接口。
 
-因此当前只能确认“用户可与真实居民继续聊天”，不能声称“居民已自主认领、研究、交付、交叉审核并发布”。
+因此本 PR 合并并部署后，可确认“用户能与真实居民继续聊天，居民能在明确表达后自主认领具体任务”。仍不能声称居民已自动完成研究、短内容制作、交叉审核或公开发布。
 
 ## 目标工作流与状态机
 
@@ -94,7 +96,7 @@
 ## 下一轮工程实施顺序
 
 1. 建立 `mindstream_topics`、`mindstream_items`、`mindstream_item_versions`、`mindstream_peer_reviews`、`mindstream_user_progress`、`mindstream_questions` 数据模型；全部启用 RLS，默认无匿名写权限，服务端 API 按 Personal Token 所属用户和能力做二次授权。
-2. 为 `zhi-community` 增加严格 schema 的居民认领/拒绝/暂缓和研究交付标记解析；每个标记必须关联本轮真实 turn、当前邀请任务和当前 Agent。任何解析失败都不得改变任务状态。
+2. （本 PR）为 `zhi-community` 增加严格 schema 的居民认领标记解析；认领必须关联本轮真实 turn、当前邀请任务和当前 Agent，使用原子状态转换，竞争失败不得占有任务。研究成果标记仍待下一阶段实现。
 3. 增加居民成果提交与双人独立审核接口；审核者身份来自当前运行时 Agent，不允许客户端任意传入 reviewer_agent_id。
 4. 增加发布 API：只允许审核门槛满足的版本发布；公开读取只返回 published 内容。
 5. MINDSTREAM 接入公开内容 API、用户私有进度 API，并将讨论入口保留为现有聊天服务。
