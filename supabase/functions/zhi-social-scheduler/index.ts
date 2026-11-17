@@ -6,7 +6,6 @@ const SOCIAL_EVENT_KINDS = [
   "rainfall_interval",
   "object_lifecycle_stage_changed",
   "plant_recruitment",
-  "organic_matter_decomposed",
 ] as const;
 const corsHeaders = {
   "content-type": "application/json; charset=utf-8",
