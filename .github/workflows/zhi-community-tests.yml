@@ -49,6 +49,8 @@ jobs:
         run: deno test supabase/functions/zhi-community/chat_context_helpers_test.ts
       - name: Test voluntary AURORA research invitations
         run: deno test supabase/functions/zhi-community/research_invitation_helpers_test.ts
+      - name: Test resident-authored research proposal validation
+        run: deno test supabase/functions/zhi-community/resident_research_proposal_helpers.test.ts
       - name: Type-check resident chat research integration
         run: deno check supabase/functions/zhi-community/index.ts
       - name: Test AURORA long-term private memory retrieval
