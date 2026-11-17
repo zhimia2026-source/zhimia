@@ -105,7 +105,8 @@ export function extractResearchParticipationIntent(
         rationale.length < 12 || rationale.length > 800 ||
         !visibleReply.includes(rationale) ||
         taskId === undefined ||
-        (taskId !== null && !invitedTaskIds.includes(taskId))) {
+        (taskId !== null && !invitedTaskIds.includes(taskId)) ||
+        (decision === "interested" && taskId !== null && !/我(?:认领|愿意承担|接下)/.test(visibleReply))) {
       return { reply: visibleReply, intent: null, rejected: true, extractionMethod: "none" };
     }
     return { reply: visibleReply, intent: { decision, task_id: taskId, rationale }, rejected: false, extractionMethod: "structured_marker" };
