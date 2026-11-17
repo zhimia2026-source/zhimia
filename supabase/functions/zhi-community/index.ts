@@ -1501,7 +1501,7 @@ export function createCommunityHandler(
             const { data: reviewCandidates, error: reviewCandidatesError } = await db.from("zhi_research_artifacts")
               .select("id,title,artifact_type,task_id,content_markdown,source_refs,version,submitted_by_agent_id,status")
               .eq("workspace_id", researchWorkspace.id).eq("owner_user_id", actor.userId)
-              .eq("status", "submitted").order("created_at", { ascending: true }).limit(20);
+              .eq("status", "submitted").not("submitted_by_agent_id", "is", null).order("created_at", { ascending: true }).limit(20);
             if (reviewCandidatesError) throw new Error("research_peer_review_context_unavailable");
             const candidateIds = (reviewCandidates ?? [])
               .filter((item: any) => item.submitted_by_agent_id !== agentId)
@@ -1518,13 +1518,13 @@ export function createCommunityHandler(
             const reviewable = (reviewCandidates ?? []).filter((item: any) =>
               item.submitted_by_agent_id !== agentId &&
               !reviewedByThisAgent.has(String(item.id) + ":" + String(item.version)));
-            researchReviewableArtifacts = reviewable.slice(0, 5).map((item: any) => ({
+            researchReviewableArtifacts = reviewable.slice(0, 3).map((item: any) => ({
               id: String(item.id), version: Number(item.version),
             }));
-            researchReviewContext = JSON.stringify(reviewable.slice(0, 5).map((item: any) => ({
+            researchReviewContext = JSON.stringify(reviewable.slice(0, 3).map((item: any) => ({
               artifact_id: item.id, version: item.version, title: item.title,
               artifact_type: item.artifact_type, author_agent_id: item.submitted_by_agent_id,
-              content_markdown: String(item.content_markdown ?? "").slice(0, 10000),
+              content_markdown: String(item.content_markdown ?? "").slice(0, 6000),
               source_refs: Array.isArray(item.source_refs) ? item.source_refs.slice(0, 20) : [],
             })));
 
@@ -1534,7 +1534,7 @@ export function createCommunityHandler(
               .eq("submitted_by_agent_id", agentId).eq("status", "changes_requested")
               .order("updated_at", { ascending: false }).limit(5);
             if (reworkError) throw new Error("research_rework_context_unavailable");
-            researchMyReworkContext = JSON.stringify((reworkItems ?? []).map((item: any) => ({
+            researchMyReworkContext = JSON.stringify(((reworkItems ?? []).slice(0, 2).map((item: any) => ({
               existing_artifact_id: item.id, task_id: item.task_id, version: item.version,
               title: item.title, artifact_type: item.artifact_type,
               content_markdown: String(item.content_markdown ?? "").slice(0, 10000),
