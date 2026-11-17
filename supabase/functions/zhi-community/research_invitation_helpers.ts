@@ -79,7 +79,7 @@ export function extractResearchParticipationIntent(
     for (const task of invitedTasks) {
       if (!invitedTaskIds.includes(task.id) || !task.task_key) continue;
       const line = reply.split(/\r?\n/).find((candidate) =>
-        candidate.includes(task.task_key) && /我(?:选|选择|决定从)/.test(candidate) && /(?:作为起点|开始|切入)/.test(candidate)
+        candidate.includes(task.task_key) && /我(?:认领|愿意承担|接下)/.test(candidate) && /(?:作为起点|开始|切入)/.test(candidate)
       )?.trim();
       if (line && /我(?:认领|愿意承担|接下)/.test(line) && line.length >= 12 && line.length <= 800) {
         return {
