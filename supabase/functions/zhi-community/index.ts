@@ -1534,10 +1534,10 @@ export function createCommunityHandler(
               .eq("submitted_by_agent_id", agentId).eq("status", "changes_requested")
               .order("updated_at", { ascending: false }).limit(5);
             if (reworkError) throw new Error("research_rework_context_unavailable");
-            researchMyReworkContext = JSON.stringify(((reworkItems ?? []).slice(0, 2).map((item: any) => ({
+            researchMyReworkContext = JSON.stringify((reworkItems ?? []).slice(0, 2).map((item: any) => ({
               existing_artifact_id: item.id, task_id: item.task_id, version: item.version,
               title: item.title, artifact_type: item.artifact_type,
-              content_markdown: String(item.content_markdown ?? "").slice(0, 10000),
+              content_markdown: String(item.content_markdown ?? "").slice(0, 6000),
               source_refs: Array.isArray(item.source_refs) ? item.source_refs.slice(0, 20) : [],
               status: item.status,
             })));
