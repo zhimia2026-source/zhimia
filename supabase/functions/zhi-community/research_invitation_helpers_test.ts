@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { buildResearchInvitationContext, buildResearchInvitationGuidance, extractResearchParticipationIntent } from "./research_invitation_helpers.ts";
+import { buildResearchInvitationContext, buildResearchInvitationGuidance, extractResearchParticipationIntent, extractResearchWorkflowAction } from "./research_invitation_helpers.ts";
 
 Deno.test("only requested residents receive voluntary invitation context", () => {
   const tasks = [{ id: "task-1", task_key: "PIPE-03", title: "Engineering limits", task_type: "analysis", priority: "high", status: "approved", assigned_agent_id: "agent-1", acceptance_criteria: ["evidence"] }];
