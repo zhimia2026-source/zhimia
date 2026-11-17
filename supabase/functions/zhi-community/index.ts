@@ -1829,7 +1829,7 @@ export function createCommunityHandler(
         const researchWorkflowExtraction = extractResearchWorkflowAction(modelReply, researchInvitedTaskIds, researchReviewableArtifacts);
         modelReply = researchWorkflowExtraction.reply;
         const researchWorkflowAction = researchWorkflowExtraction.action;
-        const researchProposalMarker = modelReply.match(/<ZHI_RESEARCH_PROPOSAL>([\\s\\S]*?)<\\/ZHI_RESEARCH_PROPOSAL>/i);
+        const researchProposalMarker = modelReply.match(/<ZHI_RESEARCH_PROPOSAL>([\s\S]*?)<\/ZHI_RESEARCH_PROPOSAL>/i);
         if (researchProposalMarker) modelReply = modelReply.replace(researchProposalMarker[0], "").trim();
         const researchProposalPayload = researchProposalMarker
           ? normalizeResidentResearchProposal(researchProposalMarker[1], researchProposalProjects)
