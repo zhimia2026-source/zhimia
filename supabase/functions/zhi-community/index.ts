@@ -105,45 +105,12 @@ async function loadSceneRuntimeEnvironment(
     .eq("world_id", worldId).maybeSingle();
   if (readError) throw new Error("scene_ecosystem_state_unavailable");
 
+  // The ecosystem cron is the sole world-clock writer. Chat reads the latest
+  // committed snapshot and must never invoke the engine as a side effect:
+  // that service endpoint requires a verified service-role JWT, while modern
+  // Supabase secret API keys are not JWTs. Keeping tick advancement out of the
+  // chat request also prevents a clock catch-up failure from becoming HTTP 500.
   let current = initial;
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  if (current && supabaseUrl && serviceKey) {
-    const worldMs = Date.parse(current.world_time);
-    const nowMs = Date.now();
-    // Avoid a write on every scene read. A scene tick is due only when the
-    // persisted world clock is at least one hour behind real UTC.
-    if (Number.isFinite(worldMs) && nowMs - worldMs >= 60 * 60 * 1000) {
-      const targetTime = new Date(nowMs).toISOString();
-      const endpoint = supabaseUrl.replace(/\/$/, "") + "/functions/v1/zhi-ecosystem-engine";
-      for (let attempt = 0; attempt < 32; attempt++) {
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "apikey": serviceKey,
-            "Authorization": "Bearer " + serviceKey,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            world_id: worldId,
-            target_time: targetTime,
-            max_hours: 168,
-          }),
-        });
-        const result = await response.json().catch(() => null);
-        if (!response.ok || !result || result.ok !== true) {
-          throw new Error("scene_ecosystem_tick_failed");
-        }
-        if (result.advanced === false || Number(result.remaining_seconds ?? 0) <= 0) break;
-        if (attempt === 31) throw new Error("scene_ecosystem_catchup_limit_reached");
-      }
-      const { data: refreshed, error: refreshError } = await db.from("zhi_ecosystem_states")
-        .select("revision,world_time,last_advanced_at,state")
-        .eq("world_id", worldId).maybeSingle();
-      if (refreshError || !refreshed) throw new Error("scene_ecosystem_state_refresh_failed");
-      current = refreshed;
-    }
-  }
 
   const asRecord = (value: unknown): Record<string, any> =>
     value && typeof value === "object" && !Array.isArray(value)
