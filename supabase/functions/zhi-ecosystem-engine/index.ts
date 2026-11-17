@@ -554,15 +554,20 @@ Deno.serve(async (req: Request) => {
   ];
   const { data: socialEvents, error: socialEventError } = await admin
     .from("zhi_ecosystem_events")
-    .select("id,event_kind")
+    .select("id,event_kind,payload")
     .eq("world_id", worldId)
     .gt("occurred_at", new Date(fromMs).toISOString())
     .lte("occurred_at", toIso)
     .in("event_kind", socialEventKinds)
     .limit(40);
+  const meaningfulSocialEvents = (socialEvents ?? []).filter((event) => {
+    if (event.event_kind !== "rainfall_interval") return true;
+    const rainfallMm = Number((event.payload as Record<string, unknown> | null)?.rainfall_mm ?? 0);
+    return Number.isFinite(rainfallMm) && rainfallMm >= 0.25;
+  });
   if (socialEventError) {
     console.warn(JSON.stringify({ event: "social_event_lookup_failed", world_id: worldId }));
-  } else if ((socialEvents ?? []).length > 0 && SUPABASE_URL && SERVICE_ROLE_KEY) {
+  } else if (meaningfulSocialEvents.length > 0 && SUPABASE_URL && SERVICE_ROLE_KEY) {
     try {
       const wakeResponse = await fetch(
         SUPABASE_URL.replace(/\/$/, "") + "/functions/v1/zhi-social-scheduler/internal-evaluate",
@@ -575,7 +580,7 @@ Deno.serve(async (req: Request) => {
           },
           body: JSON.stringify({
             world_id: worldId,
-            event_ids: socialEvents.map((event) => event.id),
+            event_ids: meaningfulSocialEvents.map((event) => event.id),
           }),
           signal: AbortSignal.timeout(8000),
         },
