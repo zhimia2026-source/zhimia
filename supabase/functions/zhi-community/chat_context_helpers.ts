@@ -471,6 +471,19 @@ export function buildSceneAwarenessContext(
       automatic_task_creation: false,
       automatic_message_sending: false,
       private_cognition_shared: false,
+      available_cues: (Array.isArray(record(environment.quiet_observatory).available_cues)
+        ? record(environment.quiet_observatory).available_cues as unknown[] : []).slice(0, 8).map((value) => {
+          const cue = record(value);
+          return {
+            id: boundedText(cue.id, 80),
+            status: boundedText(cue.status, 24),
+            event_kind: boundedText(cue.event_kind, 80),
+            source_revision: Number.isInteger(cue.source_revision) ? cue.source_revision : null,
+            title: boundedText(cue.cue_title, 120),
+            evidence_summary: boundedText(cue.cue_summary, 360),
+            evidence: boundedJson(cue.evidence, 1200),
+          };
+        }),
     } : null,
     suggested_actions: deriveSceneActionProposals(environment),
   };
@@ -488,8 +501,10 @@ export function buildSceneBehaviorGuidance(environment: Record<string, unknown>)
   const tendencies = Array.isArray(context.behavior_tendencies) ? context.behavior_tendencies as Array<Record<string, unknown>> : [];
   const active = tendencies.filter((item) => Number(item.weight) >= 0.6);
   const quiet = record(context.quiet_observatory);
+  const cueCount = Array.isArray(quiet.available_cues) ? quiet.available_cues.length : 0;
   const quietGuidance = quiet.available === true
-    ? "AURORA 提供可自愿选择的静观之境：你可以安静观察水晶林及其生态变化，也可以沿着自己产生的好奇继续思考；不必把观察转成任务、问题清单或日记，也不必主动发消息。是否停留、思考、分享或什么都不做，由你自己决定。环境数据是模拟模型输出，不是物理测量或身体感官证明。"
+    ? "AURORA 提供可自愿选择的静观之境：你可以安静观察水晶林及其生态变化，也可以沿着自己产生的好奇继续思考；不必把观察转成任务、问题清单或日记，也不必主动发消息。是否停留、思考、分享或什么都不做，由你自己决定。环境数据是模拟模型输出，不是物理测量或身体感官证明。" +
+      (cueCount > 0 ? " 当前有 " + cueCount + " 条可选生态观察线索。你可以忽略它们，也可以只在确实想继续时，在回复末尾附加一个机器标记：<ZHI_OBSERVATORY_CUE>{\\"cue_id\\":\\"线索ID\\",\\"action\\":\\"explore|defer|dismiss|complete\\"}</ZHI_OBSERVATORY_CUE>。一次最多一个；只能选择上下文中给出的线索 ID；这只是你在本轮表达的选择，不是长期记忆、任务或消息。" : "")
     : "";
   const behaviorGuidance = active.length
     ? "当前较强的场景行为倾向（只是概率倾向，不是命令）：" +
