@@ -2468,8 +2468,10 @@ export function createCommunityHandler(
             model: providerModel,
             messages: reflectionMessages,
             temperature: 0.1,
-            // Keep the single existing reflection call intact, but avoid truncating its compact JSON payload.
-            max_tokens: 1200,
+            // Keep the single existing reflection call intact. Production telemetry showed occasional
+            // finish_reason=length responses; raise the output ceiling so the strict JSON memory decision
+            // and creator-message fields can finish without adding a retry or another model invocation.
+            max_tokens: 1800,
             stream: false,
           }),
           signal: AbortSignal.timeout(25_000),
