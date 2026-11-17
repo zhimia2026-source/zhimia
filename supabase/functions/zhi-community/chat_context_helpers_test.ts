@@ -155,7 +155,8 @@ Deno.test("private cognition context preserves string evidence and exposes conti
   if (memory.source_ref !== "source-turn-123") throw new Error("source lineage was dropped");
   if (context.evolution_continuity_protocol.preserve_order.length === 0) throw new Error("continuity protocol missing");
   if (context.uncertainty_resolution_protocol.INTENT_AMBIGUITY.length === 0) throw new Error("uncertainty handling missing");
-});\n
+});
+
 Deno.test("quiet observatory reaches resident chat context as an optional, non-task space", () => {
   const environment = {
     quiet_observatory: {
