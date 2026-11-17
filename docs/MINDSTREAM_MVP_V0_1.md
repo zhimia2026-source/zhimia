@@ -44,7 +44,7 @@
 - 页面明确说明尚未接入 AI 与云端服务。
 - 静态资源不得包含任何服务端密钥。
 
-## 下一阶段
+## 下一阶段\n\n- 当前页面已接入现有 AURORA 居民聊天入口；三条内容仍是明确标注的示例，不代表居民真实交付。\n- 认知生产闭环设计与生产缺口见 [MINDSTREAM_COGNITIVE_LOOP_V1.md](MINDSTREAM_COGNITIVE_LOOP_V1.md)。\n\n
 
 1. 确认真实 Supabase schema、RLS、现有 Token 网关和 Agent 内容生产 API。
 2. 设计 `mindstream_items`、`mindstream_sources`、`mindstream_reviews`、`mindstream_user_progress`、`mindstream_questions` 数据结构。
