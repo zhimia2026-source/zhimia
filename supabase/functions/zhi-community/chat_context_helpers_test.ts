@@ -1,4 +1,4 @@
-import { buildSceneAwarenessContext, normalizeResidentIdentityReply } from "./chat_context_helpers.ts";
+import { buildSceneAwarenessContext, buildSceneBehaviorGuidance, normalizeResidentIdentityReply } from "./chat_context_helpers.ts";
 
 Deno.test("scene awareness includes ecological event time, payload and causal chain", () => {
   const context = JSON.parse(buildSceneAwarenessContext(
@@ -155,4 +155,24 @@ Deno.test("private cognition context preserves string evidence and exposes conti
   if (memory.source_ref !== "source-turn-123") throw new Error("source lineage was dropped");
   if (context.evolution_continuity_protocol.preserve_order.length === 0) throw new Error("continuity protocol missing");
   if (context.uncertainty_resolution_protocol.INTENT_AMBIGUITY.length === 0) throw new Error("uncertainty handling missing");
+});\n
+Deno.test("quiet observatory reaches resident chat context as an optional, non-task space", () => {
+  const environment = {
+    quiet_observatory: {
+      name: "静观之境",
+      available: true,
+      spatial_anchor: "crystal_forest",
+      questions_required: false,
+      diary_required: false,
+      automatic_task_creation: false,
+      automatic_message_sending: false,
+      private_cognition_shared: false,
+    },
+  };
+  const context = JSON.parse(buildSceneAwarenessContext({}, environment));
+  if (context.quiet_observatory?.available !== true) throw new Error("quiet observatory missing from scene context");
+  if (context.quiet_observatory.automatic_task_creation !== false) throw new Error("task-free rule missing");
+  const guidance = buildSceneBehaviorGuidance(environment);
+  if (!guidance.includes("由你自己决定")) throw new Error("resident choice guidance missing");
+  if (!guidance.includes("不必把观察转成任务")) throw new Error("non-task observation guidance missing");
 });
