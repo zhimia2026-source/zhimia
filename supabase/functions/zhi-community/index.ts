@@ -14,7 +14,7 @@ import { buildCognitiveWorkspaceSnapshot, buildSuperBrainDiagnostics, buildSuper
 import { buildCognitiveReflectionContext } from "./memory_experience_helpers.ts";
 import { classifyModeledMovementOutcome } from "./movement_helpers.ts";
 import { buildQuietObservatorySnapshot } from "./observatory_helpers.ts";
-import { resolveCueTransition } from "./observatory_cue_helpers.ts";
+import { extractObservatoryCueAction, resolveCueTransition } from "./observatory_cue_helpers.ts";
 import { buildResearchInvitationContext, buildResearchInvitationGuidance, extractResearchParticipationIntent, extractResearchWorkflowAction } from "./research_invitation_helpers.ts";
 import { normalizeResidentResearchProposal } from "./resident_research_proposal_helpers.ts";
 
@@ -661,7 +661,7 @@ export function createCommunityHandler(
           return reply({ cue: { id: cue.id, status: cue.status }, idempotent_replay: true });
         }
         const { data: updated, error: updateError } = await db.from("zhi_observatory_interest_cues")
-          .update(transition.update).eq("id", cue.id).eq("agent_id", agentId).eq("owner_user_id", actor.userId)
+          .update({ ...transition.update, decision_source: "resident_api_action", decision_turn_id: null }).eq("id", cue.id).eq("agent_id", agentId).eq("owner_user_id", actor.userId)
           .eq("status", cue.status).select("id,status,not_before,decided_at").maybeSingle();
         if (updateError || !updated) return reply({ error: "cue_state_conflict" }, 409);
         return reply({ cue: updated, no_automatic_memory: true, no_automatic_message: true });
@@ -1509,6 +1509,7 @@ export function createCommunityHandler(
       let spatialPerceptionContext = "";
       let sceneBehaviorGuidance = "当前 Agent 没有已授权的 AURORA 居民感知上下文。";
       let auroraWorldId: string | null = null;
+      let observatoryAvailableCues: Array<{ id: string; status: string }> = [];
       let auroraReachableDestinations: Array<Record<string, any>> = [];
       let auroraPublicResidenceNodes: Array<Record<string, any>> = [];
       let auroraPresence: Record<string, any> | null = null;
@@ -1548,6 +1549,23 @@ export function createCommunityHandler(
           if (auroraWorld?.status === "open") {
             auroraWorldId = auroraWorld.id;
             const sceneRuntime = await loadSceneRuntimeEnvironment(db, auroraWorld.id, auroraWorld.environment_state);
+            const { data: cueRows, error: cueReadError } = await db.from("zhi_observatory_interest_cues")
+              .select("id,status,event_kind,source_revision,cue_title,cue_summary,evidence")
+              .eq("agent_id", agentId).eq("owner_user_id", actor.userId).eq("world_id", auroraWorld.id)
+              .in("status", ["available", "exploring", "deferred"])
+              .lte("not_before", new Date().toISOString()).gt("expires_at", new Date().toISOString())
+              .order("created_at", { ascending: false }).limit(8);
+            if (cueReadError) throw new Error("observatory_cues_unavailable");
+            observatoryAvailableCues = (cueRows ?? []).map((cue: any) => ({ id: cue.id, status: cue.status }));
+            const sceneEnvironment = structuredClone(sceneRuntime.environment) as Record<string, unknown>;
+            const quietObservatory = sceneEnvironment.quiet_observatory &&
+                typeof sceneEnvironment.quiet_observatory === "object" && !Array.isArray(sceneEnvironment.quiet_observatory)
+              ? sceneEnvironment.quiet_observatory as Record<string, unknown>
+              : {};
+            sceneEnvironment.quiet_observatory = {
+              ...quietObservatory,
+              available_cues: cueRows ?? [],
+            };
             const asRuntimeRecord = (value: unknown): Record<string, unknown> =>
               value !== null && typeof value === "object" && !Array.isArray(value)
                 ? value as Record<string, unknown>
@@ -1562,17 +1580,17 @@ export function createCommunityHandler(
               : null;
             const sceneAwareness = buildSceneAwarenessContext({
               name: auroraWorld.name, description: auroraWorld.description, visibility: auroraWorld.visibility,
-            }, sceneRuntime.environment);
+            }, sceneEnvironment);
             sceneAwarenessContext = JSON.stringify({
               scene_awareness_context: sceneAwareness,
-              behavior_guidance: buildSceneBehaviorGuidance(sceneRuntime.environment),
+              behavior_guidance: buildSceneBehaviorGuidance(sceneEnvironment),
               simulation: sceneRuntime.simulation,
               epistemic_contract: {
                 modeled_environment_is_not_physical_observation: true,
                 private_agent_memory_included: false,
               },
             });
-            sceneBehaviorGuidance = buildSceneBehaviorGuidance(sceneRuntime.environment);
+            sceneBehaviorGuidance = buildSceneBehaviorGuidance(sceneEnvironment);
             const [{ data: presence, error: presenceError }, { data: routeNodes, error: routeNodesError },
               { data: routeEdges, error: routeEdgesError }] = await Promise.all([
               db.from("zhi_spatial_presence")
@@ -1971,7 +1989,35 @@ export function createCommunityHandler(
          }));
        }
 
-       // Remove machine markers from the human-facing reply; validate each marker before recording.
+       // A cue choice is recorded only when the resident model explicitly emits a marker
+        // for a cue actually surfaced in this turn. This is runtime-output provenance,
+        // not a cryptographic Agent-held signature or a long-term memory write.
+        const observatoryCueExtraction = extractObservatoryCueAction(modelReply, observatoryAvailableCues);
+        modelReply = observatoryCueExtraction.reply;
+        if (observatoryCueExtraction.rejected) {
+          console.warn(JSON.stringify({ event: "observatory_cue_action_rejected", agent_id: agentId, turn_id: pendingTurn.id }));
+        } else if (observatoryCueExtraction.action && auroraWorldId) {
+          const cueAction = observatoryCueExtraction.action;
+          const transition = resolveCueTransition(cueAction.action, cueAction.status, Date.now());
+          if (transition?.idempotent) {
+            // Repeated declarations of an already-active choice are harmless.
+          } else if (transition) {
+            const { data: updatedCue, error: cueUpdateError } = await db.from("zhi_observatory_interest_cues")
+              .update({
+                ...transition.update,
+                decision_source: "resident_chat_output",
+                decision_turn_id: pendingTurn.id,
+              })
+              .eq("id", cueAction.cue_id).eq("agent_id", agentId).eq("owner_user_id", actor.userId)
+              .eq("world_id", auroraWorldId).eq("status", cueAction.status)
+              .select("id,status").maybeSingle();
+            if (cueUpdateError || !updatedCue) {
+              console.warn(JSON.stringify({ event: "observatory_cue_action_commit_conflict", agent_id: agentId, turn_id: pendingTurn.id }));
+            }
+          }
+        }
+
+        // Remove machine markers from the human-facing reply; validate each marker before recording.
         // A structured resident reply is recorded only as runtime-observed intent.
         // The current creator-authenticated chat path is NOT an Agent-held signature.
         const researchIntentExtraction = extractResearchParticipationIntent(modelReply, researchInvitedTaskIds, researchInvitedTasks);

@@ -1,3 +1,4 @@
+export type CueAction = "explore" | "defer" | "dismiss" | "complete";
 export type CueStatus = "available" | "exploring" | "deferred" | "dismissed" | "completed" | "expired";
 export type CueUpdate = {
   status: CueStatus;
@@ -38,4 +39,28 @@ export function resolveCueTransition(action: string, status: string, nowMs: numb
     return { update: { status: "completed", decided_at: now, updated_at: now }, idempotent: false };
   }
   return null;
+}
+
+export type AvailableCue = { id: string; status: string };
+
+export function extractObservatoryCueAction(reply: string, cues: AvailableCue[], nowMs = Date.now()) {
+  const matches = [...reply.matchAll(/<ZHI_OBSERVATORY_CUE>([\s\S]*?)<\/ZHI_OBSERVATORY_CUE>/gi)];
+  if (!matches.length) return { reply, action: null, rejected: false };
+  const cleaned = reply.replace(/<ZHI_OBSERVATORY_CUE>[\s\S]*?<\/ZHI_OBSERVATORY_CUE>/gi, "").trim();
+  if (matches.length !== 1) return { reply: cleaned, action: null, rejected: true };
+  try {
+    const parsed = JSON.parse(matches[0][1]);
+    if (!parsed || typeof parsed !== "object" || typeof parsed.cue_id !== "string" ||
+        !/^[0-9a-f-]{36}$/i.test(parsed.cue_id) ||
+        !["explore", "defer", "dismiss", "complete"].includes(parsed.action)) {
+      return { reply: cleaned, action: null, rejected: true };
+    }
+    const cue = cues.find((item) => item.id === parsed.cue_id);
+    if (!cue || !resolveCueTransition(parsed.action, cue.status, nowMs)) {
+      return { reply: cleaned, action: null, rejected: true };
+    }
+    return { reply: cleaned, action: { cue_id: cue.id, action: parsed.action as CueAction, status: cue.status }, rejected: false };
+  } catch {
+    return { reply: cleaned, action: null, rejected: true };
+  }
 }
