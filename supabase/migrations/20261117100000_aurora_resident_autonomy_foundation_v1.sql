@@ -90,9 +90,19 @@ begin
   end if;
 
   if not exists (
-    select 1 from public.zhi_research_workspaces w
+    select 1
+    from public.zhi_research_workspaces w
     join public.zhi_research_members m on m.workspace_id = w.id
-    where w.id = p_workspace_id and w.owner_user_id = p_owner_user_id and w.status = 'active'
+    join public.zhi_world_memberships wm
+      on wm.world_id = w.world_id
+     and wm.principal_user_id = p_owner_user_id
+     and wm.agent_id = p_agent_id
+     and wm.status = 'active'
+     and wm.revoked_at is null
+     and (wm.expires_at is null or wm.expires_at > now())
+    where w.id = p_workspace_id and w.owner_user_id = p_owner_user_id
+      and w.world_id = '50b06c01-060d-49fa-8988-8f38c13406d7'::uuid
+      and w.status = 'active'
       and m.owner_user_id = p_owner_user_id and m.agent_id = p_agent_id
       and m.participation_status = 'requested'
   ) then
