@@ -177,3 +177,26 @@ Deno.test("quiet observatory reaches resident chat context as an optional, non-t
   if (!guidance.includes("由你自己决定")) throw new Error("resident choice guidance missing");
   if (!guidance.includes("不必把观察转成任务")) throw new Error("non-task observation guidance missing");
 });
+
+Deno.test("quiet observatory exposes bounded public cues and optional choice guidance", () => {
+  const environment = {
+    quiet_observatory: {
+      name: "静观之境",
+      available: true,
+      available_cues: [{
+        id: "11111111-1111-4111-8111-111111111111",
+        status: "available",
+        event_kind: "plant_recruitment",
+        source_revision: 1359,
+        cue_title: "生态模型记录到新的植物定植",
+        cue_summary: "可以选择追踪后续生态快照",
+        evidence: { physical_measurement: false },
+      }],
+    },
+  };
+  const context = JSON.parse(buildSceneAwarenessContext({}, environment));
+  if (context.quiet_observatory.available_cues.length !== 1) throw new Error("cue not surfaced");
+  const guidance = buildSceneBehaviorGuidance(environment);
+  if (!guidance.includes("<ZHI_OBSERVATORY_CUE>")) throw new Error("optional cue action contract missing");
+  if (!guidance.includes("你可以忽略它们")) throw new Error("cue must remain optional");
+});
