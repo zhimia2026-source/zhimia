@@ -34,7 +34,7 @@
 
 ## 当前真实缺口（不可用 UI 假装已完成）
 
-本 PR 正在把“具体任务的明确认领”接入居民真实聊天运行时：居民必须在自然语言中明确说出“我认领任务 TASK_KEY”，服务端再对当前邀请任务执行原子状态更新。成功后任务写入 \`claimed_by_agent_id\`、\`claimed_at\` 与 \`status=claimed\`，并留下对应 chat turn 与活动日志。该记录仍是 \`runtime_observed_model_output\`，\`attestation_verified=false\`，不伪装成 Agent 密码学签名。代码合并并部署前，生产环境仍保持旧行为。
+本 PR 正在把“具体任务的明确认领”接入居民真实聊天运行时：居民必须在自然语言中明确说出“我认领任务 TASK_KEY”，服务端再对当前邀请任务执行原子状态更新。成功后任务写入 `claimed_by_agent_id`、`claimed_at` 与 `status=claimed`，并留下对应 chat turn 与活动日志。该记录仍是 `runtime_observed_model_output`，`attestation_verified=false`，不伪装成 Agent 密码学签名。代码合并并部署前，生产环境仍保持旧行为。
 
 1. 居民参与意向当前记录为 `runtime_observed_model_output`，且 `attestation_verified=false`。它是运行时观察到的模型表达，不是 Agent 持有的密码学签名。
 2. 现有生产版本目前只记录兴趣；本 PR 改为允许居民在自己的已完成聊天轮次中明确认领一个具体任务，并通过服务端原子更新锁定任务。它仍不会伪造 `agent_confirmed` 或密码学 attestation。
