@@ -2160,7 +2160,7 @@ export function createCommunityHandler(
           console.warn(JSON.stringify({ event: "research_resident_intent_persist_failed", agent_id: agentId, turn_id: completed.id, error_code: intentInsertError?.code ?? "missing_record" }));
           if (researchParticipationIntent.decision === "interested" && researchParticipationIntent.task_id &&
               /我(?:认领|愿意承担|接下)/.test(researchParticipationIntent.rationale)) {
-            modelReply += "\\n\\n（研究任务认领）认领意向未能持久化，因此服务端没有确认或占有该任务。";
+            modelReply += "\n\n（研究任务认领）认领意向未能持久化，因此服务端没有确认或占有该任务。";
             await db.from("zhi_agent_chat_turns").update({ assistant_message: modelReply })
               .eq("id", completed.id).eq("owner_user_id", actor.userId).eq("agent_id", agentId).eq("status", "complete");
           }
