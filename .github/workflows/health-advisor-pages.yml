@@ -53,7 +53,7 @@ jobs:
           cp web/zhi-memory.html _site/zhi-memory.html
           cp web/zhi-memory.js _site/zhi-memory.js
           cp web/aurora-research-center.html _site/aurora-research-center.html
-          cp web/aurora-research-center.js _site/aurora-research-center.js _site/mindstream.html
+          cp web/aurora-research-center.js _site/aurora-research-center.js
           cp web/mindstream.html _site/mindstream.html
           test -s _site/index.html
           test -s _site/zhi-health-advisor-client.js
