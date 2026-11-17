@@ -2,6 +2,12 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 type Actor = { userId: string; capabilities: string[] };
+const SOCIAL_EVENT_KINDS = [
+  "rainfall_interval",
+  "object_lifecycle_stage_changed",
+  "plant_recruitment",
+  "organic_matter_decomposed",
+] as const;
 const corsHeaders = {
   "content-type": "application/json; charset=utf-8",
   "cache-control": "no-store",
@@ -85,7 +91,7 @@ function overlap(a: string[], b: string[]) {
   const union = new Set([...a, ...b]).size;
   return { ratio: union ? matched.length / union : 0, matched };
 }
-async function evaluateAgent(db: SupabaseClient, agentId: string, ownerUserId: string, onlyWorldId?: string) {
+async function evaluateAgent(db: SupabaseClient, agentId: string, ownerUserId: string, onlyWorldId?: string, eventIds?: string[]) {
   const now = new Date();
   const since = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
   const [{ data: profile, error: profileError }, { data: selfAgent, error: selfAgentError }] = await Promise.all([
@@ -136,12 +142,15 @@ async function evaluateAgent(db: SupabaseClient, agentId: string, ownerUserId: s
       (peerMemberships ?? []).some(m => m.agent_id === p.id && m.principal_user_id === p.owner_user_id)
     );
 
+    let eventQuery = db.from("zhi_ecosystem_events").select("id,event_kind,payload,occurred_at")
+      .eq("world_id", worldId).in("event_kind", [...SOCIAL_EVENT_KINDS])
+      .order("occurred_at", { ascending: false }).limit(30);
+    if (eventIds?.length) eventQuery = eventQuery.in("id", eventIds);
+    else eventQuery = eventQuery.gte("occurred_at", since);
     const [{ data: relationships, error: relError }, { data: events, error: eventError }, { data: presence, error: presenceError }] = await Promise.all([
       db.from("zhi_social_relationships").select("*")
         .eq("observer_agent_id", agentId).eq("owner_user_id", ownerUserId).eq("world_id", worldId),
-      db.from("zhi_ecosystem_events").select("id,event_kind,payload,occurred_at")
-        .eq("world_id", worldId).gte("occurred_at", since)
-        .order("occurred_at", { ascending: false }).limit(30),
+      eventQuery,
       db.from("zhi_spatial_presence").select("agent_id,current_node_id,position_status,last_confirmed_at,confidence")
         .eq("world_id", worldId).eq("position_status", "confirmed")
         .gte("last_confirmed_at", new Date(now.getTime() - 2 * 3600000).toISOString())
@@ -269,12 +278,25 @@ Deno.serve(async (req: Request) => {
       if (!key || bearer !== key) return reply({ error: "unauthorized" }, 401);
       const body = await readBody(req);
       const worldId = typeof body.world_id === "string" ? body.world_id : undefined;
+      let eventIds: string[] | undefined;
+      if (body.event_ids !== undefined) {
+        if (!Array.isArray(body.event_ids) || body.event_ids.length < 1 || body.event_ids.length > 40 ||
+            body.event_ids.some((id: unknown) => typeof id !== "string" || !/^[0-9a-f-]{36}$/i.test(id))) {
+          return reply({ error: "invalid_event_ids" }, 400);
+        }
+        eventIds = [...new Set(body.event_ids as string[])];
+      }
+      const nowIso = new Date().toISOString();
+      const { error: expiryError } = await db.from("zhi_social_intents")
+        .update({ status: "expired", decided_at: nowIso })
+        .in("status", ["pending", "deferred"]).lt("expires_at", nowIso);
+      if (expiryError) throw new Error("intent_expiry_sweep_failed");
       const { data: profiles, error } = await db.from("zhi_social_profiles")
         .select("agent_id,owner_user_id").eq("enabled", true).limit(200);
       if (error) throw new Error("profiles_unavailable");
       const results = [];
-      for (const p of profiles ?? []) results.push(await evaluateAgent(db, p.agent_id, p.owner_user_id, worldId));
-      return reply({ ok: true, evaluated: results.length, results });
+      for (const p of profiles ?? []) results.push(await evaluateAgent(db, p.agent_id, p.owner_user_id, worldId, eventIds));
+      return reply({ ok: true, evaluated: results.length, event_scoped: Boolean(eventIds), results });
     }
 
     const match = routePath.match(/^\/v1\/agents\/([0-9a-f-]{36})\/social(?:\/(.*))?$/i);
@@ -322,11 +344,17 @@ Deno.serve(async (req: Request) => {
       if (!last || Date.now() - last >= 24 * 3600000) {
         await evaluateAgent(db, agentId, actor.userId);
       }
+      const nowIso = new Date().toISOString();
+      const { error: expiryError } = await db.from("zhi_social_intents")
+        .update({ status: "expired", decided_at: nowIso })
+        .eq("agent_id", agentId).eq("owner_user_id", actor.userId)
+        .in("status", ["pending", "deferred"]).lt("expires_at", nowIso);
+      if (expiryError) throw new Error("intent_expiry_sweep_failed");
       const { data, error } = await db.from("zhi_social_intents").select(
         "id,world_id,peer_agent_id,trigger_kind,reason_code,value_score,context,status,not_before,expires_at,created_at"
       ).eq("agent_id", agentId).eq("owner_user_id", actor.userId)
-        .in("status", ["pending", "deferred", "accepted"]).lte("not_before", new Date().toISOString())
-        .gt("expires_at", new Date().toISOString()).order("value_score", { ascending: false }).limit(10);
+        .in("status", ["pending", "deferred", "accepted"]).lte("not_before", nowIso)
+        .gt("expires_at", nowIso).order("value_score", { ascending: false }).limit(10);
       if (error) throw new Error("inbox_read_failed");
       return reply({ items: data ?? [], evaluated_on_wake: true });
     }
