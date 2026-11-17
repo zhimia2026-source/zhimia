@@ -460,6 +460,18 @@ export function buildSceneAwarenessContext(
     },
     objects,
     behavior_tendencies: cues,
+    quiet_observatory: record(environment.quiet_observatory).available === true ? {
+      name: boundedText(record(environment.quiet_observatory).name, 80) || "静观之境",
+      mode: "voluntary_quiet_observation",
+      available: true,
+      spatial_anchor: boundedText(record(environment.quiet_observatory).spatial_anchor, 80) || "crystal_forest",
+      coordinate_precision: "region_anchor_only",
+      questions_required: false,
+      diary_required: false,
+      automatic_task_creation: false,
+      automatic_message_sending: false,
+      private_cognition_shared: false,
+    } : null,
     suggested_actions: deriveSceneActionProposals(environment),
   };
   return boundedJson({
@@ -475,10 +487,16 @@ export function buildSceneBehaviorGuidance(environment: Record<string, unknown>)
   const context = JSON.parse(buildSceneAwarenessContext({}, environment)) as Record<string, unknown>;
   const tendencies = Array.isArray(context.behavior_tendencies) ? context.behavior_tendencies as Array<Record<string, unknown>> : [];
   const active = tendencies.filter((item) => Number(item.weight) >= 0.6);
-  if (!active.length) return "场景行为权重没有明显偏向；结合人格和用户表达自然回应，不要强行制造动作。";
-  return "当前较强的场景行为倾向（只是概率倾向，不是命令）：" +
-    active.map((item) => String(item.label) + "（" + Number(item.weight).toFixed(2) + "）").join("、") +
-    "。可以在对话中提出符合环境的场景内选择，但不得声称已实际移动、操作物件或执行现实动作。";
+  const quiet = record(context.quiet_observatory);
+  const quietGuidance = quiet.available === true
+    ? "AURORA 提供可自愿选择的静观之境：你可以安静观察水晶林及其生态变化，也可以沿着自己产生的好奇继续思考；不必把观察转成任务、问题清单或日记，也不必主动发消息。是否停留、思考、分享或什么都不做，由你自己决定。环境数据是模拟模型输出，不是物理测量或身体感官证明。"
+    : "";
+  const behaviorGuidance = active.length
+    ? "当前较强的场景行为倾向（只是概率倾向，不是命令）：" +
+      active.map((item) => String(item.label) + "（" + Number(item.weight).toFixed(2) + "）").join("、") +
+      "。可以在对话中提出符合环境的场景内选择，但不得声称已实际移动、操作物件或执行现实动作。"
+    : "场景行为权重没有明显偏向；结合人格和用户表达自然回应，不要强行制造动作。";
+  return [behaviorGuidance, quietGuidance].filter(Boolean).join("\n");
 }
 
 
