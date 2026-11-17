@@ -544,6 +544,59 @@ Deno.serve(async (req: Request) => {
     }, status);
   }
 
+  // Deterministic social evaluation runs only after meaningful ecological events.
+  // Ordinary clock ticks do not wake the scheduler; this path never invokes a model.
+  const socialEventKinds = [
+    "rainfall_interval",
+    "object_lifecycle_stage_changed",
+    "plant_recruitment",
+  ];
+  const { data: socialEvents, error: socialEventError } = await admin
+    .from("zhi_ecosystem_events")
+    .select("id,event_kind,payload")
+    .eq("world_id", worldId)
+    .gt("occurred_at", new Date(fromMs).toISOString())
+    .lte("occurred_at", toIso)
+    .in("event_kind", socialEventKinds)
+    .limit(40);
+  const meaningfulSocialEvents = (socialEvents ?? []).filter((event) => {
+    if (event.event_kind !== "rainfall_interval") return true;
+    const rainfallMm = Number((event.payload as Record<string, unknown> | null)?.rainfall_mm ?? 0);
+    return Number.isFinite(rainfallMm) && rainfallMm >= 0.25;
+  });
+  if (socialEventError) {
+    console.warn(JSON.stringify({ event: "social_event_lookup_failed", world_id: worldId }));
+  } else if (meaningfulSocialEvents.length > 0 && SUPABASE_URL && SERVICE_ROLE_KEY) {
+    try {
+      const wakeResponse = await fetch(
+        SUPABASE_URL.replace(/\/$/, "") + "/functions/v1/zhi-social-scheduler/internal-evaluate",
+        {
+          method: "POST",
+          headers: {
+            "apikey": SERVICE_ROLE_KEY,
+            "Authorization": "Bearer " + SERVICE_ROLE_KEY,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            world_id: worldId,
+            event_ids: meaningfulSocialEvents.map((event) => event.id),
+          }),
+          signal: AbortSignal.timeout(8000),
+        },
+      );
+      if (!wakeResponse.ok) {
+        console.warn(JSON.stringify({
+          event: "social_event_evaluation_failed",
+          world_id: worldId,
+          status: wakeResponse.status,
+        }));
+      }
+    } catch {
+      // Social evaluation is additive; it must never roll back a committed world tick.
+      console.warn(JSON.stringify({ event: "social_event_evaluation_unavailable", world_id: worldId }));
+    }
+  }
+
   return json({
     ok: true,
     advanced: true,

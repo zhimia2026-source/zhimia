@@ -1,0 +1,29 @@
+name: ZHI event-driven social typecheck
+
+on:
+  pull_request:
+    paths:
+      - "supabase/functions/zhi-ecosystem-engine/**"
+      - "supabase/functions/zhi-social-scheduler/**"
+      - ".github/workflows/zhi-event-driven-social.yml"
+  push:
+    branches: [main]
+    paths:
+      - "supabase/functions/zhi-ecosystem-engine/**"
+      - "supabase/functions/zhi-social-scheduler/**"
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check event-driven social runtime
+        run: deno check --no-lock supabase/functions/zhi-ecosystem-engine/index.ts supabase/functions/zhi-social-scheduler/index.ts
