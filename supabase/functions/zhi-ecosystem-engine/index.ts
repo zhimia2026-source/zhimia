@@ -550,7 +550,6 @@ Deno.serve(async (req: Request) => {
     "rainfall_interval",
     "object_lifecycle_stage_changed",
     "plant_recruitment",
-    "organic_matter_decomposed",
   ];
   const { data: socialEvents, error: socialEventError } = await admin
     .from("zhi_ecosystem_events")
