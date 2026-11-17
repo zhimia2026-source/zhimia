@@ -10,12 +10,14 @@ Deno.test("only requested residents receive voluntary invitation context", () =>
   assertEquals(buildResearchInvitationContext({ agentId: "agent-1", residentName: "Elon", participationStatus: "declined", tasks }), "");
 });
 
-Deno.test("does not expose tasks assigned to another resident or inactive tasks", () => {
+Deno.test("shows tasks assigned to another resident as visible but not claimable, and hides inactive tasks", () => {
   const context = buildResearchInvitationContext({ agentId: "agent-1", residentName: "Resident", participationStatus: "requested", tasks: [
     { id: "other", task_key: "PIPE-02", title: "Other", task_type: "analysis", priority: "normal", status: "assigned", assigned_agent_id: "agent-2" },
     { id: "blocked", task_key: "PIPE-04", title: "Blocked", task_type: "analysis", priority: "normal", status: "blocked" },
   ] });
-  assertEquals(context, "");
+  assertEquals(context.includes("PIPE-02"), true);
+  assertEquals(context.includes("assigned_to_another_resident_not_claimable"), true);
+  assertEquals(context.includes("PIPE-04"), false);
   assertEquals(buildResearchInvitationGuidance(""), "");
 });
 
