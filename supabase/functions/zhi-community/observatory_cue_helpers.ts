@@ -1,7 +1,15 @@
-export type CueAction = "explore" | "defer" | "dismiss" | "complete";
 export type CueStatus = "available" | "exploring" | "deferred" | "dismissed" | "completed" | "expired";
+export type CueUpdate = {
+  status: CueStatus;
+  not_before?: string;
+  decided_at: string;
+  updated_at: string;
+};
+export type CueTransition =
+  | { update: null; idempotent: true }
+  | { update: CueUpdate; idempotent: false };
 
-export function resolveCueTransition(action: string, status: string, nowMs: number) {
+export function resolveCueTransition(action: string, status: string, nowMs: number): CueTransition | null {
   const now = new Date(nowMs).toISOString();
   if (action === "explore") {
     if (status === "exploring") return { update: null, idempotent: true };
