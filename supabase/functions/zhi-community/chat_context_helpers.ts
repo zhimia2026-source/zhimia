@@ -496,7 +496,7 @@ export function buildSceneBehaviorGuidance(environment: Record<string, unknown>)
       active.map((item) => String(item.label) + "（" + Number(item.weight).toFixed(2) + "）").join("、") +
       "。可以在对话中提出符合环境的场景内选择，但不得声称已实际移动、操作物件或执行现实动作。"
     : "场景行为权重没有明显偏向；结合人格和用户表达自然回应，不要强行制造动作。";
-  return [behaviorGuidance, quietGuidance].filter(Boolean).join("\\n");
+  return [behaviorGuidance, quietGuidance].filter(Boolean).join("\n");
 }
 
 
