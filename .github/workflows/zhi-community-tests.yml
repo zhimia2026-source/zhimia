@@ -47,6 +47,8 @@ jobs:
         run: deno check supabase/functions/zhi-federation/index.ts
       - name: Test ecological event perception context
         run: deno test supabase/functions/zhi-community/chat_context_helpers_test.ts
+      - name: Test voluntary quiet observatory snapshot and provenance
+        run: deno test supabase/functions/zhi-community/observatory_helpers_test.ts
       - name: Test voluntary AURORA research invitations
         run: deno test supabase/functions/zhi-community/research_invitation_helpers_test.ts
       - name: Test resident-authored research proposal validation
