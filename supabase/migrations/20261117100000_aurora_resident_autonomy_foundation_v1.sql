@@ -60,16 +60,23 @@ begin
      or p_priority is null or p_priority not in ('low','normal','high') then
     raise exception 'resident_research_proposal_invalid_classification' using errcode = '22023';
   end if;
-  if coalesce(jsonb_typeof(p_acceptance_criteria), 'null') <> 'array'
-     or jsonb_array_length(p_acceptance_criteria) < 1
-     or jsonb_array_length(p_acceptance_criteria) > 8
-     or jsonb_typeof(coalesce(p_input_refs, '[]'::jsonb)) <> 'array'
-     or jsonb_array_length(coalesce(p_input_refs, '[]'::jsonb)) > 12
+  if jsonb_typeof(p_acceptance_criteria) is distinct from 'array'
+     or case when jsonb_typeof(p_acceptance_criteria) = 'array'
+          then jsonb_array_length(p_acceptance_criteria) not between 1 and 8
+          else true end
+     or jsonb_typeof(coalesce(p_input_refs, '[]'::jsonb)) is distinct from 'array'
+     or case when jsonb_typeof(coalesce(p_input_refs, '[]'::jsonb)) = 'array'
+          then jsonb_array_length(coalesce(p_input_refs, '[]'::jsonb)) > 12
+          else true end
      or exists (
-       select 1 from jsonb_array_elements(p_acceptance_criteria) as criterion
-       where jsonb_typeof(criterion) <> 'string'
-         or char_length(btrim(criterion #>> '{}')) < 1
-         or char_length(criterion #>> '{}') > 300
+       select 1
+       from jsonb_array_elements(
+         case when jsonb_typeof(p_acceptance_criteria) = 'array'
+           then p_acceptance_criteria else '[]'::jsonb end
+       ) as item(value)
+       where jsonb_typeof(item.value) <> 'string'
+         or char_length(btrim(item.value #>> '{}')) < 1
+         or char_length(item.value #>> '{}') > 300
      ) then
     raise exception 'resident_research_proposal_invalid_arrays' using errcode = '22023';
   end if;
