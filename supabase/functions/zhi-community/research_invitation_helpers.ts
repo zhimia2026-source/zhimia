@@ -38,7 +38,7 @@ export function buildResearchInvitationContext(input: ResearchInvitationInput): 
       priority: task.priority,
       status: task.status,
       assignment: task.assigned_agent_id === input.agentId
-        ? (task.status === "claimed" || task.status === "in_progress" || task.status === "review" || task.status === "changes_requested" ? "claimed_by_this_resident" : "assigned_to_this_resident")
+        ? (task.status === "claimed" || task.status === "in_progress" || task.status === "review" || task.status === "changes_requested" ? "claimed_by_this_resident" : task.status === "assigned" ? "assigned_to_this_resident" : "designated_resident_pending_assignment_transition")
         : "open_for_voluntary_interest",
       acceptance_criteria: Array.isArray(task.acceptance_criteria)
         ? task.acceptance_criteria.slice(0, 8)
@@ -79,7 +79,7 @@ export function extractResearchParticipationIntent(
     for (const task of invitedTasks) {
       if (!invitedTaskIds.includes(task.id) || !task.task_key) continue;
       const line = reply.split(/\r?\n/).find((candidate) =>
-        candidate.includes(task.task_key) && /我(?:认领|愿意承担|接下)/.test(candidate) && /(?:作为起点|开始|切入)/.test(candidate)
+        candidate.includes(task.task_key) && /我(?:选|选择|决定从)/.test(candidate) && /(?:作为起点|开始|切入)/.test(candidate) && /(?:作为起点|开始|切入)/.test(candidate)
       )?.trim();
       if (line && /我(?:认领|愿意承担|接下)/.test(line) && line.length >= 12 && line.length <= 800) {
         return {
