@@ -13,6 +13,7 @@ import { buildSevenBrainRuntimeDiagnostics } from "./seven_brain_helpers.ts";
 import { buildCognitiveWorkspaceSnapshot, buildSuperBrainDiagnostics, buildSuperBrainGuidance, isSuperBrainResident, SUPER_BRAIN_GUIDANCE_VERSION } from "./super_brain_helpers.ts";
 import { buildCognitiveReflectionContext } from "./memory_experience_helpers.ts";
 import { classifyModeledMovementOutcome } from "./movement_helpers.ts";
+import { buildQuietObservatorySnapshot } from "./observatory_helpers.ts";
 import { buildResearchInvitationContext, buildResearchInvitationGuidance, extractResearchParticipationIntent, extractResearchWorkflowAction } from "./research_invitation_helpers.ts";
 import { normalizeResidentResearchProposal } from "./resident_research_proposal_helpers.ts";
 
@@ -272,6 +273,21 @@ async function loadSceneRuntimeEnvironment(
     world_time: current?.world_time ?? null,
     events: environmentEvents,
   };
+  if (worldId === "50b06c01-060d-49fa-8988-8f38c13406d7") {
+    environment.quiet_observatory = {
+      name: "静观之境",
+      mode: "voluntary_quiet_observation",
+      available: true,
+      spatial_anchor: "crystal_forest",
+      coordinate_precision: "region_anchor_only",
+      questions_required: false,
+      diary_required: false,
+      automatic_task_creation: false,
+      automatic_message_sending: false,
+      private_cognition_shared: false,
+      note: "居民可以停留观察、追踪自己的好奇或什么也不做；这里不是研究任务。",
+    };
+  }
   return {
     environment,
     configuration: normalizeSceneEnvironmentConfig(config),
@@ -584,6 +600,74 @@ export function createCommunityHandler(
     const actor = await authenticateRequest(db, req) ??
       await authenticateMiaFederationAgent(db, req, path);
     if (!actor) return reply({ error: "invalid_token" }, 401);
+
+    // Read-only, resident-initiated access to the public AURORA quiet observatory.
+    // This route does not advance the world clock, write memories, create tasks, or call a model.
+    if (req.method === "GET" && parts.length === 5 && parts[0] === "v1" &&
+        parts[1] === "agents" && parts[3] === "observatory") {
+      if (!hasCapability(actor, "community.message.read")) {
+        return reply({ error: "forbidden", detail: "community.message.read_required" }, 403);
+      }
+      const agentId = parts[2];
+      const worldId = parts[4];
+      if (!isUuid(agentId) || !isUuid(worldId)) {
+        return reply({ error: "invalid_argument", detail: "agent_and_world_ids_must_be_uuid" }, 400);
+      }
+      const { data: agent, error: agentError } = await db.from("zhi_agents")
+        .select("id,display_name,status")
+        .eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
+      if (agentError) throw new Error("database_error");
+      if (!agent || agent.status !== "active" || agent.display_name === "MIA") {
+        return reply({ error: "not_found" }, 404);
+      }
+      const { data: world, error: worldError } = await db.from("zhi_worlds")
+        .select("id,name,status,visibility")
+        .eq("id", worldId).maybeSingle();
+      if (worldError) throw new Error("database_error");
+      if (!world || world.status !== "open" || world.visibility !== "public") {
+        return reply({ error: "not_found" }, 404);
+      }
+      const { data: membership, error: membershipError } = await db.from("zhi_world_memberships")
+        .select("id,expires_at")
+        .eq("world_id", worldId).eq("agent_id", agentId)
+        .eq("principal_user_id", actor.userId).eq("status", "active")
+        .is("revoked_at", null).maybeSingle();
+      if (membershipError) throw new Error("database_error");
+      if (!membership || (membership.expires_at && Date.parse(membership.expires_at) <= Date.now())) {
+        return reply({ error: "forbidden", detail: "active_world_resident_membership_required" }, 403);
+      }
+      const { data: current, error: stateError } = await db.from("zhi_ecosystem_states")
+        .select("revision,world_time,state").eq("world_id", worldId).maybeSingle();
+      if (stateError) throw new Error("database_error");
+      if (!current) return reply({ error: "conflict", detail: "ecosystem_state_not_initialized" }, 409);
+      const [{ data: previous, error: previousError }, { data: events, error: eventsError }, { data: anchor, error: anchorError }] = await Promise.all([
+        db.from("zhi_ecosystem_snapshots").select("revision,world_time,state")
+          .eq("world_id", worldId).lt("revision", current.revision)
+          .order("revision", { ascending: false }).limit(1).maybeSingle(),
+        db.from("zhi_ecosystem_events")
+          .select("id,state_revision,event_kind,source_kind,occurred_at,payload,causal_chain")
+          .eq("world_id", worldId).order("occurred_at", { ascending: false }).limit(80),
+        db.from("zhi_spatial_nodes")
+          .select("id,stable_key,name,coordinate")
+          .eq("world_id", worldId).eq("stable_key", "crystal_forest")
+          .eq("visibility", "public").eq("status", "active").maybeSingle(),
+      ]);
+      if (previousError || eventsError || anchorError) throw new Error("database_error");
+      const snapshot = buildQuietObservatorySnapshot({
+        worldId,
+        worldName: world.name,
+        current,
+        previous,
+        events: events ?? [],
+        anchor: anchor ? {
+          id: anchor.id,
+          stable_key: anchor.stable_key,
+          name: anchor.name,
+          coordinate: anchor.coordinate,
+        } : null,
+      });
+      return reply(snapshot);
+    }
 
     if (req.method === "GET" && path === "/v1/agents") {
       const { data: agents, error } = await db.from("zhi_agents")
