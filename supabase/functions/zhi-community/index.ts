@@ -2158,6 +2158,12 @@ export function createCommunityHandler(
           .select("id,decision,task_id,created_at").single();
         if (intentInsertError || !intentRecord) {
           console.warn(JSON.stringify({ event: "research_resident_intent_persist_failed", agent_id: agentId, turn_id: completed.id, error_code: intentInsertError?.code ?? "missing_record" }));
+          if (researchParticipationIntent.decision === "interested" && researchParticipationIntent.task_id &&
+              /我(?:认领|愿意承担|接下)/.test(researchParticipationIntent.rationale)) {
+            modelReply += "\\n\\n（研究任务认领）认领意向未能持久化，因此服务端没有确认或占有该任务。";
+            await db.from("zhi_agent_chat_turns").update({ assistant_message: modelReply })
+              .eq("id", completed.id).eq("owner_user_id", actor.userId).eq("agent_id", agentId).eq("status", "complete");
+          }
         } else {
           let claimStatus = "not_requested";
           if (researchParticipationIntent.decision === "interested" && researchParticipationIntent.task_id && /我(?:认领|愿意承担|接下)/.test(researchParticipationIntent.rationale)) {
@@ -2174,13 +2180,15 @@ export function createCommunityHandler(
               claimStatus = "error";
             } else if (claimedTask) {
               claimStatus = "claimed";
-              await db.from("zhi_research_activity").insert({
+              const { error: activityError } = await db.from("zhi_research_activity").insert({
                 workspace_id: researchWorkspaceId, owner_user_id: actor.userId, actor_type: "agent",
                 actor_agent_id: agentId, event_type: "task.claimed", entity_type: "task",
                 entity_id: claimedTask.id, summary: "居民自主认领研究任务",
                 metadata: { task_key: claimedTask.task_key, source_chat_turn_id: completed.id,
                   intent_id: intentRecord.id, provenance: "runtime_observed_model_output", attestation_verified: false },
               });
+              if (activityError) console.warn(JSON.stringify({ event: "research_task_claim_activity_write_failed",
+                agent_id: agentId, turn_id: completed.id, task_id: claimedTask.id }));
             } else {
               const { data: existingClaim, error: existingClaimError } = await db.from("zhi_research_tasks")
                 .select("id,status,assigned_agent_id,claimed_by_agent_id")
