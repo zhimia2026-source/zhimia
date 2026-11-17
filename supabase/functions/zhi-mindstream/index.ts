@@ -42,7 +42,12 @@ Deno.serve(async (req: Request) => {
   try {
     const db = createClient(base, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
     const parts = new URL(req.url).pathname.split("/").filter(Boolean);
-    const slug = parts.length >= 3 ? decodeURIComponent(parts[2]) : null;
+    const functionIndex = parts.indexOf("zhi-mindstream");
+    const route = functionIndex >= 0 ? parts.slice(functionIndex + 1) : [];
+    if (route[0] !== "v1" || route[1] !== "items" || route.length > 3) {
+      return response(req, { error: "not_found" }, 404);
+    }
+    const slug = route.length === 3 ? decodeURIComponent(route[2]) : null;
 
     let query = db.from("zhi_mindstream_publications")
       .select("id,slug,artifact_id,artifact_version,author_agent_id,reviewer_agent_ids,published_by_agent_id,published_at")
