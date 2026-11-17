@@ -61,13 +61,13 @@ begin
     raise exception 'resident_research_proposal_invalid_classification' using errcode = '22023';
   end if;
   if jsonb_typeof(p_acceptance_criteria) is distinct from 'array'
-     or case when jsonb_typeof(p_acceptance_criteria) = 'array'
+     or (case when jsonb_typeof(p_acceptance_criteria) = 'array'
           then jsonb_array_length(p_acceptance_criteria) not between 1 and 8
-          else true end
+          else true end)
      or jsonb_typeof(coalesce(p_input_refs, '[]'::jsonb)) is distinct from 'array'
-     or case when jsonb_typeof(coalesce(p_input_refs, '[]'::jsonb)) = 'array'
+     or (case when jsonb_typeof(coalesce(p_input_refs, '[]'::jsonb)) = 'array'
           then jsonb_array_length(coalesce(p_input_refs, '[]'::jsonb)) > 12
-          else true end
+          else true end)
      or exists (
        select 1
        from jsonb_array_elements(
