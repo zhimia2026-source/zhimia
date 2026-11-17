@@ -143,12 +143,15 @@ export function extractResearchWorkflowAction(
 ): { reply: string; action: ResearchWorkflowAction | null; rejected: boolean } {
   const re = /<(ZHI_RESEARCH_ARTIFACT|ZHI_RESEARCH_REVIEW)>([\s\S]*?)<\/\1>/g;
   const matches = [...reply.matchAll(re)];
+  const opens = [...reply.matchAll(/<ZHI_RESEARCH_(?:ARTIFACT|REVIEW)>/g)];
+  const closes = [...reply.matchAll(/<\/ZHI_RESEARCH_(?:ARTIFACT|REVIEW)>/g)];
   const cleaned = reply.replace(re, "").replace(/<\/?ZHI_RESEARCH_(?:ARTIFACT|REVIEW)>/g, "").trim();
   if (!matches.length) {
-    const dangling = /<\/?ZHI_RESEARCH_(?:ARTIFACT|REVIEW)>/.test(reply);
-    return { reply: cleaned, action: null, rejected: dangling };
+    const firstOpen = opens[0]?.index;
+    return { reply: firstOpen === undefined ? cleaned : reply.slice(0, firstOpen).trim(), action: null, rejected: opens.length > 0 || closes.length > 0 };
   }
-  if (matches.length !== 1 || cleaned.length < 12) return { reply: cleaned, action: null, rejected: true };
+  if (matches.length !== 1 || opens.length !== 1 || closes.length !== 1 || cleaned.length < 12)
+    return { reply: cleaned, action: null, rejected: true };
   try {
     const tag = matches[0][1];
     const value = JSON.parse(matches[0][2]);
@@ -188,7 +191,7 @@ export function extractResearchWorkflowAction(
     }
 
     const artifactId = typeof value?.artifact_id === "string" ? value.artifact_id : "";
-    const version = Number(value?.version);
+    const version = typeof value?.version === "number" ? value.version : NaN;
     const reviewable = reviewableArtifacts.find((item) => item.id === artifactId && item.version === version);
     const verdict = value?.verdict;
     const notes = typeof value?.notes === "string" ? value.notes.trim() : "";
