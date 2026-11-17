@@ -20,7 +20,7 @@ Deno.test("does not expose tasks assigned to another resident or inactive tasks"
 });
 
 Deno.test("records only an explicit decision tied to visible rationale and invited task", () => {
-  const reply = '我愿意研究 PIPE-03，因为这个工程约束会决定试点能否稳定交付。<ZHI_RESEARCH_INTENT>{"decision":"interested","task_id":"task-1","rationale":"因为这个工程约束会决定试点能否稳定交付。"}</ZHI_RESEARCH_INTENT>';
+  const reply = '我认领任务 PIPE-03，因为这个工程约束会决定试点能否稳定交付。<ZHI_RESEARCH_INTENT>{"decision":"interested","task_id":"task-1","rationale":"因为这个工程约束会决定试点能否稳定交付。"}</ZHI_RESEARCH_INTENT>';
   const parsed = extractResearchParticipationIntent(reply, ["task-1"]);
   assertEquals(parsed.intent?.decision, "interested");
   assertEquals(parsed.intent?.task_id, "task-1");
@@ -65,4 +65,31 @@ Deno.test("does not infer task interest from a task mention without explicit sel
   const parsed = extractResearchParticipationIntent(reply, ["task-pipe"], [{ id: "task-pipe", task_key: "PIPE-01" }]);
   assertEquals(parsed.intent, null);
   assertEquals(parsed.extractionMethod, "none");
+});
+
+Deno.test("specific task claims require explicit first-person claim language", () => {
+  const taskId = "task-claim";
+  const rationale = "我愿意负责核验公开来源并整理证据清单。";
+  const claimed = extractResearchParticipationIntent(
+    `我认领任务 PIPE-01。 ${rationale}<ZHI_RESEARCH_INTENT>{"decision":"interested","task_id":"${taskId}","rationale":"${rationale}"}</ZHI_RESEARCH_INTENT>`,
+    [taskId],
+    [{ id: taskId, task_key: "PIPE-01" }],
+  );
+  assertEquals(claimed.intent?.task_id, taskId);
+  assertEquals(claimed.rejected, false);
+
+  const interestOnly = extractResearchParticipationIntent(
+    `我对 PIPE-01 很感兴趣。 ${rationale}<ZHI_RESEARCH_INTENT>{"decision":"interested","task_id":"${taskId}","rationale":"${rationale}"}</ZHI_RESEARCH_INTENT>`,
+    [taskId],
+    [{ id: taskId, task_key: "PIPE-01" }],
+  );
+  assertEquals(interestOnly.intent, null);
+  assertEquals(interestOnly.rejected, true);
+});
+
+Deno.test("natural-language selection records interest but does not claim without claim wording", () => {
+  const reply = "我选 PIPE-01 作为起点。";
+  const parsed = extractResearchParticipationIntent(reply, ["task-pipe"], [{ id: "task-pipe", task_key: "PIPE-01" }]);
+  assertEquals(parsed.intent?.task_id, "task-pipe");
+  assertEquals(/我(?:认领|愿意承担|接下)/.test(parsed.intent?.rationale ?? ""), false);
 });
