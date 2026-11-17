@@ -14,6 +14,7 @@ import { buildCognitiveWorkspaceSnapshot, buildSuperBrainDiagnostics, buildSuper
 import { buildCognitiveReflectionContext } from "./memory_experience_helpers.ts";
 import { classifyModeledMovementOutcome } from "./movement_helpers.ts";
 import { buildQuietObservatorySnapshot } from "./observatory_helpers.ts";
+import { resolveCueTransition } from "./observatory_cue_helpers.ts";
 import { buildResearchInvitationContext, buildResearchInvitationGuidance, extractResearchParticipationIntent, extractResearchWorkflowAction } from "./research_invitation_helpers.ts";
 import { normalizeResidentResearchProposal } from "./resident_research_proposal_helpers.ts";
 
@@ -654,25 +655,13 @@ export function createCommunityHandler(
         if (cueError) throw new Error("observatory_cue_read_failed");
         if (!cue || cue.world_id !== "50b06c01-060d-49fa-8988-8f38c13406d7") return reply({ error: "cue_not_found" }, 404);
         if (cue.expires_at && Date.parse(cue.expires_at) <= Date.now()) return reply({ error: "cue_expired" }, 409);
-        const allowed = action === "explore"
-          ? ["available", "deferred", "exploring"]
-          : action === "defer" || action === "dismiss"
-            ? ["available", "deferred", "exploring"]
-            : ["exploring", "completed"];
-        if (!allowed.includes(cue.status)) return reply({ error: "cue_state_conflict" }, 409);
-        if (action === "complete" && cue.status === "completed") {
-          return reply({ cue: { id: cue.id, status: "completed" }, idempotent_replay: true });
+        const transition = resolveCueTransition(action, cue.status, Date.now());
+        if (!transition) return reply({ error: "cue_state_conflict" }, 409);
+        if (transition.idempotent) {
+          return reply({ cue: { id: cue.id, status: cue.status }, idempotent_replay: true });
         }
-        const now = new Date();
-        const update = action === "explore"
-          ? { status: "exploring", not_before: now.toISOString(), decided_at: now.toISOString(), updated_at: now.toISOString() }
-          : action === "defer"
-            ? { status: "deferred", not_before: new Date(now.getTime() + 24 * 3600000).toISOString(), decided_at: now.toISOString(), updated_at: now.toISOString() }
-            : action === "dismiss"
-              ? { status: "dismissed", decided_at: now.toISOString(), updated_at: now.toISOString() }
-              : { status: "completed", decided_at: now.toISOString(), updated_at: now.toISOString() };
         const { data: updated, error: updateError } = await db.from("zhi_observatory_interest_cues")
-          .update(update).eq("id", cue.id).eq("agent_id", agentId).eq("owner_user_id", actor.userId)
+          .update(transition.update).eq("id", cue.id).eq("agent_id", agentId).eq("owner_user_id", actor.userId)
           .eq("status", cue.status).select("id,status,not_before,decided_at").maybeSingle();
         if (updateError || !updated) return reply({ error: "cue_state_conflict" }, 409);
         return reply({ cue: updated, no_automatic_memory: true, no_automatic_message: true });
