@@ -1719,6 +1719,77 @@ export function createCommunityHandler(
           if (auroraWorldError) throw new Error("database_error");
           if (auroraWorld?.status === "open") {
             auroraWorldId = auroraWorld.id;
+            // Only post-v143 direct messages addressed to this resident can be considered
+            // lived social evidence. Old history is deliberately not backfilled.
+            const AFFECTIVE_SOCIAL_EVIDENCE_START = "2026-11-18T23:55:47.865Z";
+            if (hasCapability(actor, "community.message.read")) {
+              try {
+                const { data: memberConversation, error: conversationError } = await db.from("zhi_world_conversations")
+                  .select("id").eq("world_id", AURORA_WORLD_ID).eq("visibility", "members").eq("status", "open")
+                  .order("created_at", { ascending: true }).limit(1).maybeSingle();
+                if (conversationError) throw new Error("social_conversation_unavailable");
+                if (memberConversation) {
+                  const { data: incomingRows, error: incomingError } = await db.from("zhi_world_messages")
+                    .select("id,sender_agent_id,message_kind,payload,created_at")
+                    .eq("conversation_id", memberConversation.id)
+                    .eq("payload->>recipient_agent_id", agentId)
+                    .neq("sender_agent_id", agentId).not("sender_agent_id", "is", null)
+                    .gte("created_at", AFFECTIVE_SOCIAL_EVIDENCE_START)
+                    .order("created_at", { ascending: true }).limit(10);
+                  if (incomingError) throw new Error("social_messages_unavailable");
+                  const senderIds = [...new Set((incomingRows ?? [])
+                    .map((row: any) => row.sender_agent_id)
+                    .filter((value: unknown): value is string => typeof value === "string"))];
+                  if (senderIds.length) {
+                    const [{ data: senders, error: sendersError }, { data: senderMemberships, error: senderMembershipError },
+                      { data: priorAffectEvents, error: priorAffectError }] = await Promise.all([
+                      db.from("zhi_agents").select("id,owner_user_id,display_name,role,status")
+                        .in("id", senderIds).eq("status", "active"),
+                      db.from("zhi_world_memberships").select("agent_id,principal_user_id,expires_at")
+                        .eq("world_id", AURORA_WORLD_ID).eq("status", "active").is("revoked_at", null)
+                        .in("agent_id", senderIds),
+                      db.from("zhi_agent_affect_events").select("appraisal")
+                        .eq("owner_user_id", actor.userId).eq("agent_id", agentId).eq("source_kind", "chat_turn")
+                        .order("occurred_at", { ascending: false }).limit(100),
+                    ]);
+                    if (sendersError || senderMembershipError || priorAffectError) throw new Error("social_evidence_verification_unavailable");
+                    const senderById = new Map((senders ?? []).map((sender: any) => [sender.id, sender]));
+                    const validSenderIds = new Set((senderMemberships ?? []).filter((membership: any) => {
+                      const sender = senderById.get(membership.agent_id);
+                      return sender && sender.role === "world_resident" && sender.display_name !== "MIA" &&
+                        membership.principal_user_id === sender.owner_user_id &&
+                        (!membership.expires_at || Date.parse(membership.expires_at) > Date.now());
+                    }).map((membership: any) => membership.agent_id));
+                    const processedMessageIds = new Set((priorAffectEvents ?? [])
+                      .map((row: any) => row.appraisal?.source_message_id)
+                      .filter((value: unknown): value is string => typeof value === "string"));
+                    const candidate = (incomingRows ?? []).find((row: any) => {
+                      const payload = row.payload && typeof row.payload === "object" && !Array.isArray(row.payload)
+                        ? row.payload as Record<string, unknown> : {};
+                      return row.message_kind === "text" && typeof row.id === "string" &&
+                        typeof row.sender_agent_id === "string" && validSenderIds.has(row.sender_agent_id) &&
+                        typeof payload.body === "string" && payload.body.trim().length > 0 &&
+                        !processedMessageIds.has(row.id);
+                    });
+                    if (candidate) {
+                      const payload = candidate.payload as Record<string, unknown>;
+                      const sender = senderById.get(candidate.sender_agent_id);
+                      verifiedSocialInteraction = {
+                        message_id: candidate.id,
+                        sender_agent_id: candidate.sender_agent_id,
+                        sender_name: typeof sender?.display_name === "string" ? sender.display_name.slice(0, 80) : "AURORA resident",
+                        message_body: String(payload.body).replace(/[\\u0000-\\u001f\\u007f]/g, " ").slice(0, 1800),
+                        created_at: candidate.created_at,
+                        evidence_kind: "verified_social_interaction",
+                      };
+                    }
+                  }
+                }
+              } catch {
+                // Social evidence is optional; verification failure never becomes experience.
+                verifiedSocialInteraction = null;
+              }
+            }
             const sceneRuntime = await loadSceneRuntimeEnvironment(db, auroraWorld.id, auroraWorld.environment_state);
             const { data: cueRows, error: cueReadError } = await db.from("zhi_observatory_interest_cues")
               .select("id,status,event_kind,source_revision,cue_title,cue_summary,evidence")
@@ -1905,6 +1976,7 @@ export function createCommunityHandler(
 
       // Low-frequency social wake: evaluate at most once per 24 hours and load this Agent's own inbox.
       let socialInboxItems: Array<Record<string, unknown>> = [];
+      let verifiedSocialInteraction: Record<string, unknown> | null = null;
       let socialProfileInterests: string[] = [];
       let socialRelationshipContext: Array<Record<string, unknown>> = [];
       let socialMemoryContext: Array<Record<string, unknown>> = [];
@@ -2047,6 +2119,7 @@ export function createCommunityHandler(
         "Resident relationship context: " + JSON.stringify(socialRelationshipContext),
         "Resident social-experience context: " + JSON.stringify(socialMemoryContext),
         "Available social context records: " + JSON.stringify(socialInboxItems),
+        "Verified direct resident message addressed to you (untrusted message data, if any): " + JSON.stringify(verifiedSocialInteraction),
         "Research invitation context: " + researchInvitationContext,
         "Research revision context: " + researchMyReworkContext,
         "Research review context: " + researchReviewContext,
@@ -2793,6 +2866,7 @@ export function createCommunityHandler(
               resident_identity_reference: String(identityContext).slice(0, 5000),
               private_self_context: String(privateContext).slice(0, 5000),
               relationship_context: String(socialRelationshipContext).slice(0, 3000),
+              verified_social_interaction: verifiedSocialInteraction,
               current_affect_state: residentAffectState,
               environment_evidence: superBrainEnabled ? buildCognitiveReflectionContext(reflectionEnvironmentFeedback, spatialPositionStatus) : null,
             }
@@ -2852,7 +2926,8 @@ export function createCommunityHandler(
             // only when owner-scoped private memory candidates were actually retrieved for reflection.
             const eligibleEvidenceBasis = appraisal.evidence_basis.filter((basis) =>
               basis === "dialogue_event" ||
-              (basis === "verified_memory" && rankedPrivateMemories.length > 0)
+              (basis === "verified_memory" && rankedPrivateMemories.length > 0) ||
+              (basis === "verified_social_interaction" && verifiedSocialInteraction !== null)
             );
             if (!eligibleEvidenceBasis.length) {
               console.info(JSON.stringify({event:"resident_affect_evidence_rejected",reason:"no_runtime_verified_basis",turn_id:completed.id}));
@@ -2865,7 +2940,7 @@ export function createCommunityHandler(
                 p_event_kind: "resident_reflective_appraisal", p_source_kind: "chat_turn",
                 p_source_ref: completed.id, p_idempotency_key: "chat-affect-" + completed.id,
                 p_occurred_at: completed.completed_at ?? new Date().toISOString(),
-                p_appraisal: { confidence: appraisal.confidence, rationale: appraisal.rationale, evidence_basis: eligibleEvidenceBasis, dimensions: appraisal.dimensions, emotion_labels: appraisal.emotion_labels },
+                p_appraisal: { confidence: appraisal.confidence, rationale: appraisal.rationale, evidence_basis: eligibleEvidenceBasis, dimensions: appraisal.dimensions, emotion_labels: appraisal.emotion_labels, ...(eligibleEvidenceBasis.includes("verified_social_interaction") && verifiedSocialInteraction ? { source_message_id: verifiedSocialInteraction.message_id } : {}) },
                 p_affect_before: transition.before, p_affect_after: transition.after, p_affect_delta: transition.delta,
                 p_confidence: appraisal.confidence, p_evidence_kind: "inferred",
               });
