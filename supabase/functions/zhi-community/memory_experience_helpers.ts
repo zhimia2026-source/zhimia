@@ -73,7 +73,7 @@ function parseModelJsonObject(raw: unknown): Record<string, unknown> | null {
       const char = text[i];
       if (inString) {
         if (escaped) escaped = false;
-        else if (char === "\") escaped = true;
+        else if (char === "\\") escaped = true;
         else if (char === '"') inString = false;
         continue;
       }
@@ -256,7 +256,7 @@ export function buildPrivateReflectionMessages(
     "同时判断你是否确实有一件值得单独告诉创造者的事。只有当你有明确、具体、非重复、对创造者有价值的想法、邀请或世界近况时，creator_message.send 才设为 true；是否发送由你判断，不要求每轮留言。",
     "creator_message 是独立的对外留言，不得泄露私有反思、隐藏推理、长期记忆原文、第三方私人信息或认证秘密。",
     "输出 creator_message 对象，字段 send(boolean), subject(string), body(string), message_kind(message/invitation/world_event/important)。不发送时使用 send=false、subject空字符串、body空字符串。",
-    "情感评价是可选的、基于本智能人自身经历的内部评价，不是对话情绪分类，也不是为了填满维度。只在本轮确实造成可说明的内在变化时输出 affect_appraisal；否则省略。必须给出 evidence_basis，允许值仅为 dialogue_event（本轮对话确实对你造成影响）或 verified_memory（本轮确实调用了相关的既有私人记忆）；不得仅凭用户替你描述的情绪、泛化人格设定或公共世界事件推断你有某种感受。公共 AURORA 事件不是你的亲历，除非存在可验证的个人暴露证据；当前系统尚不把未验证的环境线索当作亲历。只能使用有证据支持的维度，未提及维度保持不变；所有维度 evidence_kind 固定为 inferred，不得伪装成自我报告或直接观察。数值范围：core_axes.valence[-1,1]、core_axes.arousal[0,1]、core_axes.agency[-1,1]；其他维度[0,1]。输出 affect_appraisal={confidence:number,rationale:string,evidence_basis:[dialogue_event|verified_memory],dimensions:{group:{dimension:{value:number,confidence:number,evidence_kind:\"inferred\"}}},emotion_labels:[{label:string,intensity:number,confidence:number}]}。标签开放词汇且可为空；不要求积极、消极或任何情绪。",
+    "情感评价是可选的、基于本智能人自身经历的内部评价，不是对话情绪分类，也不是为了填满维度。只在本轮确实造成可说明的内在变化时输出 affect_appraisal；否则省略。必须给出 evidence_basis，允许值仅为 dialogue_event（本轮对话确实对你造成影响）或 verified_memory（本轮确实调用了相关的既有私人记忆）；不得仅凭用户替你描述的情绪、泛化人格设定或公共世界事件推断你有某种感受。公共 AURORA 事件不是你的亲历，除非存在可验证的个人暴露证据；当前系统尚不把未验证的环境线索当作亲历。只能使用有证据支持的维度，未提及维度保持不变；所有维度 evidence_kind 固定为 inferred，不得伪装成自我报告或直接观察。数值范围：core_axes.valence[-1,1]、core_axes.arousal[0,1]、core_axes.agency[-1,1]；其他维度[0,1]。输出 affect_appraisal={confidence:number,rationale:string,evidence_basis:[dialogue_event|verified_memory],dimensions:{group:{dimension:{value:number,confidence:number,evidence_kind:inferred}}},emotion_labels:[{label:string,intensity:number,confidence:number}]}。标签开放词汇且可为空；不要求积极、消极或任何情绪。",
     "只输出 JSON 对象，不要 Markdown，不要代码围栏。字段为 worth_remembering(boolean), observed_facts(string[]), hypotheses(string[]), unknowns(string[]), reflection(string), importance(integer), creator_message(object), affect_appraisal(可选对象)。",
   ].join("\n");
   const priorMemories = existingMemories.slice(0, 8).map((memory) => {
