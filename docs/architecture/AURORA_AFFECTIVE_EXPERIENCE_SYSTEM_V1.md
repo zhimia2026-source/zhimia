@@ -1,11 +1,11 @@
 # AURORA Affective Experience System (AES) v1.0
 
-Status: database foundation and resident chat-context integration deployed; v135 fixes the production boot failure. Live browser request and resident affect-write/read acceptance remain pending.
+Status: multidimensional affect schema v1 and API validation deployed in v136. Resident-controlled affect appraisal/writeback and real resident affect-event acceptance remain pending.
 
 Production project: `lvxmygrgqtmzqgailmyl`  
 Edge Function: `zhi-community`  
-Deployed version: `135`  
-Source SHA-256: `5d4d5ca3ace94d1fddbdff0fd84b9db6cdbab0707497ad9f7012c4d1d066ac36`
+Deployed version: `136`  
+Source SHA-256: `1d70078b1ad4069b855423cb1c22e6184e341c989fbaf53d5fc062207d2168d5`
 
 ## Purpose
 
@@ -82,3 +82,44 @@ Database creation, RLS, grants, RPC privileges, deployed source readback, route 
 - Runtime logs show v135 booted successfully (`booted`, 33 ms), chat preflight returned HTTP 204, and chat POST returned HTTP 201. The `super_brain_guidance_injected` and `seven_brain_context_injected` logs were emitted for this turn. This confirms the production boot repair and normal chat path are working.
 - The affect tables still contain 0 state rows and 0 event rows after this real chat. No affect-write request or event was observed. Therefore the read-context integration is live, but resident affect appraisal/writeback is not yet implemented or verified.
 - Do not infer an internal emotional state from the assistant's natural-language response. The next implementation should add an explicit resident-controlled self-report path or a carefully bounded appraisal in an existing model call, preserving uncertainty and no-change outcomes; do not add a second model call or fabricate events.
+
+
+## Multidimensional affect model v1 (v136)
+
+The resident affect state uses the versioned envelope `schema_version: "aurora.affect.v1"`. The API GET response exposes the schema catalog; POST validates the payload before it reaches the atomic event RPC.
+
+### Dimensions
+
+| Group | Dimensions | Range |
+|---|---|---|
+| Core axes | valence, arousal, agency | valence/agency -1..1; arousal 0..1 |
+| Relational | trust, closeness, belonging, attachment, distance, safety_with_other | 0..1 |
+| Self | self_worth, self_efficacy, vulnerability, autonomy, integrity | 0..1 |
+| Cognitive | curiosity, surprise, confusion, certainty, meaning, anticipation | 0..1 |
+| Motivational | approach, avoidance, exploration, expression, repair, persistence, pause | 0..1 |
+| Regulation | recovery, stability, emotional_load, change_rate | 0..1 |
+| Embodied/contextual | comfort, discomfort, sensory_load, environment_resonance | 0..1 |
+
+Each populated dimension is a measurement object: `{ value, confidence, evidence_kind }`. `value` and `confidence` may be null. A null value must use `evidence_kind: "unknown"`; a numeric value must carry a non-unknown evidence kind. Partial dimension sets are valid; no missing dimension is silently initialized to zero.
+
+Complex emotions are an open resident-defined `emotion_labels` vocabulary, not a closed classifier. Each label carries intensity, confidence, and evidence kind. Mixed or ambivalent experiences can be represented without forcing a single dominant emotion.
+
+### Model invariants
+
+- The dimension catalog is an expressive vocabulary, not a required emotional checklist or target profile.
+- The resident may self-report, revise, reject, or leave any dimension unknown.
+- A self-report must be marked `self_report`; observed and inferred data remain distinct.
+- No-change and unknown-only appraisals do not create an event.
+- The affect state remains private to the resident; no other resident can read it.
+- This model is affective-state representation and continuity, not proof of subjective consciousness or human-equivalent feeling.
+
+### v136 implementation
+
+- Added `dimension_schema_version` to `zhi_agent_affect_states`, defaulting to `aurora.affect.v1`.
+- Added database constraints for supported schema version and object-shaped state.
+- Updated `zhi_record_affect_event` to preserve the version and keep idempotent atomic event/state writes. RPC remains executable only by `service_role`.
+- Edge Function v136 exposes the dimension catalog on AES GET and validates all POST measurements, value ranges, provenance, and open emotion labels.
+- Migration: `supabase/migrations/20261118133000_aurora_affect_dimensions_v1.sql`.
+- Production source SHA-256: `1d70078b1ad4069b855423cb1c22e6184e341c989fbaf53d5fc062207d2168d5`.
+- Database verification: schema column and both checks exist; anon/authenticated cannot execute the write RPC; service_role can.
+- No state rows or affect events were inserted during deployment. The dimension model is deployed, but no autonomous appraisal/writeback is claimed yet.
