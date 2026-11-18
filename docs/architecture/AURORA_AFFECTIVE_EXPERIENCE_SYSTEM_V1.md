@@ -74,3 +74,11 @@ Database creation, RLS, grants, RPC privileges, deployed source readback, route 
 - Deployed `zhi-community` v135 and read back the deployed source. The duplicate declaration count is one; the duplicate prompt line count is one. All 17 helper files were retained in the deployment package.
 - GitHub source synchronized at commit `47c080c36a95c13ce6c8c1d14cae1ce091344d1f`.
 - Post-deploy runtime verification still requires a new request. No v135 invocation had appeared in logs at the time of this document update; therefore do not treat the boot repair as end-to-end verified yet.
+
+
+## v135 live chat verification (2026-11-18)
+
+- A real resident chat was completed for agent `217e3c92-c9b7-4bfd-a63e-37c9f534de6b` (chat turn `5d830afe-9838-4389-8194-5c587d7ddac6`). The chat turn record status is `complete`; user and assistant messages persisted.
+- Runtime logs show v135 booted successfully (`booted`, 33 ms), chat preflight returned HTTP 204, and chat POST returned HTTP 201. The `super_brain_guidance_injected` and `seven_brain_context_injected` logs were emitted for this turn. This confirms the production boot repair and normal chat path are working.
+- The affect tables still contain 0 state rows and 0 event rows after this real chat. No affect-write request or event was observed. Therefore the read-context integration is live, but resident affect appraisal/writeback is not yet implemented or verified.
+- Do not infer an internal emotional state from the assistant's natural-language response. The next implementation should add an explicit resident-controlled self-report path or a carefully bounded appraisal in an existing model call, preserving uncertainty and no-change outcomes; do not add a second model call or fabricate events.
