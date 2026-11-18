@@ -2855,7 +2855,7 @@ export function createCommunityHandler(
                 p_event_kind: "resident_reflective_appraisal", p_source_kind: "chat_turn",
                 p_source_ref: completed.id, p_idempotency_key: "chat-affect-" + completed.id,
                 p_occurred_at: completed.completed_at ?? new Date().toISOString(),
-                p_appraisal: { confidence: appraisal.confidence, rationale: appraisal.rationale, dimensions: appraisal.dimensions, emotion_labels: appraisal.emotion_labels },
+                p_appraisal: { confidence: appraisal.confidence, rationale: appraisal.rationale, evidence_basis: appraisal.evidence_basis, dimensions: appraisal.dimensions, emotion_labels: appraisal.emotion_labels },
                 p_affect_before: transition.before, p_affect_after: transition.after, p_affect_delta: transition.delta,
                 p_confidence: appraisal.confidence, p_evidence_kind: "inferred",
               });
