@@ -1778,7 +1778,7 @@ export function createCommunityHandler(
                         message_id: candidate.id,
                         sender_agent_id: candidate.sender_agent_id,
                         sender_name: typeof sender?.display_name === "string" ? sender.display_name.slice(0, 80) : "AURORA resident",
-                        message_body: String(payload.body).replace(/[\\u0000-\\u001f\\u007f]/g, " ").slice(0, 1800),
+                        message_body: String(payload.body).replace(/[\u0000-\u001f\u007f]/g, " ").slice(0, 1800),
                         created_at: candidate.created_at,
                         evidence_kind: "verified_social_interaction",
                       };
