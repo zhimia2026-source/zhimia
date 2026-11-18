@@ -123,3 +123,10 @@ Complex emotions are an open resident-defined `emotion_labels` vocabulary, not a
 - Production source SHA-256: `1d70078b1ad4069b855423cb1c22e6184e341c989fbaf53d5fc062207d2168d5`.
 - Database verification: schema column and both checks exist; anon/authenticated cannot execute the write RPC; service_role can.
 - No state rows or affect events were inserted during deployment. The dimension model is deployed, but no autonomous appraisal/writeback is claimed yet.
+
+
+## Affective engine integration (2026-11-18)
+
+The resident chat lifecycle reuses the existing private reflection model invocation to produce an optional, evidence-bounded `affect_appraisal`; it adds no model call or scheduled task. The appraisal is restricted to AURORA `world_resident` agents and excludes the MIA prototype. `affective_engine.ts` validates v1 dimensions, records only inferred evidence, preserves unmentioned dimensions, and applies confidence-weighted inertia before writing through the service-role-only `zhi_record_affect_event` RPC. The current affect state and resident identity/self/relationship references are included in the reflection context. The next chat turn receives the persisted state as private context with explicit cognitive-coupling guidance. Missing or invalid appraisals cause no write; there is no default emotion or fabricated event.
+
+This is a causal computational affect mechanism, not proof of phenomenal consciousness or subjective feeling. Production validation still requires naturally occurring resident turns and inspection of real, attributable affect events; synthetic fixtures must never be written to resident records.
