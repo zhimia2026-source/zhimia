@@ -79,6 +79,69 @@ function manifestInterests(value: unknown): string[] {
     ...(Array.isArray(personality.capability_layer) ? personality.capability_layer : []),
   ]);
 }
+function affectMeasurement(state: unknown, group: string, key: string): { value: number; confidence: number } | null {
+  if (!state || typeof state !== "object" || Array.isArray(state)) return null;
+  const root = state as Record<string, unknown>;
+  const dimensions = root.dimensions && typeof root.dimensions === "object" && !Array.isArray(root.dimensions)
+    ? root.dimensions as Record<string, unknown> : {};
+  const groupValue = dimensions[group] && typeof dimensions[group] === "object" && !Array.isArray(dimensions[group])
+    ? dimensions[group] as Record<string, unknown> : {};
+  const raw = groupValue[key];
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const item = raw as Record<string, unknown>;
+  if (typeof item.value !== "number" || !Number.isFinite(item.value) || item.value < 0 || item.value > 1 ||
+      typeof item.confidence !== "number" || item.confidence < 0.55 || item.confidence > 1 ||
+      item.evidence_kind !== "inferred") return null;
+  return { value: item.value, confidence: item.confidence };
+}
+
+/**
+ * Bounded affect-to-social-action coupling. Only the resident's own, private,
+ * confidence-bearing appraisal may adjust its own candidate priority.
+ * Missing/unknown dimensions produce zero adjustment; frequency, cooldown,
+ * consent, and safety gates remain unchanged.
+ */
+function affectiveSocialPriority(reason: string, state: unknown): { adjustment: number; dimensions_used: number } {
+  const profiles: Record<string, Array<{ group: string; key: string; direction: 1 | -1 }>> = {
+    world_event: [
+      { group: "motivational", key: "exploration", direction: 1 },
+      { group: "cognitive", key: "curiosity", direction: 1 },
+      { group: "motivational", key: "pause", direction: -1 },
+    ],
+    shared_interest: [
+      { group: "motivational", key: "exploration", direction: 1 },
+      { group: "cognitive", key: "curiosity", direction: 1 },
+      { group: "motivational", key: "pause", direction: -1 },
+    ],
+    co_presence: [
+      { group: "motivational", key: "approach", direction: 1 },
+      { group: "relational", key: "belonging", direction: 1 },
+      { group: "motivational", key: "avoidance", direction: -1 },
+    ],
+    relationship: [
+      { group: "motivational", key: "approach", direction: 1 },
+      { group: "relational", key: "closeness", direction: 1 },
+      { group: "relational", key: "attachment", direction: 1 },
+      { group: "motivational", key: "avoidance", direction: -1 },
+    ],
+  };
+  const profile = profiles[reason] ?? [];
+  let weightedSignal = 0;
+  let totalWeight = 0;
+  let dimensionsUsed = 0;
+  for (const item of profile) {
+    const measurement = affectMeasurement(state, item.group, item.key);
+    if (!measurement) continue;
+    const weight = measurement.confidence;
+    weightedSignal += ((measurement.value - 0.5) * 2 * item.direction) * weight;
+    totalWeight += weight;
+    dimensionsUsed++;
+  }
+  if (!totalWeight) return { adjustment: 0, dimensions_used: 0 };
+  const normalized = Math.max(-1, Math.min(1, weightedSignal / totalWeight));
+  return { adjustment: Math.round(normalized * 5 * 100) / 100, dimensions_used: dimensionsUsed };
+}
+
 function eventText(value: unknown): string {
   if (!value || typeof value !== "object" || Array.isArray(value)) return "";
   return Object.entries(value as Record<string, unknown>).slice(0, 20)
@@ -114,9 +177,20 @@ async function evaluateAgent(db: SupabaseClient, agentId: string, ownerUserId: s
   if (membershipError) throw new Error("membership_unavailable");
 
   let queued = 0;
+  let affectivelyAdjustedCandidates = 0;
+  let affectDimensionsUsed = 0;
   for (const membership of memberships ?? []) {
     if (membership.expires_at && Date.parse(membership.expires_at) <= now.getTime()) continue;
     const worldId = membership.world_id;
+    let residentAffectState: unknown = null;
+    if (worldId === "50b06c01-060d-49fa-8988-8f38c13406d7" &&
+        selfAgent.role === "world_resident" && selfAgent.display_name !== "MIA") {
+      const { data: affectRow, error: affectReadError } = await db.from("zhi_agent_affect_states")
+        .select("current_state,state_version")
+        .eq("owner_user_id", ownerUserId).eq("agent_id", agentId).maybeSingle();
+      if (affectReadError) throw new Error("resident_affect_state_unavailable");
+      residentAffectState = affectRow?.current_state ?? null;
+    }
     const { data: world, error: worldError } = await db.from("zhi_worlds")
       .select("id,status").eq("id", worldId).maybeSingle();
     if (worldError) throw new Error("world_unavailable");
@@ -216,10 +290,18 @@ async function evaluateAgent(db: SupabaseClient, agentId: string, ownerUserId: s
         : Math.min(100, interest.ratio * 60 + Math.min(40, sharedTopics.length * 20));
       const interestValue = interestOpportunity || sharedWorldEvent ? 100 : 0;
       const timing = samePlace || sharedTopicEvent || interestOpportunity ? 100 : 50;
-      const score = Math.round((interestValue * 0.25 + familiarity * 0.20 + novelty * 0.20 + collaboration * 0.20 + timing * 0.15) * 100) / 100;
-      if (score < Number(profile.minimum_score)) continue;
+      const baseScore = Math.round((interestValue * 0.25 + familiarity * 0.20 + novelty * 0.20 + collaboration * 0.20 + timing * 0.15) * 100) / 100;
       const reason = eventMatches.length || eventOpportunity ? "world_event" : interest.matched.length ? "shared_interest" :
         samePlace ? "co_presence" : "relationship";
+      const affectPriority = worldId === "50b06c01-060d-49fa-8988-8f38c13406d7"
+        ? affectiveSocialPriority(reason, residentAffectState)
+        : { adjustment: 0, dimensions_used: 0 };
+      const score = Math.round(Math.max(0, Math.min(100, baseScore + affectPriority.adjustment)) * 100) / 100;
+      if (affectPriority.dimensions_used > 0) {
+        affectivelyAdjustedCandidates++;
+        affectDimensionsUsed += affectPriority.dimensions_used;
+      }
+      if (score < Number(profile.minimum_score)) continue;
       const relevantEvents = eventMatches.length ? eventMatches : eventOpportunity ? recentEvents : [];
       candidates.push({
         peer, score, reason,
@@ -246,6 +328,14 @@ async function evaluateAgent(db: SupabaseClient, agentId: string, ownerUserId: s
       if (insertError) throw new Error("social_intent_queue_failed");
       queued++;
     }
+  }
+  if (affectDimensionsUsed > 0) {
+    console.info(JSON.stringify({
+      event: "resident_affective_social_priority",
+      candidate_count: affectivelyAdjustedCandidates,
+      affect_dimension_uses: affectDimensionsUsed,
+      priority_adjustment_cap: 5,
+    }));
   }
   await db.from("zhi_social_profiles").update({ last_evaluated_at: now.toISOString(), updated_at: now.toISOString() })
     .eq("agent_id", agentId).eq("owner_user_id", ownerUserId);
