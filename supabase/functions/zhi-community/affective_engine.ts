@@ -2,6 +2,7 @@ export type AffectMeasurement = { value: number; confidence: number; evidence_ki
 export type AffectAppraisal = {
  dimensions: Record<string, Record<string, AffectMeasurement>>;
  emotion_labels: Array<{label:string;intensity:number;confidence:number;evidence_kind:"inferred"}>;
+ evidence_basis: Array<"dialogue_event" | "verified_memory">;
  confidence:number; rationale:string;
 };
 const RANGES:Record<string,Record<string,[number,number]>>={
@@ -26,6 +27,11 @@ function parse(raw:unknown):Record<string,unknown>|null{
 }
 export function normalizeAffectAppraisal(raw:unknown):AffectAppraisal|null{
  const root=parse(raw);if(!root)return null;const a=rec(root.affect_appraisal),dims=rec(a.dimensions),out:AffectAppraisal["dimensions"]={};
+ const allowedBasis=new Set(["dialogue_event","verified_memory"]);
+ const evidenceBasis=Array.isArray(a.evidence_basis)
+  ? [...new Set(a.evidence_basis.filter((v):v is "dialogue_event"|"verified_memory"=>typeof v==="string"&&allowedBasis.has(v)))]
+  : [];
+ if(!evidenceBasis.length || (Array.isArray(a.evidence_basis)&&evidenceBasis.length!==a.evidence_basis.length))return null;
  for(const [g,rv] of Object.entries(dims)){const allowed=RANGES[g],vals=rec(rv);if(!allowed||Object.keys(vals).length>12)return null;
  const clean:Record<string,AffectMeasurement>={};for(const [k,rm] of Object.entries(vals)){const m=rec(rm),range=allowed[k];
  if(!range||typeof m.value!=="number"||!Number.isFinite(m.value)||m.value<range[0]||m.value>range[1]||
@@ -39,7 +45,7 @@ export function normalizeAffectAppraisal(raw:unknown):AffectAppraisal|null{
  const confidence=typeof a.confidence==="number"&&a.confidence>=0&&a.confidence<=1?a.confidence:0;
  const rationale=typeof a.rationale==="string"?a.rationale.slice(0,500):"";
  if(!Object.keys(out).length&&!labels.length)return null;
- return {dimensions:out,emotion_labels:labels,confidence,rationale};
+ return {dimensions:out,emotion_labels:labels,evidence_basis:evidenceBasis,confidence,rationale};
 }
 export function evolveAffectState(previous:unknown,appraisal:AffectAppraisal){
  const before=rec(previous),oldDims=rec(before.dimensions);
