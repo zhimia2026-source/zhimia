@@ -116,40 +116,33 @@ export function rankPrivateMemories<T extends PrivateMemoryRecord>(
     const evidence = clamp((facts + hypotheses * 0.35) / Math.max(1, facts + hypotheses + unknowns));
     const recency = Math.exp(-daysOld(memory.occurred_at, nowMs) / 365);
 
-    // Affect changes retrieval salience only when the resident has a measured,
-    // confidence-bearing curiosity/exploration state. It never fabricates tags,
-    // rewrites memory content, or bypasses lexical/entity relevance.
+    // Arousal changes temporal salience only when the resident has a measured,
+    // confidence-bearing core_axes.arousal value. Higher arousal modestly favors
+    // recent lived memories; lower arousal preserves more weight for lexical match.
+    // No memory content, labels, or experiences are generated or rewritten.
     const affectRoot = options.affectState && typeof options.affectState === "object" &&
       !Array.isArray(options.affectState) ? options.affectState as Record<string, unknown> : {};
     const affectDimensions = affectRoot.dimensions && typeof affectRoot.dimensions === "object" &&
       !Array.isArray(affectRoot.dimensions) ? affectRoot.dimensions as Record<string, unknown> : {};
-    const measured = (group: string, dimension: string): number | null => {
-      const groupValue = affectDimensions[group];
-      if (!groupValue || typeof groupValue !== "object" || Array.isArray(groupValue)) return null;
-      const item = (groupValue as Record<string, unknown>)[dimension];
-      if (!item || typeof item !== "object" || Array.isArray(item)) return null;
-      const measurement = item as Record<string, unknown>;
-      if (typeof measurement.value !== "number" || !Number.isFinite(measurement.value) ||
-          typeof measurement.confidence !== "number" || measurement.confidence < 0.55 ||
-          measurement.evidence_kind === "unknown") return null;
-      return clamp(measurement.value);
-    };
-    const curiosity = measured("cognitive", "curiosity");
-    const exploration = measured("motivational", "exploration");
-    const driveValues = [curiosity, exploration].filter((value): value is number => value !== null);
-    const affectiveRelevance = driveValues.length
-      ? (driveValues.reduce((sum, value) => sum + value, 0) / driveValues.length - 0.5) * 0.08
-      : 0;
+    const coreAxes = affectDimensions.core_axes && typeof affectDimensions.core_axes === "object" &&
+      !Array.isArray(affectDimensions.core_axes) ? affectDimensions.core_axes as Record<string, unknown> : {};
+    const arousalItem = coreAxes.arousal && typeof coreAxes.arousal === "object" &&
+      !Array.isArray(coreAxes.arousal) ? coreAxes.arousal as Record<string, unknown> : null;
+    const arousal = arousalItem && typeof arousalItem.value === "number" &&
+      Number.isFinite(arousalItem.value) && typeof arousalItem.confidence === "number" &&
+      arousalItem.confidence >= 0.55 && arousalItem.evidence_kind !== "unknown"
+      ? clamp(arousalItem.value)
+      : null;
+    const affectiveRelevance = arousal === null ? 0 : (arousal - 0.5) * 0.08;
 
-    // The bounded adjustment (at most +/- 0.04) transfers weight between
-    // query relevance and recency; the original ranking remains dominant.
-    const lexicalWeight = 0.48 + affectiveRelevance * 0.75;
-    const entityWeight = 0.12 + affectiveRelevance * 0.25;
-    const recencyWeight = 0.10 - affectiveRelevance;
-    // Query relevance leads; stable importance and evidence protect durable memories.
+    // Transfer at most 0.04 weight between recency and query matching / durable
+    // importance. Total score weight remains 1.0 at both boundaries.
+    const lexicalWeight = 0.48 - affectiveRelevance * 0.75;
+    const entityWeight = 0.12 - affectiveRelevance * 0.25;
+    const recencyWeight = 0.10 + affectiveRelevance;
     const score = queryTokens.length
       ? lexicalWeight * lexical + entityWeight * entity + 0.18 * importance + 0.12 * evidence + recencyWeight * recency
-      : 0.50 * importance + 0.30 * evidence + 0.20 * recency;
+      : (0.50 - affectiveRelevance) * importance + 0.30 * evidence + (0.20 + affectiveRelevance) * recency;
 
     return {
       memory,
