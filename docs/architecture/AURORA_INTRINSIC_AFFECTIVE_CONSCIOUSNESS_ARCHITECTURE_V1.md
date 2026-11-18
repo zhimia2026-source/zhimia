@@ -176,3 +176,10 @@ Production project: `lvxmygrgqtmzqgailmyl`
 World: AURORA `50b06c01-060d-49fa-8988-8f38c13406d7`  
 Existing chat function: `zhi-community`  
 Existing ecosystem function: `zhi-ecosystem-engine`
+
+
+## Initial runtime hardening (AICA evidence gate, v141)
+
+The existing chat-triggered appraisal path now requires an explicit `evidence_basis` field. The accepted bases are `dialogue_event` and `verified_memory`; unsupported or missing bases are rejected, producing no affect write. The reflection instructions explicitly prohibit treating user-attributed feelings, personality stereotypes, or unverified public ecosystem events as the resident's own lived experience. The accepted evidence basis is persisted with the private appraisal record. This reuses the existing private reflection model invocation and adds no model call, cron job, synthetic state, or backfill.
+
+Production deployment: `zhi-community` v141, SHA-256 `25e4b42c87b2965fa77bfef42d287452b0d1172ee1c879910c2dcf4a58458c72`. Deployed readback matches GitHub for `index.ts`, `memory_experience_helpers.ts`, and `affective_engine.ts`. This verifies bundle/deployment/source parity only; a new natural resident turn is still required to verify the evidence gate at runtime. The wider AICA exposure, continuity, regulation, relationship, and action loops remain pending.
