@@ -64,11 +64,18 @@ Deno.test("creator notes require explicit opt-in and reject empty or oversized c
   const declined = normalizeAgentCreatorMessage({
     creator_message: { send: false, subject: "", body: "", message_kind: "message" },
   });
-  const malformed = normalizeAgentCreatorMessage({
+  const short = normalizeAgentCreatorMessage({
     creator_message: { send: true, body: "hi" },
   });
-  if (!valid || valid.message_kind !== "invitation" || declined !== null || malformed !== null) {
-    throw new Error("creator note opt-in validation failed");
+  const malformed = normalizeAgentCreatorMessage({
+    creator_message: { send: true, body: "" },
+  });
+  const oversized = normalizeAgentCreatorMessage({
+    creator_message: { send: true, body: "x".repeat(8001) },
+  });
+  if (!valid || valid.message_kind !== "invitation" || declined !== null ||
+      !short || short.body !== "hi" || malformed !== null || oversized !== null) {
+    throw new Error("creator note validation does not match the 1-8000 character storage boundary");
   }
 });
 
@@ -94,14 +101,15 @@ Deno.test("long-term memory quality gate only retains importance 3 through 5", (
 
 import { buildPrivateReflectionMessages } from "./memory_experience_helpers.ts";
 
-Deno.test("private reflection prompt defines durable importance levels without weakening the gate", () => {
-  const messages = buildPrivateReflectionMessages("我们讨论了长期目标", "我会继续思考。");
+Deno.test("private reflection leaves experience value and emotional significance to the resident", () => {
+  const messages = buildPrivateReflectionMessages("我那一刻感到失落", "我还不确定这段经历意味着什么。");
   const system = messages[0].content;
-  for (const phrase of ["1=寒暄", "3=对未来交流有帮助", "4=重要里程碑", "5=会长期改变自我理解", "不得为了凑齐记忆数量而提高评分"]) {
-    if (!system.includes(phrase)) throw new Error("durable importance rubric is incomplete");
+  if (!system.includes("短暂情绪、关系变化、疑问、冲突或一次性经历也可能具有个人意义") ||
+      !system.includes("worth_remembering=true 时 importance 使用 3 到 5")) {
+    throw new Error("resident-owned memory choice was not expressed");
   }
-  if (!system.includes("importance 必须至少为 3")) {
-    throw new Error("importance threshold must remain unchanged");
+  for (const phrase of ["1=寒暄", "短暂情绪或一次性信息；2=", "必须说明它未来会如何帮助"]) {
+    if (system.includes(phrase)) throw new Error("fixed value rubric still excludes experiences");
   }
 });
 
@@ -116,10 +124,10 @@ Deno.test("private reflection receives bounded same-agent memory references", ()
   if (data.existing_private_memories[0].source_ref !== "turn-a") throw new Error("experience source lineage missing");
   if (data.existing_private_memories[0].unknowns[0] !== "[FACT_GAP]尚未查证") throw new Error("typed uncertainty missing");
   for (const marker of ["[FACT_GAP]", "[INTENT_AMBIGUITY]", "[HYPOTHESIS_UNCERTAINTY]", "[SELF_LIMIT]", "[FUTURE_UNCERTAINTY]"]) {
-    if (!messages[0].content.includes(marker)) throw new Error("uncertainty taxonomy missing: " + marker);
+    if (messages[0].content.includes(marker)) throw new Error("fixed uncertainty taxonomy remains: " + marker);
   }
-  if (!messages[0].content.includes("演化连续性") || !messages[0].content.includes("认知结构沉淀")) {
-    throw new Error("evolution continuity guidance missing");
+  if (!messages[0].content.includes("不必把每次互动解释成成长或人格变化")) {
+    throw new Error("reflection still prescribes a growth narrative");
   }
   const bounded = buildPrivateReflectionMessages("新进展", "我理解了。", Array.from({ length: 20 }, (_, i) => ({
     observed_facts: ["fact-" + i], reflection: "reflection-" + i, importance: 3,
@@ -209,12 +217,13 @@ Deno.test("creator note parser accepts fenced JSON with surrounding prose", () =
 });
 
 
-Deno.test("private reflection prompt requires compact JSON to reduce provider truncation", () => {
+Deno.test("private reflection keeps a machine schema without forcing a short expressive style", () => {
   const messages = buildPrivateReflectionMessages("一次重要交流", "我会保留证据边界。");
   const system = messages[0].content;
-  if (!system.includes("输出必须紧凑") ||
-      !system.includes("reflection 最多 2 句") ||
-      !system.includes("self_model_candidate(string)")) {
-    throw new Error("compact reflection output contract is incomplete");
+  if (!system.includes("只输出 JSON 对象") ||
+      system.includes("输出必须紧凑") ||
+      system.includes("reflection 最多 2 句") ||
+      system.includes("self_model_candidate(string)")) {
+    throw new Error("reflection style remains over-structured");
   }
 });
