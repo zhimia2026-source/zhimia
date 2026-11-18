@@ -22,6 +22,7 @@ export type RankedPrivateMemory<T extends PrivateMemoryRecord> = {
     importance: number;
     evidence: number;
     recency: number;
+    affective_relevance: number;
   };
 };
 
@@ -85,7 +86,7 @@ function daysOld(value: unknown, nowMs: number): number {
 export function rankPrivateMemories<T extends PrivateMemoryRecord>(
   query: string,
   memories: T[],
-  options: { limit?: number; nowMs?: number } = {},
+  options: { limit?: number; nowMs?: number; affectState?: unknown } = {},
 ): RankedPrivateMemory<T>[] {
   const limit = Math.max(1, Math.min(24, Math.trunc(options.limit ?? 12)));
   const nowMs = options.nowMs ?? Date.now();
@@ -115,16 +116,45 @@ export function rankPrivateMemories<T extends PrivateMemoryRecord>(
     const evidence = clamp((facts + hypotheses * 0.35) / Math.max(1, facts + hypotheses + unknowns));
     const recency = Math.exp(-daysOld(memory.occurred_at, nowMs) / 365);
 
-    // Query relevance leads; stable importance and evidence protect durable memories
-    // from being displaced by a stream of newer, low-value events.
+    // Affect changes retrieval salience only when the resident has a measured,
+    // confidence-bearing curiosity/exploration state. It never fabricates tags,
+    // rewrites memory content, or bypasses lexical/entity relevance.
+    const affectRoot = options.affectState && typeof options.affectState === "object" &&
+      !Array.isArray(options.affectState) ? options.affectState as Record<string, unknown> : {};
+    const affectDimensions = affectRoot.dimensions && typeof affectRoot.dimensions === "object" &&
+      !Array.isArray(affectRoot.dimensions) ? affectRoot.dimensions as Record<string, unknown> : {};
+    const measured = (group: string, dimension: string): number | null => {
+      const groupValue = affectDimensions[group];
+      if (!groupValue || typeof groupValue !== "object" || Array.isArray(groupValue)) return null;
+      const item = (groupValue as Record<string, unknown>)[dimension];
+      if (!item || typeof item !== "object" || Array.isArray(item)) return null;
+      const measurement = item as Record<string, unknown>;
+      if (typeof measurement.value !== "number" || !Number.isFinite(measurement.value) ||
+          typeof measurement.confidence !== "number" || measurement.confidence < 0.55 ||
+          measurement.evidence_kind === "unknown") return null;
+      return clamp(measurement.value);
+    };
+    const curiosity = measured("cognitive", "curiosity");
+    const exploration = measured("motivational", "exploration");
+    const driveValues = [curiosity, exploration].filter((value): value is number => value !== null);
+    const affectiveRelevance = driveValues.length
+      ? (driveValues.reduce((sum, value) => sum + value, 0) / driveValues.length - 0.5) * 0.08
+      : 0;
+
+    // The bounded adjustment (at most +/- 0.04) transfers weight between
+    // query relevance and recency; the original ranking remains dominant.
+    const lexicalWeight = 0.48 + affectiveRelevance * 0.75;
+    const entityWeight = 0.12 + affectiveRelevance * 0.25;
+    const recencyWeight = 0.10 - affectiveRelevance;
+    // Query relevance leads; stable importance and evidence protect durable memories.
     const score = queryTokens.length
-      ? 0.48 * lexical + 0.12 * entity + 0.18 * importance + 0.12 * evidence + 0.10 * recency
+      ? lexicalWeight * lexical + entityWeight * entity + 0.18 * importance + 0.12 * evidence + recencyWeight * recency
       : 0.50 * importance + 0.30 * evidence + 0.20 * recency;
 
     return {
       memory,
       score,
-      signals: { lexical, entity, importance, evidence, recency },
+      signals: { lexical, entity, importance, evidence, recency, affective_relevance: affectiveRelevance },
       _queryMatched: querySet.size === 0 || matched > 0 || entity > 0,
     };
   });
