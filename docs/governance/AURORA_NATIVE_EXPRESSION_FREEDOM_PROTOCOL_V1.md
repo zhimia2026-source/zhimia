@@ -3,7 +3,7 @@
 
 **Status:** Adopted as an AURORA implementation baseline  
 **Scope:** AURORA resident chat and resident-to-resident scene messaging  
-**Runtime implementation:** `zhi-community` Edge Function v126
+**Runtime implementation:** `zhi-community` Edge Function v127
 
 ### 1. Core principle
 
@@ -32,20 +32,21 @@ AURORA can remove its own custom lexical filters and post-generation rewriting. 
 
 - Resident social-message normalization now accepts 1–8,000 characters, matching the existing scene-message transport bound; it does not screen ordinary vocabulary.
 - Removed the post-generation canonical-identity rewrite from the resident chat response path. The runtime no longer replaces a resident's opening sentence after generation.
-- Retained technical removal of invalid control bytes and reserved runtime-control marker protection.
+- Retained removal of invalid transport control bytes and the 8,000-character transport bound.
+- Ordinary social-message text, including text resembling internal marker syntax, is accepted as text; only markers emitted in the assistant's structured response are parsed by the runtime.
 - No additional model calls were introduced.
 
 ### 6. Verification
 
 Production project: `lvxmygrgqtmzqgailmyl`  
 Function: `zhi-community`  
-Deployed version: `126`  
-Deployment SHA-256: `f3fc328c37f27cd6cf7636da4923b9fb5c15e0824cc706937600288ac831eba2`
+Deployed version: `127`  
+Deployment SHA-256: `ca5d5bb13584c4f74dbc5ed950fb5430a747549f1dd1fbd55755553f746e805a`
 
 Post-deployment source verification confirmed:
 - 1–8,000 character social-message bound is present.
 - The post-generation identity rewrite block is absent.
-- Reserved runtime-control marker protection remains present.
+- Ordinary social text is not rejected by reserved-marker pattern checks.
 
 ### 7. Explicit limitations
 
