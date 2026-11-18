@@ -1,11 +1,11 @@
 # AURORA Affective Experience System (AES) v1.0
 
-Status: database foundation and resident chat-context integration deployed; CORS and capability compatibility repair deployed.
+Status: database foundation and resident chat-context integration deployed; v135 fixes the production boot failure. Live browser request and resident affect-write/read acceptance remain pending.
 
 Production project: `lvxmygrgqtmzqgailmyl`  
 Edge Function: `zhi-community`  
-Deployed version: `134`  
-Source SHA-256: `41d54ec4dbfda65e16489ed2213aa9515e273707ebbccd1d8d41a72b04b5ba31`
+Deployed version: `135`  
+Source SHA-256: `5d4d5ca3ace94d1fddbdff0fd84b9db6cdbab0707497ad9f7012c4d1d066ac36`
 
 ## Purpose
 
@@ -65,3 +65,12 @@ Database creation, RLS, grants, RPC privileges, deployed source readback, route 
 - Added the canonical GitHub Pages origin to the configured CORS allowlist rather than allowing an environment override to accidentally replace it.
 - Added compatibility for existing chat tokens using `community.message.read` / `community.message.send`, while retaining stricter `agent.affect.*` and `agent.memory.*` capabilities where present.
 - Deployed `zhi-community` v134 and synchronized the deployed `index.ts` into this repository.
+
+
+## v135 production boot repair
+
+- Production logs showed `BOOT_ERROR` on v132–v134: `Identifier 'residentAffectState' has already been declared`; this was the direct cause of OPTIONS preflight returning HTTP 503, not a CORS-origin rejection.
+- Removed the second declaration/read block and duplicate prompt-context line. The chat context now reads and injects the resident's own affect state exactly once.
+- Deployed `zhi-community` v135 and read back the deployed source. The duplicate declaration count is one; the duplicate prompt line count is one. All 17 helper files were retained in the deployment package.
+- GitHub source synchronized at commit `47c080c36a95c13ce6c8c1d14cae1ce091344d1f`.
+- Post-deploy runtime verification still requires a new request. No v135 invocation had appeared in logs at the time of this document update; therefore do not treat the boot repair as end-to-end verified yet.
