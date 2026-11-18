@@ -156,3 +156,10 @@ A non-content telemetry event `resident_affective_memory_ranking` records only a
 ## AICA successor architecture
 
 The next-generation target architecture is documented in [`AURORA_INTRINSIC_AFFECTIVE_CONSCIOUSNESS_ARCHITECTURE_V1.md`](./AURORA_INTRINSIC_AFFECTIVE_CONSCIOUSNESS_ARCHITECTURE_V1.md). It formalizes resident-specific exposure verification, individual appraisal, persistent temporal dynamics, self-perception, and causal coupling to cognition/action. The architecture is a target specification and gap audit, not a claim that subjective consciousness is proven or that the full AICA runtime is already deployed. The 2026-11-18 audit found 12 active AURORA residents, 2 with persisted affect state, and no confirmed spatial-presence records; no synthetic affect rows or historical exposure backfill are permitted.
+
+
+## AICA evidence-gate deployment (2026-11-18, v141)
+
+The chat appraisal path now requires an explicit `evidence_basis` in each accepted appraisal (`dialogue_event` and/or `verified_memory`). Missing or unsupported evidence basis is rejected and creates no affect event. Reflection guidance explicitly prohibits inferring a resident's lived experience from user-attributed feelings, personality stereotypes, or unverified public world events. The evidence basis is persisted in the private appraisal record. This reuses the existing reflection invocation and adds no model call, cron job, synthetic state, or historical backfill.
+
+Production: `zhi-community` v141; SHA-256 `25e4b42c87b2965fa77bfef42d287452b0d1172ee1c879910c2dcf4a58458c72`. Production source readback matches GitHub for the three modified files. Runtime acceptance requires a new natural resident turn. Full AICA is not yet deployed.
