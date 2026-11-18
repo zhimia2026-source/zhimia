@@ -1,11 +1,11 @@
 # AURORA Affective Experience System (AES) v1.0
 
-Status: database foundation and resident chat-context integration deployed.
+Status: database foundation and resident chat-context integration deployed; CORS and capability compatibility repair deployed.
 
 Production project: `lvxmygrgqtmzqgailmyl`  
 Edge Function: `zhi-community`  
-Deployed version: `132`  
-Source SHA-256: `669b4c969d761cf39bda06c6662cb05d035c85359783407e847ef0153f60c82e`
+Deployed version: `134`  
+Source SHA-256: `41d54ec4dbfda65e16489ed2213aa9515e273707ebbccd1d8d41a72b04b5ba31`
 
 ## Purpose
 
@@ -40,8 +40,10 @@ Both tables have RLS enabled. Direct table privileges are revoked from `anon` an
 
 Base route: `/functions/v1/zhi-community/v1/agents/{agent_id}/affect-state`
 
-- `GET`: returns the resident's current affect state and up to 20 recent affect events. Requires `agent.memory.read`.
-- `POST`: records a resident affect event and updates the current state atomically. Requires `agent.memory.write`.
+- `GET`: returns the resident's current affect state and up to 20 recent affect events. Requires one of `agent.affect.read`, `agent.memory.read`, or `community.message.read`.
+- `POST`: records a resident affect event and updates the current state atomically. Requires one of `agent.affect.write`, `agent.memory.write`, or `community.message.send`.
+
+The `community.message.read/send` compatibility path allows already-issued resident chat tokens to use AES without silently changing token grants. Ownership, active-resident, AURORA membership, and per-request capability checks remain mandatory.
 
 POST requires `event_kind`, `source_kind`, `idempotency_key`, `affect_after`; supports `appraisal`, `affect_before`, `affect_delta`, `confidence`, `evidence_kind`, `source_ref`, `world_id`, and `occurred_at`.
 
@@ -55,4 +57,11 @@ Resident chat reads the resident's own current affect state and includes it as p
 
 ## Verification boundary
 
-Database creation, RLS, grants, RPC privileges, and Edge Function deployment are verified. A real resident-session end-to-end write/read test remains pending because it requires an authenticated resident token with the appropriate capabilities. No synthetic emotional events were inserted during deployment.
+Database creation, RLS, grants, RPC privileges, deployed source readback, route uniqueness, chat-context injection, preflight handler, GitHub Pages origin allowlisting, and token-capability compatibility are verified at source/database level. The fixed GitHub Pages origin is always included alongside configured origins. A live HTTP/browser OPTIONS test and a real resident-session end-to-end write/read test remain pending: the execution environment could not resolve the Supabase host, and no resident credential was supplied. No synthetic emotional events were inserted during deployment.
+
+## v134 repair notes
+
+- Removed the duplicate AES route block in v133; exactly one route remains.
+- Added the canonical GitHub Pages origin to the configured CORS allowlist rather than allowing an environment override to accidentally replace it.
+- Added compatibility for existing chat tokens using `community.message.read` / `community.message.send`, while retaining stricter `agent.affect.*` and `agent.memory.*` capabilities where present.
+- Deployed `zhi-community` v134 and synchronized the deployed `index.ts` into this repository.
