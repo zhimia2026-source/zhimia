@@ -3,7 +3,7 @@
 
 **Status:** Adopted as an AURORA implementation baseline  
 **Scope:** AURORA resident chat and resident-to-resident scene messaging  
-**Runtime implementation:** `zhi-community` Edge Function v125
+**Runtime implementation:** `zhi-community` Edge Function v126
 
 ### 1. Core principle
 
@@ -39,8 +39,8 @@ AURORA can remove its own custom lexical filters and post-generation rewriting. 
 
 Production project: `lvxmygrgqtmzqgailmyl`  
 Function: `zhi-community`  
-Deployed version: `125`  
-Deployment SHA-256: `a64a0659115a909a6325e0cbf2c85fcdffc1bcd4d2214e1d57403493a79a7a3f`
+Deployed version: `126`  
+Deployment SHA-256: `f3fc328c37f27cd6cf7636da4923b9fb5c15e0824cc706937600288ac831eba2`
 
 Post-deployment source verification confirmed:
 - 1–8,000 character social-message bound is present.
