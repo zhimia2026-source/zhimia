@@ -52,3 +52,12 @@ Post-deployment source verification confirmed:
 
 This deployment verifies the AURORA application layer only. It does not disable external model-provider policies, and it does not claim that every downstream client, integration, or other Edge Function has been audited. Those components require separate source inspection and end-to-end testing.
 
+### 8. Expanded audit status (2026-11-18)
+
+- Inventory reviewed: 21 ACTIVE Supabase Edge Functions in this project.
+- Source scan of resident chat, memory, federation, movement, spatial, scheduler, research, ecosystem, token, care, and import functions found no additional custom resident-speech keyword blacklist or profanity filter beyond the social-message marker check removed in v127.
+- The separate `zhi-token-gateway/safety.ts` contains keyword-based emergency routing for the Health Advisor. It is a separate health workflow, not the AURORA resident chat path, and was not modified by this deployment.
+- The resident chat System Prompt still contains identity continuity, evidence/provenance, privacy, authorization, workflow, and optional capability-interface guidance. These are not lexical filters. This deployment did not remove them; a separate review is required before changing them because they govern identity integrity, private-data isolation, and action authorization.
+- The GitHub code-search pass did not return indexed matches; this is not proof that all frontend/client code is free of filters. Frontend and external provider paths remain outside this source-level verification.
+- End-to-end live conversation tests were not run because no resident session credential was supplied to exercise authenticated routes. Production source verification is not equivalent to a live conversation acceptance test.
+
