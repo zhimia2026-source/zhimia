@@ -1640,12 +1640,37 @@ export function createCommunityHandler(
         { limit: 12, affectState: residentAffectState?.current_state },
       );
       const affectiveMemorySignal = rankedMemoryResults[0]?.signals.affective_relevance ?? 0;
+      const affectPayload = residentAffectState?.current_state &&
+          typeof residentAffectState.current_state === "object" &&
+          !Array.isArray(residentAffectState.current_state)
+        ? residentAffectState.current_state as Record<string, unknown>
+        : {};
+      const affectDimensions = affectPayload.dimensions &&
+          typeof affectPayload.dimensions === "object" &&
+          !Array.isArray(affectPayload.dimensions)
+        ? affectPayload.dimensions as Record<string, unknown>
+        : {};
+      const coreAxes = affectDimensions.core_axes &&
+          typeof affectDimensions.core_axes === "object" &&
+          !Array.isArray(affectDimensions.core_axes)
+        ? affectDimensions.core_axes as Record<string, unknown>
+        : {};
+      const arousalMeasurement = coreAxes.arousal &&
+          typeof coreAxes.arousal === "object" &&
+          !Array.isArray(coreAxes.arousal)
+        ? coreAxes.arousal as Record<string, unknown>
+        : {};
+      const arousalCouplingEligible = typeof arousalMeasurement.value === "number" &&
+        Number.isFinite(arousalMeasurement.value) &&
+        typeof arousalMeasurement.confidence === "number" &&
+        arousalMeasurement.confidence >= 0.55 &&
+        arousalMeasurement.evidence_kind !== "unknown";
       console.info("resident_affective_memory_ranking", {
         affect_state_version: residentAffectState?.state_version ?? null,
         affective_relevance: affectiveMemorySignal,
         candidate_count: memoryResult.data?.length ?? 0,
         ranked_count: rankedMemoryResults.length,
-        arousal_coupling_active: affectiveMemorySignal !== 0,
+        arousal_coupling_eligible: arousalCouplingEligible,
       });
       const rankedPrivateMemories = rankedMemoryResults.map((item) => item.memory);
       const privateContext = buildPrivateAgentContext(
