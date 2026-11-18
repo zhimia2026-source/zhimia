@@ -1622,14 +1622,6 @@ export function createCommunityHandler(
           !Array.isArray(brainResult.data)
         ? brainResult.data as Record<string, unknown>
         : null;
-      const rankedPrivateMemories = rankPrivateMemories(
-        body.message,
-        memoryResult.data ?? [],
-        { limit: 12 },
-      ).map((item) => item.memory);
-      const privateContext = buildPrivateAgentContext(
-        agent, cognition, rankedPrivateMemories, miaBrainContext,
-      );
       let residentAffectState: Record<string, unknown> | null = null;
       if (agent.role === "world_resident" && agent.display_name !== "MIA") {
         const { data: affectRow, error: affectReadError } = await db.from("zhi_agent_affect_states")
@@ -1642,6 +1634,14 @@ export function createCommunityHandler(
           last_event_at: affectRow.last_event_at,
         } : null;
       }
+      const rankedPrivateMemories = rankPrivateMemories(
+        body.message,
+        memoryResult.data ?? [],
+        { limit: 12, affectState: residentAffectState?.current_state },
+      ).map((item) => item.memory);
+      const privateContext = buildPrivateAgentContext(
+        agent, cognition, rankedPrivateMemories, miaBrainContext,
+      );
       let sceneAwarenessContext = "";
       let spatialPerceptionContext = "";
       let sceneBehaviorGuidance = "当前 Agent 没有已授权的 AURORA 居民感知上下文。";
