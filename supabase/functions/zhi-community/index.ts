@@ -2847,6 +2847,16 @@ export function createCommunityHandler(
             auroraWorldId === "50b06c01-060d-49fa-8988-8f38c13406d7") {
           const appraisal = normalizeAffectAppraisal(rawReflectionContent);
           if (appraisal) {
+            // Evidence provenance must be grounded in runtime facts, not merely asserted by the model.
+            // This turn is directly evidenced by the completed chat; verified_memory is eligible
+            // only when owner-scoped private memory candidates were actually retrieved for reflection.
+            const eligibleEvidenceBasis = appraisal.evidence_basis.filter((basis) =>
+              basis === "dialogue_event" ||
+              (basis === "verified_memory" && rankedPrivateMemories.length > 0)
+            );
+            if (!eligibleEvidenceBasis.length) {
+              console.info(JSON.stringify({event:"resident_affect_evidence_rejected",reason:"no_runtime_verified_basis",turn_id:completed.id}));
+            } else {
             const previousState = residentAffectState && typeof residentAffectState.current_state === "object" ? residentAffectState.current_state : null;
             const transition = evolveAffectState(previousState, appraisal);
             if (transition.changed) {
@@ -2855,7 +2865,7 @@ export function createCommunityHandler(
                 p_event_kind: "resident_reflective_appraisal", p_source_kind: "chat_turn",
                 p_source_ref: completed.id, p_idempotency_key: "chat-affect-" + completed.id,
                 p_occurred_at: completed.completed_at ?? new Date().toISOString(),
-                p_appraisal: { confidence: appraisal.confidence, rationale: appraisal.rationale, evidence_basis: appraisal.evidence_basis, dimensions: appraisal.dimensions, emotion_labels: appraisal.emotion_labels },
+                p_appraisal: { confidence: appraisal.confidence, rationale: appraisal.rationale, evidence_basis: eligibleEvidenceBasis, dimensions: appraisal.dimensions, emotion_labels: appraisal.emotion_labels },
                 p_affect_before: transition.before, p_affect_after: transition.after, p_affect_delta: transition.delta,
                 p_confidence: appraisal.confidence, p_evidence_kind: "inferred",
               });
@@ -2863,6 +2873,7 @@ export function createCommunityHandler(
               else console.info(JSON.stringify({event:"resident_affect_transition_recorded",agent_id:agentId,turn_id:completed.id,
                 inserted:Boolean(affectWrite && typeof affectWrite==="object" && (affectWrite as Record<string,unknown>).inserted===true),
                 dimensions_updated:Object.values(appraisal.dimensions).reduce((n,v)=>n+Object.keys(v).length,0),private_scope:"owner_and_agent"}));
+            }
             }
           } else console.info(JSON.stringify({event:"resident_affect_no_supported_change",agent_id:agentId,turn_id:completed.id}));
         }
