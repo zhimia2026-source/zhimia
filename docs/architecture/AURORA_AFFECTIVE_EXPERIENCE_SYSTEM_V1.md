@@ -163,3 +163,8 @@ The next-generation target architecture is documented in [`AURORA_INTRINSIC_AFFE
 The chat appraisal path now requires an explicit `evidence_basis` in each accepted appraisal (`dialogue_event` and/or `verified_memory`). Missing or unsupported evidence basis is rejected and creates no affect event. Reflection guidance explicitly prohibits inferring a resident's lived experience from user-attributed feelings, personality stereotypes, or unverified public world events. The evidence basis is persisted in the private appraisal record. This reuses the existing reflection invocation and adds no model call, cron job, synthetic state, or historical backfill.
 
 Production: `zhi-community` v141; SHA-256 `25e4b42c87b2965fa77bfef42d287452b0d1172ee1c879910c2dcf4a58458c72`. Production source readback matches GitHub for the three modified files. Runtime acceptance requires a new natural resident turn. Full AICA is not yet deployed.
+
+
+## v141 natural-turn checkpoint (2026-11-18)
+
+One complete natural resident chat turn ran after v141 deployment. The existing reflection path returned `resident_affect_no_supported_change`; no affect event was written. This is the intended no-forced-emotion behavior, not a failed write. The memory ranker processed 36 authorized candidate memories and returned 12, but the resident had no persisted affect state, so affective ranking was not eligible and the ranking adjustment remained zero. The runtime therefore confirms that the evidence gate did not fabricate an emotional transition, while also demonstrating the remaining coverage gap. No private message, resident identifier, or affect label is included in this checkpoint.
