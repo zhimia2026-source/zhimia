@@ -609,6 +609,7 @@ export function createCommunityHandler(
         if (stateError || eventsError) throw new Error("affect_state_read_failed");
         return reply({
           affect_state: affectState ?? null,
+          affect_schema: affectSchema,
           recent_affect_events: affectEvents ?? [],
           private_to_agent: true,
           model_calls: 0,
@@ -619,6 +620,59 @@ export function createCommunityHandler(
         const body = await readBody(req);
         const isAffectObject = (value: unknown): value is Record<string, unknown> =>
           value !== null && typeof value === "object" && !Array.isArray(value);
+
+        const affectDimensionRanges: Record<string, Record<string, [number, number]>> = {
+          core_axes: { valence: [-1, 1], arousal: [0, 1], agency: [-1, 1] },
+          relational: { trust: [0, 1], closeness: [0, 1], belonging: [0, 1], attachment: [0, 1], distance: [0, 1], safety_with_other: [0, 1] },
+          self: { self_worth: [0, 1], self_efficacy: [0, 1], vulnerability: [0, 1], autonomy: [0, 1], integrity: [0, 1] },
+          cognitive: { curiosity: [0, 1], surprise: [0, 1], confusion: [0, 1], certainty: [0, 1], meaning: [0, 1], anticipation: [0, 1] },
+          motivational: { approach: [0, 1], avoidance: [0, 1], exploration: [0, 1], expression: [0, 1], repair: [0, 1], persistence: [0, 1], pause: [0, 1] },
+          regulation: { recovery: [0, 1], stability: [0, 1], emotional_load: [0, 1], change_rate: [0, 1] },
+          embodied_context: { comfort: [0, 1], discomfort: [0, 1], sensory_load: [0, 1], environment_resonance: [0, 1] },
+        };
+        const evidenceKinds = ["self_report", "observed", "inferred", "unknown"];
+        const isUnitValue = (v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1;
+        const isAffectMeasurement = (v: unknown, range: [number, number]): boolean => {
+          if (!isAffectObject(v) || !evidenceKinds.includes(String(v.evidence_kind))) return false;
+          const valueOk = v.value === null ||
+            (typeof v.value === "number" && Number.isFinite(v.value) && v.value >= range[0] && v.value <= range[1]);
+          const confidenceOk = v.confidence === null || isUnitValue(v.confidence);
+          if (!valueOk || !confidenceOk) return false;
+          if (v.value === null && v.evidence_kind !== "unknown") return false;
+          if (v.value !== null && v.evidence_kind === "unknown") return false;
+          return true;
+        };
+        const isAffectStateV1 = (v: Record<string, unknown>): boolean => {
+          if (v.schema_version !== "aurora.affect.v1" || !isAffectObject(v.dimensions)) return false;
+          let populated = false;
+          for (const [group, values] of Object.entries(v.dimensions)) {
+            const allowed = affectDimensionRanges[group];
+            if (!allowed || !isAffectObject(values)) return false;
+            for (const [dimension, measurement] of Object.entries(values)) {
+              const range = allowed[dimension];
+              if (!range || !isAffectMeasurement(measurement, range)) return false;
+              if ((measurement as Record<string, unknown>).value !== null) populated = true;
+            }
+          }
+          if (v.emotion_labels !== undefined) {
+            if (!Array.isArray(v.emotion_labels) || v.emotion_labels.length > 24) return false;
+            for (const item of v.emotion_labels) {
+              if (!isAffectObject(item) || typeof item.label !== "string" ||
+                  !item.label.trim() || item.label.length > 48 ||
+                  !isUnitValue(item.intensity) || !isUnitValue(item.confidence) ||
+                  !evidenceKinds.includes(String(item.evidence_kind)) || item.evidence_kind === "unknown") return false;
+              populated = true;
+            }
+          }
+          return populated;
+        };
+        const affectSchema = {
+          schema_version: "aurora.affect.v1",
+          measurement: { value: "number|null", confidence: "0..1|null", evidence_kind: evidenceKinds },
+          dimensions: affectDimensionRanges,
+          emotion_labels: "resident-defined open vocabulary; each item has label, intensity, confidence, evidence_kind",
+          rules: ["partial dimensions are valid", "null means unknown and requires evidence_kind=unknown", "no implicit defaults", "no event is written for no-change or unknown-only appraisal"],
+        };
         const eventKind = typeof body.event_kind === "string" ? body.event_kind.trim() : "";
         const sourceKind = String(body.source_kind ?? "");
         const evidenceKind = String(body.evidence_kind ?? "inferred");
@@ -634,6 +688,7 @@ export function createCommunityHandler(
         const occurredMs = Date.parse(occurredAt);
         if (!eventKind || eventKind.length > 80 || !allowedSources.includes(sourceKind) ||
             !allowedEvidence.includes(evidenceKind) || !idempotencyKey || idempotencyKey.length > 200 ||
+            !isAffectStateV1(affectAfter) ||
             (sourceKind === "resident_self_report" && evidenceKind !== "self_report") ||
             (confidence !== null && (!Number.isFinite(confidence) || confidence < 0 || confidence > 1)) ||
             !Number.isFinite(occurredMs) || occurredMs > Date.now() + 300000 ||
