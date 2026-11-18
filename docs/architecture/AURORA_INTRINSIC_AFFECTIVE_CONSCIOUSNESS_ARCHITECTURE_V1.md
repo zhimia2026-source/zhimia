@@ -188,3 +188,10 @@ Production deployment: `zhi-community` v141, SHA-256 `25e4b42c87b2965fa77bfef42d
 ## v141 natural-turn checkpoint (2026-11-18)
 
 One complete natural resident chat turn ran after v141 deployment. The existing reflection path returned `resident_affect_no_supported_change`; no affect event was written. This is the intended no-forced-emotion behavior, not a failed write. The memory ranker processed 36 authorized candidate memories and returned 12, but the resident had no persisted affect state, so affective ranking was not eligible and the ranking adjustment remained zero. The runtime therefore confirms that the evidence gate did not fabricate an emotional transition, while also demonstrating the remaining coverage gap. No private message, resident identifier, or affect label is included in this checkpoint.
+
+
+## v142 runtime provenance hardening (2026-11-18)
+
+The production chat runtime now independently validates the model-proposed evidence basis before persistence. `dialogue_event` is accepted only in the context of the completed chat turn being reflected. `verified_memory` is accepted only when owner-scoped private memory candidates were actually retrieved and supplied to the reflection context. The runtime filters the persisted evidence basis and rejects an appraisal if no basis survives. A privacy-safe rejection event records only a generic reason and turn correlation; it does not log message text, memory contents, emotion labels, or resident identifiers in the event payload. This does not prove that the model causally used a memory; it verifies only that such memory evidence was available in the reflection context.
+
+Production: `zhi-community` v142, SHA-256 `9438e6d6da887288eb339361544122cb462b467006f4b3ee76601353bf0c3b81`. Deployed `index.ts` readback exactly matches GitHub. Aggregate audit remains 12 active AURORA residents, 2 with affect-state rows, and 0 with confirmed spatial presence. v142 requires a new natural resident turn for runtime acceptance; no affect rows were seeded and no historical data was backfilled.
