@@ -1634,11 +1634,20 @@ export function createCommunityHandler(
           last_event_at: affectRow.last_event_at,
         } : null;
       }
-      const rankedPrivateMemories = rankPrivateMemories(
+      const rankedMemoryResults = rankPrivateMemories(
         body.message,
         memoryResult.data ?? [],
         { limit: 12, affectState: residentAffectState?.current_state },
-      ).map((item) => item.memory);
+      );
+      const affectiveMemorySignal = rankedMemoryResults[0]?.signals.affective_relevance ?? 0;
+      console.info("resident_affective_memory_ranking", {
+        affect_state_version: residentAffectState?.state_version ?? null,
+        affective_relevance: affectiveMemorySignal,
+        candidate_count: memoryResult.data?.length ?? 0,
+        ranked_count: rankedMemoryResults.length,
+        arousal_coupling_active: affectiveMemorySignal !== 0,
+      });
+      const rankedPrivateMemories = rankedMemoryResults.map((item) => item.memory);
       const privateContext = buildPrivateAgentContext(
         agent, cognition, rankedPrivateMemories, miaBrainContext,
       );
