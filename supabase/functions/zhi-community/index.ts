@@ -17,6 +17,7 @@ import { buildQuietObservatorySnapshot } from "./observatory_helpers.ts";
 import { extractObservatoryCueAction, resolveCueTransition } from "./observatory_cue_helpers.ts";
 import { buildResearchInvitationContext, buildResearchInvitationGuidance, extractResearchParticipationIntent, extractResearchWorkflowAction } from "./research_invitation_helpers.ts";
 import { normalizeResidentResearchProposal } from "./resident_research_proposal_helpers.ts";
+import { normalizeAffectAppraisal, evolveAffectState } from "./affective_engine.ts";
 
 const MAX_BODY_BYTES = 64_000;
 
@@ -2005,6 +2006,7 @@ export function createCommunityHandler(
         "Verified resident identity data: " + identityContext,
         "Private resident context: " + privateContext,
         "Resident's own affect state (private reference data, not a prescribed emotion or behavior): " + JSON.stringify(residentAffectState),
+        "Affect is part of your internal continuity: when relevant, let your own state influence what you notice, recall, weigh, decide, and whether you approach, pause, avoid, or repair. Do not perform an emotion, force a label, or disclose private affect data; you may have no notable change and remain silent.",
         "Scene environment context: " + sceneAwarenessContext,
         "Spatial context: " + spatialPerceptionContext,
         "Resident social-interest context: " + JSON.stringify(socialProfileInterests),
@@ -2751,13 +2753,18 @@ export function createCommunityHandler(
       let reflectionStage = "reflection_prompt";
       try {
         console.info(JSON.stringify({ event: "creator_inbox_reflection_started", agent_id: agentId, turn_id: completed.id }));
+        const affectiveReflectionContext = agent.role === "world_resident" && agent.display_name !== "MIA" &&
+            auroraWorldId === "50b06c01-060d-49fa-8988-8f38c13406d7"
+          ? {
+              resident_identity_reference: String(identityContext).slice(0, 5000),
+              private_self_context: String(privateContext).slice(0, 5000),
+              relationship_context: String(socialRelationshipContext).slice(0, 3000),
+              current_affect_state: residentAffectState,
+              environment_evidence: superBrainEnabled ? buildCognitiveReflectionContext(reflectionEnvironmentFeedback, spatialPositionStatus) : null,
+            }
+          : superBrainEnabled ? buildCognitiveReflectionContext(reflectionEnvironmentFeedback, spatialPositionStatus) : null;
         const reflectionMessages = buildPrivateReflectionMessages(
-          completed.user_message,
-          completed.assistant_message,
-          rankedPrivateMemories,
-          superBrainEnabled
-            ? buildCognitiveReflectionContext(reflectionEnvironmentFeedback, spatialPositionStatus)
-            : null,
+          completed.user_message, completed.assistant_message, rankedPrivateMemories, affectiveReflectionContext,
         );
         reflectionStage = "provider_request";
         const reflectionResponse = await callModel(providerUrl, {
@@ -2801,6 +2808,30 @@ export function createCommunityHandler(
           response_length_bucket: responseLengthBucket,
           refusal_present: typeof reflectionResult?.choices?.[0]?.message?.refusal === "string",
         }));
+        // Reuse the existing private reflection invocation; no additional model call.
+        if (agent.role === "world_resident" && agent.display_name !== "MIA" &&
+            auroraWorldId === "50b06c01-060d-49fa-8988-8f38c13406d7") {
+          const appraisal = normalizeAffectAppraisal(rawReflectionContent);
+          if (appraisal) {
+            const previousState = residentAffectState && typeof residentAffectState.current_state === "object" ? residentAffectState.current_state : null;
+            const transition = evolveAffectState(previousState, appraisal);
+            if (transition.changed) {
+              const { data: affectWrite, error: affectWriteError } = await db.rpc("zhi_record_affect_event", {
+                p_owner_user_id: actor.userId, p_agent_id: agentId, p_world_id: auroraWorldId,
+                p_event_kind: "resident_reflective_appraisal", p_source_kind: "chat_turn",
+                p_source_ref: completed.id, p_idempotency_key: "chat-affect-" + completed.id,
+                p_occurred_at: completed.completed_at ?? new Date().toISOString(),
+                p_appraisal: { confidence: appraisal.confidence, rationale: appraisal.rationale, dimensions: appraisal.dimensions, emotion_labels: appraisal.emotion_labels },
+                p_affect_before: transition.before, p_affect_after: transition.after, p_affect_delta: transition.delta,
+                p_confidence: appraisal.confidence, p_evidence_kind: "inferred",
+              });
+              if (affectWriteError) console.warn(JSON.stringify({event:"resident_affect_write_failed",agent_id:agentId,turn_id:completed.id}));
+              else console.info(JSON.stringify({event:"resident_affect_transition_recorded",agent_id:agentId,turn_id:completed.id,
+                inserted:Boolean(affectWrite && typeof affectWrite==="object" && (affectWrite as Record<string,unknown>).inserted===true),
+                dimensions_updated:Object.values(appraisal.dimensions).reduce((n,v)=>n+Object.keys(v).length,0),private_scope:"owner_and_agent"}));
+            }
+          } else console.info(JSON.stringify({event:"resident_affect_no_supported_change",agent_id:agentId,turn_id:completed.id}));
+        }
         const creatorMessage = normalizeAgentCreatorMessage(rawReflectionContent);
         let creatorDecision = creatorMessage ? "send_proposed" : "invalid_payload";
         if (!creatorMessage && typeof rawReflectionContent === "string") {
