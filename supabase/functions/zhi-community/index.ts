@@ -1722,7 +1722,7 @@ export function createCommunityHandler(
             // Only post-v143 direct messages addressed to this resident can be considered
             // lived social evidence. Old history is deliberately not backfilled.
             const AFFECTIVE_SOCIAL_EVIDENCE_START = "2026-11-18T23:55:47.865Z";
-            if (hasCapability(actor, "community.message.read")) {
+            if (agent.role === "world_resident" && agent.display_name !== "MIA" && hasCapability(actor, "community.message.read")) {
               try {
                 const { data: memberConversation, error: conversationError } = await db.from("zhi_world_conversations")
                   .select("id").eq("world_id", AURORA_WORLD_ID).eq("visibility", "members").eq("status", "open")
