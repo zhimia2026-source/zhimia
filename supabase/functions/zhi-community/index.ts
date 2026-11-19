@@ -2987,7 +2987,7 @@ export function createCommunityHandler(
                 p_occurred_at: completed.completed_at ?? new Date().toISOString(),
                 p_appraisal: { confidence: appraisal.confidence, rationale: appraisal.rationale, evidence_basis: eligibleEvidenceBasis, dimensions: appraisal.dimensions, emotion_labels: appraisal.emotion_labels, ...(eligibleEvidenceBasis.includes("verified_social_interaction") && verifiedSocialInteraction ? { source_message_id: verifiedSocialInteraction.message_id } : {}) },
                 p_affect_before: transition.before, p_affect_after: transition.after, p_affect_delta: transition.delta,
-                p_confidence: appraisal.confidence, p_evidence_kind: "inferred",
+                p_confidence: appraisal.confidence, p_evidence_kind: Object.values(appraisal.dimensions).flatMap((group) => Object.values(group)).length > 0 && Object.values(appraisal.dimensions).flatMap((group) => Object.values(group)).every((measurement) => measurement.evidence_kind === "self_report") ? "self_report" : "inferred",
               });
               if (affectWriteError) console.warn(JSON.stringify({event:"resident_affect_write_failed",agent_id:agentId,turn_id:completed.id}));
               else console.info(JSON.stringify({event:"resident_affect_transition_recorded",agent_id:agentId,turn_id:completed.id,
