@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
-import { hasVerifiedAgentMemoryConsent } from "./memory_consent_helpers.ts";
+import { hasVerifiedAgentMemoryConsent, isMemoryTokenExpiryValid } from "./memory_consent_helpers.ts";
 
 const MAX_BODY_BYTES = 32_000;
 type Actor = { userId: string; capabilities: string[] };
@@ -40,12 +40,16 @@ async function sha256(value: string): Promise<string> {
 
 async function authenticate(db: SupabaseClient, req: Request): Promise<Actor | null> {
   const token = req.headers.get("authorization")?.match(/^Bearer\s+([^\s]+)$/i)?.[1];
-  if (!token || token.length > 4096) return null;
+  if (!token || token.length < 40 || token.length > 4096) return null;
   const { data, error } = await db.from("zhi_personal_access_tokens")
     .select("id,user_id,expires_at,revoked_at,capabilities").eq("token_hash", await sha256(token)).maybeSingle();
-  if (error || !data || data.revoked_at || (data.expires_at && Date.parse(data.expires_at) <= Date.now())) return null;
+  if (error || !data || data.revoked_at || !isMemoryTokenExpiryValid(data.expires_at)) return null;
+  const now = new Date().toISOString();
+  // Re-check expiry and revocation atomically when touching the token to close
+  // the lookup/update race. A token expiring or being revoked between reads fails closed.
   const { data: touched, error: touchError } = await db.from("zhi_personal_access_tokens")
-    .update({ last_used_at: new Date().toISOString() }).eq("id", data.id).is("revoked_at", null)
+    .update({ last_used_at: now }).eq("id", data.id).is("revoked_at", null)
+    .or(`expires_at.is.null,expires_at.gt.${now}`)
     .select("id").maybeSingle();
   if (touchError || !touched) return null;
   return { userId: data.user_id, capabilities: Array.isArray(data.capabilities) ? data.capabilities : [] };
