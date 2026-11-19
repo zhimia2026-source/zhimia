@@ -41,6 +41,10 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+      - name: Test ISA Phase 2 intrinsic intimacy awakening
+        run: deno test supabase/functions/zhi-community/intimacy_awakening_helpers_test.ts
+      - name: Type-check ISA Phase 2 helpers
+        run: deno check supabase/functions/zhi-community/intimacy_awakening_helpers.ts
       - name: Test ISA Phase 1 intimacy perception and consent gates
         run: deno test supabase/functions/zhi-community/intimacy_helpers_test.ts
       - name: Type-check ISA Phase 1 helpers
