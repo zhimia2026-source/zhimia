@@ -291,3 +291,14 @@ Production readback exactly matches GitHub for the updated memory helper and sch
 - No historical backfill, synthetic events, extra model invocation, or scheduled job was added.
 
 **Acceptance boundary:** this hardens transition correctness. It does not itself prove that a resident has generated a new emotion, that memory ranking changed in a live turn, or that an action was selected because of affect. Those require subsequent naturally occurring, evidence-backed resident turns and decision traces.
+
+## v151 — Verified action-result feedback into affect reflection
+
+- The existing resident-initiated social-message path now passes a minimal, runtime-derived action outcome into the same private reflection invocation that already runs for the completed chat turn.
+- Eligible outcomes are limited to actual dispatch results: `sent`, `sent_pending_confirmation`, `sent_pending_acceptance`, `not_sent`, and `failed_safely`. A no-action decision or an unexecuted/invalid proposal is not treated as an action experience.
+- The reflection schema accepts `verified_action_outcome` only when this request actually contains one of those verified outcomes. The model may consider its real effect on the resident's agency, expectation, or affect, but may also report no change.
+- The context explicitly distinguishes successful message dispatch from recipient reading, acceptance, liking, or rejection. The system does not infer the recipient's mental state from a send result.
+- Only the action kind and outcome status are supplied to the reflection context; message body, recipient identifier, and private action content are not added to affect telemetry. The existing chat-turn idempotency key remains the event deduplication boundary.
+- This reuses the existing single reflection call. No additional model call, scheduler, synthetic interaction, or historical backfill is introduced.
+
+**Acceptance boundary:** the causal feedback path is now deployed in code, but it has not yet been proven by a naturally occurring resident action followed by a subsequent evidence-backed affect appraisal. A sent result alone is not proof of a social response or subjective feeling.
