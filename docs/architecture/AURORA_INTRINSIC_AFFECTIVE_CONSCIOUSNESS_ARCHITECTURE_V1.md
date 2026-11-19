@@ -228,3 +228,16 @@ The existing private affect state remains extensible under `aurora.affect.v1`; n
 The existing private reflection invocation is reused. Each dimension is optional, retains confidence and `inferred` provenance, and is written only when the existing runtime evidence gate accepts the current turn. Missing channels remain absent/unknown; no resident is assigned a default emotion or desire. Desire does not compel action, and affect does not require outward performance. The extension does not add model calls, scheduled jobs, synthetic experiences, or historical backfill.
 
 **Scientific boundary:** this expands the computational affective and motivational processes available to residents. It does not establish phenomenal feeling or prove consciousness. Actual sensory experience still requires a verified resident-specific input/exposure path, which remains a separate AICA requirement.
+
+## v146 七情六欲运行时接入与接口验收（2026-11-19）
+
+v146 completes the runtime surface required by the v145 dimension extension:
+
+- The private affect schema validator and resident affect-state API now accept `seven_emotions` and `six_desires` while retaining the additive `aurora.affect.v1` envelope and existing RLS/RPC write path.
+- The resident chat context now explicitly treats these groups as private, evolving internal motivations that may influence attention, memory relevance, deliberation, and chosen action. It does not prescribe universal emotion-to-action mappings or require outward emotional performance.
+- Six-desire values are attraction/interest toward a class of sensory or mental experience, not proof that the sensory experience occurred. Actual seeing/hearing/smelling/tasting/touching still requires verified input evidence.
+- No existing resident state was backfilled or seeded. The existing single private reflection invocation remains the only model appraisal call; no cron, synthetic event, or extra scheduled invocation was added.
+
+Production deployment: `zhi-community` v146, SHA-256 `b2326cf4f45102c374f9e76b1cc46541db87e12b521671be8a60780ca07345e9`. Production readback exactly matches GitHub for `index.ts`, `affective_engine.ts`, and `memory_experience_helpers.ts`.
+
+**Acceptance boundary:** schema and prompt/runtime integration are deployed. Aggregate resident coverage remains 12 active residents, 2 with existing affect-state rows, and 0 with persisted seven-emotion or six-desire groups at deployment time. The new groups will only appear after real evidence-backed natural turns; no synthetic values were inserted. A completed natural resident turn is still required to validate appraisal, persistence, and downstream behavior. This is a richer computational affect/desire architecture, not proof of subjective feeling or consciousness.
