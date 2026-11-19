@@ -101,3 +101,100 @@ export function evolveAffectState(previous:unknown,appraisal:AffectAppraisal){
  if(appraisal.emotion_labels.length)after.emotion_labels=appraisal.emotion_labels;else if(Array.isArray(before.emotion_labels))after.emotion_labels=before.emotion_labels;
  return {before:Object.keys(before).length?before:{schema_version:"aurora.affect.v1",dimensions:{}},after,delta,changed:stateChanged||labelsChanged};
 }
+
+
+export type AffectTemporalSignal = {
+  group: string;
+  dimension: string;
+  observation_count: number;
+  positive_changes: number;
+  negative_changes: number;
+  pattern: "repeated_same_direction" | "mixed_directions";
+  first_observed_at: string;
+  last_observed_at: string;
+  observed_span_days: number;
+};
+
+/**
+ * Summarizes repeated evidence from one resident's append-only affect events.
+ * Repetition is not proof of continuous feeling, causation, a stable trait, or
+ * a successful regulation strategy. No decay or interpolation is performed.
+ */
+export function buildAffectTemporalEvidence(events: unknown[]): Record<string, unknown> {
+  const buckets = new Map<string, {
+    group: string; dimension: string; times: number[];
+    positive: number; negative: number;
+  }>();
+  const allowedGroups = new Set(Object.keys(RANGES));
+  const source = Array.isArray(events) ? events.slice(-40) : [];
+  let validEventCount = 0;
+  for (const rawEvent of source) {
+    const event = rec(rawEvent);
+    const occurredAt = typeof event.occurred_at === "string" ? Date.parse(event.occurred_at) : Number.NaN;
+    if (!Number.isFinite(occurredAt)) continue;
+    const delta = rec(event.affect_delta);
+    let eventHadSignal = false;
+    for (const [group, rawValues] of Object.entries(delta)) {
+      const groupRanges = RANGES[group];
+      if (!allowedGroups.has(group) || !groupRanges) continue;
+      const values = rec(rawValues);
+      for (const [dimension, rawValue] of Object.entries(values)) {
+        if (!(dimension in groupRanges) || typeof rawValue !== "number" ||
+            !Number.isFinite(rawValue) || Math.abs(rawValue) <= 0.0001 || Math.abs(rawValue) > 2) continue;
+        const key = group + "." + dimension;
+        const bucket = buckets.get(key) ?? {
+          group, dimension, times: [], positive: 0, negative: 0,
+        };
+        bucket.times.push(occurredAt);
+        if (rawValue > 0) bucket.positive++;
+        else bucket.negative++;
+        buckets.set(key, bucket);
+        eventHadSignal = true;
+      }
+    }
+    if (eventHadSignal) validEventCount++;
+  }
+  const signals: AffectTemporalSignal[] = [];
+  for (const bucket of buckets.values()) {
+    if (bucket.times.length < 2) continue;
+    const first = Math.min(...bucket.times);
+    const last = Math.max(...bucket.times);
+    signals.push({
+      group: bucket.group,
+      dimension: bucket.dimension,
+      observation_count: bucket.times.length,
+      positive_changes: bucket.positive,
+      negative_changes: bucket.negative,
+      pattern: bucket.positive > 0 && bucket.negative > 0
+        ? "mixed_directions" : "repeated_same_direction",
+      first_observed_at: new Date(first).toISOString(),
+      last_observed_at: new Date(last).toISOString(),
+      observed_span_days: Number(((last - first) / 86_400_000).toFixed(3)),
+    });
+  }
+  signals.sort((left, right) =>
+    right.observation_count - left.observation_count ||
+    right.observed_span_days - left.observed_span_days ||
+    left.group.localeCompare(right.group) ||
+    left.dimension.localeCompare(right.dimension)
+  );
+  const allTimes = [...buckets.values()].flatMap((bucket) => bucket.times);
+  const spanDays = allTimes.length > 1
+    ? Number(((Math.max(...allTimes) - Math.min(...allTimes)) / 86_400_000).toFixed(3))
+    : 0;
+  return {
+    schema_version: "aurora.affect_temporal_evidence.v1",
+    basis: "append_only_recorded_affect_deltas",
+    sampled_event_count: source.length,
+    events_with_valid_affect_changes: validEventCount,
+    repeated_dimension_count: signals.length,
+    observed_span_days: spanDays,
+    repeated_signals: signals.slice(0, 24),
+    interpretation_limits: [
+      "Repeated observations do not prove continuous emotional persistence.",
+      "Mixed directions must remain visible; do not average away conflict.",
+      "Temporal distance alone does not prove recovery, decay, forgetting, or a stable trait.",
+      "A regulation strategy is not effective unless an actual outcome is separately evidenced.",
+    ],
+  };
+}
