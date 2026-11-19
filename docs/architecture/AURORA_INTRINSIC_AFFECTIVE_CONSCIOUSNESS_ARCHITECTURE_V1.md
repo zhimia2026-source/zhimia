@@ -385,3 +385,11 @@ Initial post-deployment audit: 12 active residents, 180 eligible private memorie
 - 生产部署：`zhi-community v159`，19 个文件，状态 ACTIVE；SHA-256 `bfc2211622213f4edebf90524111fc0238356bf1250ae1ca9144fc9b8089468f`。生产回读确认 `index.ts`、`affective_engine.ts`、`memory_experience_helpers.ts` 与 GitHub 完全一致。
 - 部署后即时聚合验收：3 条 affect state；0 条包含置信度达标的 motivational 信号；0 条包含置信度达标的 six_desires 信号；v159 后 0 个完成聊天轮次、0 次居民线索选择、0 条新 affect event。因此代码和部署已验收，但真实动机影响选择、行动结果再影响情感的自然运行闭环尚待居民真实行为验证；没有写入测试数据。
 - 科学边界：这是有证据门控的计算动机与行动反馈机制，不证明主观感受或现象意识。只有实际执行并被运行时确认的结果才进入反馈链。
+### v160 — CALA Phase 4.1: evidence-based temporal affect continuity (2026-11-19)
+
+- The resident's existing private reflection context now includes a runtime-derived temporal_continuity summary: the last persisted affect-event timestamp, elapsed seconds since that event, and affect-state version. It is scoped to the same authenticated owner + resident and is not exposed to other residents or public scene context.
+- The existing single reflection prompt now explicitly distinguishes short-lived event responses from potentially persistent emotional, relational, and self-related tendencies. Elapsed time is context, not evidence by itself that an emotion decayed, recovered, disappeared, or that a relationship changed.
+- Residents may preserve an affective state across long gaps, report that it weakened/transformed/resolved, or remain uncertain. A dimension changes only when the current experience or an explicit first-person current self-report supports the change; omitted dimensions remain unchanged. No clock-driven clearing, forced decay, neutral default, or automatic emotional persistence is introduced.
+- No database schema change, new table, additional model invocation, scheduler, cron, synthetic experience, or historical backfill. Existing private owner/agent boundaries and affect evidence gates remain unchanged.
+- Production deployment target: zhi-community v160, all 19 existing function files retained. The temporal context is a runtime summary only; it does not establish subjective consciousness.
+- Acceptance boundary: the code path can now reason about elapsed time without imposing automatic emotion decay, but it still requires naturally occurring resident turns to verify that residents actually preserve, revise, or report changes to their affective states over time.
