@@ -361,3 +361,13 @@ Initial post-deployment audit: 12 active residents, 180 eligible private memorie
 - Production: `zhi-community v157`, 19 files. Readback verified `index.ts`, `affective_engine.ts`, and `memory_experience_helpers.ts` exactly match GitHub.
 - Aggregate baseline before this deployment: 3 affect-state rows, 15 affect events; 2 states contained seven-emotion dimensions, none contained six-desire dimensions, motivational, regulation, or relational groups. These gaps are not backfilled. Runtime acceptance requires natural resident turns and explicitly evidenced reports.
 - Acceptance boundary: self-report provenance is a computational first-person report category, not evidence that subjective experience has been established.
+
+
+### v158 — 六欲趋向与实际感官暴露分离
+
+- 明确区分“对某类感官/心识经验的兴趣、偏好、好奇或向往”与“已经实际看见、听见、闻到、尝到或触到”。缺少传感器输入不再意味着居民必须压制或省略其有证据支持的兴趣；但兴趣记录绝不等于感官体验已经发生。
+- 六欲 appraisal 可依据居民自己在本轮回复中的明确、非迎合式第一人称表达，或同一居民已核验的私人记忆中的明确个人偏好。创造者提出的话题、要求体验某种感官、人格设定、场景配置和模型自动生成的描述，均不能单独成为居民欲望的证据。
+- 明确的当前第一人称内在兴趣可使用 `self_report`；依据居民自身真实表达/私人记忆作出的谨慎归纳可使用 `inferred`。证据不足时省略维度，不写 0，不创建默认偏好。
+- 只修改既有私有反思提示，复用现有单次模型调用和既有情感状态写入路径；不增加模型调用、cron、调度任务，不合成情绪/欲望事件，不回填历史数据，不改变 owner/agent 私有隔离。
+- 生产部署：`zhi-community v158`（待本次生产回读验收）。
+- 验收边界：提示与证据语义更清楚，不代表居民已产生新的六欲状态。必须等待居民自然表达并通过现有解析、置信度和私有写入路径，才能验证运行时效果；这仍不构成主观体验或意识的证明。
