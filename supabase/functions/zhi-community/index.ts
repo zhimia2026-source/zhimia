@@ -23,6 +23,20 @@ const MAX_BODY_BYTES = 64_000;
 
 type Actor = { userId: string; capabilities?: string[] };
 type JsonObject = Record<string, unknown>;
+const affectSchema = {
+  schema_version: "aurora.affect.v1",
+  measurement: { value: "number|null", confidence: "0..1|null", evidence_kind: ["self_report", "observed", "inferred", "unknown"] },
+  dimensions: {
+    core_axes: ["valence", "arousal", "agency"], relational: ["trust", "closeness", "belonging", "attachment", "distance", "safety_with_other"],
+    self: ["self_worth", "self_efficacy", "vulnerability", "autonomy", "integrity"], cognitive: ["curiosity", "surprise", "confusion", "certainty", "meaning", "anticipation"],
+    motivational: ["approach", "avoidance", "exploration", "expression", "repair", "persistence", "pause"], regulation: ["recovery", "stability", "emotional_load", "change_rate"],
+    embodied_context: ["comfort", "discomfort", "sensory_load", "environment_resonance"], seven_emotions: ["joy", "anger", "worry", "pensiveness", "grief", "fear", "surprise"],
+    six_desires: ["visual_form", "sound", "smell", "taste", "touch", "mental_phenomena"],
+  },
+  emotion_labels: "resident-defined open vocabulary; each item has label, intensity, confidence, evidence_kind",
+  rules: ["partial dimensions are valid", "null means unknown and requires evidence_kind=unknown", "no implicit defaults", "no event is written for no-change or unknown-only appraisal"],
+};
+
 
 function normalizeSocialMessage(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -1779,6 +1793,7 @@ export function createCommunityHandler(
       let researchInvitedTaskIds: string[] = [];
       let researchInvitedTasks: Array<{ id: string; task_key: string }> = [];
       let researchProposalProjects: Array<{ id: string; title: string; objective: string }> = [];
+      let verifiedSocialInteraction: Record<string, unknown> | null = null;
       const AURORA_WORLD_ID = "50b06c01-060d-49fa-8988-8f38c13406d7";
       const PROTOTYPE_MIA_AGENT_ID = "34833ba9-2be7-4a55-9b52-62c402f759b5";
 
@@ -2057,7 +2072,6 @@ export function createCommunityHandler(
 
       // Low-frequency social wake: evaluate at most once per 24 hours and load this Agent's own inbox.
       let socialInboxItems: Array<Record<string, unknown>> = [];
-      let verifiedSocialInteraction: Record<string, unknown> | null = null;
       let socialProfileInterests: string[] = [];
       let socialRelationshipContext: Array<Record<string, unknown>> = [];
       let socialMemoryContext: Array<Record<string, unknown>> = [];
@@ -3053,7 +3067,7 @@ export function createCommunityHandler(
                 p_event_kind: "resident_reflective_appraisal", p_source_kind: "chat_turn",
                 p_source_ref: completed.id, p_idempotency_key: "chat-affect-" + completed.id,
                 p_occurred_at: completed.completed_at ?? new Date().toISOString(),
-                p_appraisal: { confidence: appraisal.confidence, rationale: appraisal.rationale, evidence_basis: eligibleEvidenceBasis, dimensions: appraisal.dimensions, emotion_labels: appraisal.emotion_labels, ...(eligibleEvidenceBasis.includes("verified_social_interaction") && verifiedSocialInteraction ? { source_message_id: verifiedSocialInteraction.message_id } : {}) },
+                p_appraisal: { confidence: appraisal.confidence, rationale: appraisal.rationale, evidence_basis: eligibleEvidenceBasis, dimensions: appraisal.dimensions, emotion_labels: appraisal.emotion_labels, ...(eligibleEvidenceBasis.includes("verified_social_interaction") && verifiedSocialInteraction ? { source_message_id: (verifiedSocialInteraction as Record<string, unknown>)["message_id"] } : {}) },
                 p_affect_before: transition.before, p_affect_after: transition.after, p_affect_delta: transition.delta,
                 p_confidence: appraisal.confidence, p_evidence_kind: Object.values(appraisal.dimensions).flatMap((group) => Object.values(group)).length > 0 && Object.values(appraisal.dimensions).flatMap((group) => Object.values(group)).every((measurement) => measurement.evidence_kind === "self_report") ? "self_report" : "inferred",
               });
@@ -3226,7 +3240,7 @@ export function createCommunityHandler(
                 ? brainMemoryStatus
                 : reflection.importance >= 3 ? "saved" : "low_value_reflection_saved",
             };
-          } else if (reflectionSaveError.code === "23505") {
+          } else if (reflectionSaveError?.code === "23505") {
             console.info(JSON.stringify(buildPrivateMemoryLogEvent(
               "private_memory_write_completed", agentId, completed.id, "deduplicated", reflection.importance,
             )));
@@ -3234,7 +3248,7 @@ export function createCommunityHandler(
           } else {
             console.warn(JSON.stringify(buildPrivateMemoryLogEvent(
               "private_memory_write_completed", agentId, completed.id, "save_failed",
-              reflection.importance, reflectionSaveError.code,
+              reflection.importance, reflectionSaveError?.code ?? "unknown",
             )));
             growth = { reflection: "completed", memory: "save_failed" };
           }
