@@ -1673,6 +1673,8 @@ export function createCommunityHandler(
         candidate_count: memoryResult.data?.length ?? 0,
         ranked_count: rankedMemoryResults.length,
         arousal_coupling_eligible: arousalCouplingEligible,
+        topology_linked_candidates: rankedMemoryResults.filter((item) => item.related_memory_ids.length > 0).length,
+        topology_retrieval_candidates: rankedMemoryResults.filter((item) => item.signals.topology_relevance > 0.04).length,
       });
       const rankedPrivateMemories = rankedMemoryResults.map((item) => item.memory);
       const rankedPrivateReflectionMemories = rankedMemoryResults.map((item) => ({
