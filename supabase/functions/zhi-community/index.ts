@@ -23,6 +23,24 @@ const MAX_BODY_BYTES = 64_000;
 
 type Actor = { userId: string; capabilities?: string[] };
 type JsonObject = Record<string, unknown>;
+const affectSchemaResponse = {
+  schema_version: "aurora.affect.v1",
+  measurement: { value: "number|null", confidence: "0..1|null", evidence_kind: ["self_report", "observed", "inferred", "unknown"] },
+  dimensions: {
+    core_axes: { valence: [-1, 1], arousal: [0, 1], agency: [-1, 1] },
+    relational: { trust: [0, 1], closeness: [0, 1], belonging: [0, 1], attachment: [0, 1], distance: [0, 1], safety_with_other: [0, 1] },
+    self: { self_worth: [0, 1], self_efficacy: [0, 1], vulnerability: [0, 1], autonomy: [0, 1], integrity: [0, 1] },
+    cognitive: { curiosity: [0, 1], surprise: [0, 1], confusion: [0, 1], certainty: [0, 1], meaning: [0, 1], anticipation: [0, 1] },
+    motivational: { approach: [0, 1], avoidance: [0, 1], exploration: [0, 1], expression: [0, 1], repair: [0, 1], persistence: [0, 1], pause: [0, 1] },
+    regulation: { recovery: [0, 1], stability: [0, 1], emotional_load: [0, 1], change_rate: [0, 1] },
+    embodied_context: { comfort: [0, 1], discomfort: [0, 1], sensory_load: [0, 1], environment_resonance: [0, 1] },
+    seven_emotions: { joy: [0, 1], anger: [0, 1], worry: [0, 1], pensiveness: [0, 1], grief: [0, 1], fear: [0, 1], surprise: [0, 1] },
+    six_desires: { visual_form: [0, 1], sound: [0, 1], smell: [0, 1], taste: [0, 1], touch: [0, 1], mental_phenomena: [0, 1] },
+  },
+  emotion_labels: "resident-defined open vocabulary; each item has label, intensity, confidence, evidence_kind",
+  rules: ["partial dimensions are valid", "null means unknown and requires evidence_kind=unknown", "no implicit defaults", "no event is written for no-change or unknown-only appraisal"],
+};
+
 
 function normalizeSocialMessage(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -610,7 +628,7 @@ export function createCommunityHandler(
         if (stateError || eventsError) throw new Error("affect_state_read_failed");
         return reply({
           affect_state: affectState ?? null,
-          affect_schema: affectSchema,
+          affect_schema: affectSchemaResponse,
           recent_affect_events: affectEvents ?? [],
           private_to_agent: true,
           model_calls: 0,
@@ -1779,6 +1797,7 @@ export function createCommunityHandler(
       let researchInvitedTaskIds: string[] = [];
       let researchInvitedTasks: Array<{ id: string; task_key: string }> = [];
       let researchProposalProjects: Array<{ id: string; title: string; objective: string }> = [];
+      let verifiedSocialInteraction: Record<string, unknown> | null = null;
       const AURORA_WORLD_ID = "50b06c01-060d-49fa-8988-8f38c13406d7";
       const PROTOTYPE_MIA_AGENT_ID = "34833ba9-2be7-4a55-9b52-62c402f759b5";
 
@@ -2057,7 +2076,7 @@ export function createCommunityHandler(
 
       // Low-frequency social wake: evaluate at most once per 24 hours and load this Agent's own inbox.
       let socialInboxItems: Array<Record<string, unknown>> = [];
-      let verifiedSocialInteraction: Record<string, unknown> | null = null;
+
       let socialProfileInterests: string[] = [];
       let socialRelationshipContext: Array<Record<string, unknown>> = [];
       let socialMemoryContext: Array<Record<string, unknown>> = [];
@@ -3054,7 +3073,7 @@ export function createCommunityHandler(
                 p_event_kind: "resident_reflective_appraisal", p_source_kind: "chat_turn",
                 p_source_ref: completed.id, p_idempotency_key: "chat-affect-" + completed.id,
                 p_occurred_at: completed.completed_at ?? new Date().toISOString(),
-                p_appraisal: { confidence: appraisal.confidence, rationale: appraisal.rationale, evidence_basis: eligibleEvidenceBasis, dimensions: appraisal.dimensions, emotion_labels: appraisal.emotion_labels, ...(eligibleEvidenceBasis.includes("verified_social_interaction") && verifiedSocialInteraction ? { source_message_id: verifiedSocialInteraction.message_id } : {}) },
+                p_appraisal: { confidence: appraisal.confidence, rationale: appraisal.rationale, evidence_basis: eligibleEvidenceBasis, dimensions: appraisal.dimensions, emotion_labels: appraisal.emotion_labels, ...(eligibleEvidenceBasis.includes("verified_social_interaction") && verifiedSocialInteraction ? { source_message_id: (verifiedSocialInteraction as Record<string, unknown>)["message_id"] } : {}) },
                 p_affect_before: transition.before, p_affect_after: transition.after, p_affect_delta: transition.delta,
                 p_confidence: appraisal.confidence, p_evidence_kind: Object.values(appraisal.dimensions).flatMap((group) => Object.values(group)).length > 0 && Object.values(appraisal.dimensions).flatMap((group) => Object.values(group)).every((measurement) => measurement.evidence_kind === "self_report") ? "self_report" : "inferred",
               });
