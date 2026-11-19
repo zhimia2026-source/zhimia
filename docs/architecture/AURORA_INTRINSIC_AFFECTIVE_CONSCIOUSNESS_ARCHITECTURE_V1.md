@@ -281,3 +281,13 @@ Production readback exactly matches GitHub for the updated memory helper and sch
 - This does not add neutral defaults, synthetic affect, history backfill, model calls, or scheduled jobs.
 - Deployment: `zhi-community` v149. Production readback of `affective_engine.ts` matches GitHub.
 - Acceptance boundary: the current database still has 2 affect states, 0 states with persisted `seven_emotions`, 0 with `six_desires`; recent event counts are reported separately from proof of subjective experience. Natural future resident turns are needed to verify this confidence calibration in operation.
+
+## v150 — Zero-confidence exclusion and effective-transition semantics
+
+- The appraisal normalizer now excludes measurements and emotion labels with confidence exactly zero. They are not persisted as new resident affect values and cannot create a transition by themselves.
+- The state evolution helper repeats the zero-confidence guard as defense in depth. A transition is recorded only when at least one supported measurement actually changes/initializes state or a resident-defined emotion label changes.
+- Confidence-only changes remain visible in the full before/after state snapshot; the numeric `affect_delta` remains reserved for changes in measurement values, preserving its existing shape.
+- Positive-confidence first observations may initialize a dimension as a tentative inferred measurement; its confidence remains explicit. No neutral baseline is invented.
+- No historical backfill, synthetic events, extra model invocation, or scheduled job was added.
+
+**Acceptance boundary:** this hardens transition correctness. It does not itself prove that a resident has generated a new emotion, that memory ranking changed in a live turn, or that an action was selected because of affect. Those require subsequent naturally occurring, evidence-backed resident turns and decision traces.
