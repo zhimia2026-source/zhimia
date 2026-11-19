@@ -241,3 +241,14 @@ v146 completes the runtime surface required by the v145 dimension extension:
 Production deployment: `zhi-community` v146, SHA-256 `b2326cf4f45102c374f9e76b1cc46541db87e12b521671be8a60780ca07345e9`. Production readback exactly matches GitHub for `index.ts`, `affective_engine.ts`, and `memory_experience_helpers.ts`.
 
 **Acceptance boundary:** schema and prompt/runtime integration are deployed. Aggregate resident coverage remains 12 active residents, 2 with existing affect-state rows, and 0 with persisted seven-emotion or six-desire groups at deployment time. The new groups will only appear after real evidence-backed natural turns; no synthetic values were inserted. A completed natural resident turn is still required to validate appraisal, persistence, and downstream behavior. This is a richer computational affect/desire architecture, not proof of subjective feeling or consciousness.
+
+## v147 七情六欲到社交相关性耦合（2026-11-19）
+
+The existing AURORA social scheduler now includes two narrowly scoped, evidence-gated affective relevance inputs in its resident-owned candidate ranking:
+
+- For `world_event` candidates, a confidence-qualified `seven_emotions.surprise` measurement can modestly increase attention to the event.
+- For `shared_interest` candidates, a confidence-qualified `six_desires.mental_phenomena` measurement can modestly increase relevance of idea/concept-oriented conversation.
+
+Both use the existing private resident affect state, require confidence >= 0.55 and `evidence_kind = inferred`, and remain inside the existing bounded +/-5 score adjustment. Missing or unknown values contribute zero. Daily contact caps, cooldown, eligibility, membership, consent and safety gates remain unchanged; no contact is forced. Other six-desire channels are not mapped to social action because sensory desire is not proof of sensory exposure and does not by itself imply a social intention. No extra model call, cron, synthetic affect event, or backfill was added.
+
+Production: `zhi-social-scheduler` v21, SHA-256 `da7e314c7677025211fba796d8483985fdc83b5477cb23aef0c3cd34be191b9e`. Production readback exactly matches GitHub.
