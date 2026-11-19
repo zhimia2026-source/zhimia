@@ -22,6 +22,7 @@ const MOTIVATION_RANGES:Record<string,Record<string,[number,number]>>={
  core_axes:{valence:[-1,1],arousal:[0,1],agency:[-1,1]},
  relational:{trust:[0,1],closeness:[0,1],belonging:[0,1],distance:[0,1],safety_with_other:[0,1]},
  motivational:{approach:[0,1],avoidance:[0,1],exploration:[0,1],expression:[0,1],repair:[0,1],persistence:[0,1],pause:[0,1]},
+ regulation:{recovery:[0,1],stability:[0,1],emotional_load:[0,1],change_rate:[0,1]},
  seven_emotions:{joy:[0,1],anger:[0,1],worry:[0,1],pensiveness:[0,1],grief:[0,1],fear:[0,1],surprise:[0,1]},
  six_desires:{visual_form:[0,1],sound:[0,1],smell:[0,1],taste:[0,1],touch:[0,1],mental_phenomena:[0,1]}
 };
