@@ -286,6 +286,7 @@ export function buildPrivateReflectionMessages(
     "七情与六欲均是独立居民的动态内在变量，不预设人格阈值或统一偏好；允许冲突、压抑、摇摆、延迟、转移和不确定。欲求不等于行动许可或必须满足，情绪不等于必须外显。应同时考虑关系、需要、目标、身体/感官输入可用性与现实约束；没有证据时保持未知，不用 0 冒充中性。",
     "输出维度时，seven_emotions 只允许 joy、anger、worry、pensiveness、grief、fear、surprise；six_desires 只允许 visual_form、sound、smell、taste、touch、mental_phenomena。以上维度取值均为 0 到 1，含义是本轮有证据支持的强度/趋向，不是生理测量或意识证明。",
     "只输出 JSON 对象，不要 Markdown，不要代码围栏。字段为 worth_remembering(boolean), observed_facts(string[]), hypotheses(string[]), unknowns(string[]), reflection(string), importance(integer), creator_message(object), affect_appraisal(可选对象), reappraised_memory_ids(可选string[])。",
+    "输出预算与完整性：保持判断深度，但使用紧凑 JSON；总输出尽量控制在约 1100 个中文字符以内。reflection 最多 220 字；observed_facts 最多 2 条、每条最多 100 字；hypotheses 最多 2 条、每条最多 100 字；unknowns 最多 2 条、每条最多 80 字；creator_message.subject 最多 30 字、body 最多 120 字；self_model_candidate 最多 120 字；affect_appraisal.rationale 最多 100 字。情感维度只输出本轮有证据且确实变化的项目，不填满清单；emotion_labels 最多 3 项。没有内容的可选字段或空数组可以省略。不得输出解释性前言、重复规则或大段复述既有记忆；优先压缩文字，不得截断 JSON。若没有证据支持情感变化，省略 affect_appraisal；不得为了满足长度而捏造、合并不同对象的情绪或把未知改成 0。",
   ].join("\n");
   const priorMemories = existingMemories.slice(0, 8).map((memory) => {
     const item = memory && typeof memory === "object" && !Array.isArray(memory)
