@@ -146,7 +146,7 @@ Deno.serve(async (req: Request) => {
       });
       if (auditError) return reply({ error: "audit_unavailable" }, 503);
       const status = url.searchParams.get("status");
-      const allowedStatuses = ["candidate", "approved", "rejected", "archived"];
+      const allowedStatuses = ["candidate", "approved", "auto_curated", "rejected", "archived"];
       if (status && status !== "all" && !allowedStatuses.includes(status)) return reply({ error: "invalid_status" }, 400);
       const limit = Number(url.searchParams.get("limit") ?? "50");
       if (!Number.isInteger(limit) || limit < 1 || limit > 100) return reply({ error: "invalid_limit" }, 400);
