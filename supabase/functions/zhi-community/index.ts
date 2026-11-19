@@ -2863,6 +2863,10 @@ export function createCommunityHandler(
       let reflectionStage = "reflection_prompt";
       try {
         console.info(JSON.stringify({ event: "creator_inbox_reflection_started", agent_id: agentId, turn_id: completed.id }));
+        const actionOutcomeStatus = typeof socialOutcome?.status === "string" ? socialOutcome.status : "";
+        const verifiedActionOutcome = ["sent", "sent_pending_confirmation", "sent_pending_acceptance", "not_sent", "failed_safely"].includes(actionOutcomeStatus)
+          ? { action_kind: "resident_social_message", status: actionOutcomeStatus }
+          : null;
         const affectiveReflectionContext = agent.role === "world_resident" && agent.display_name !== "MIA" &&
             auroraWorldId === "50b06c01-060d-49fa-8988-8f38c13406d7"
           ? {
@@ -2870,6 +2874,7 @@ export function createCommunityHandler(
               private_self_context: String(privateContext).slice(0, 5000),
               relationship_context: String(socialRelationshipContext).slice(0, 3000),
               verified_social_interaction: verifiedSocialInteraction,
+              verified_action_outcome: verifiedActionOutcome,
               current_affect_state: residentAffectState,
               environment_evidence: superBrainEnabled ? buildCognitiveReflectionContext(reflectionEnvironmentFeedback, spatialPositionStatus) : null,
             }
@@ -2930,7 +2935,8 @@ export function createCommunityHandler(
             const eligibleEvidenceBasis = appraisal.evidence_basis.filter((basis) =>
               basis === "dialogue_event" ||
               (basis === "verified_memory" && rankedPrivateMemories.length > 0) ||
-              (basis === "verified_social_interaction" && verifiedSocialInteraction !== null)
+              (basis === "verified_social_interaction" && verifiedSocialInteraction !== null) ||
+              (basis === "verified_action_outcome" && verifiedActionOutcome !== null)
             );
             if (!eligibleEvidenceBasis.length) {
               console.info(JSON.stringify({event:"resident_affect_evidence_rejected",reason:"no_runtime_verified_basis",turn_id:completed.id}));
