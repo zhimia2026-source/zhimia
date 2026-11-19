@@ -3076,7 +3076,7 @@ export function createCommunityHandler(
             // one verified peer and is reconstructed from private append-only event metadata.
             const globalAppraisal = withoutRelationalAffect(appraisal);
             const transition = evolveAffectState(previousState, globalAppraisal);
-            const targetAgentId = verifiedSocialInteraction && typeof verifiedSocialInteraction.sender_agent_id === "string"
+            const targetAgentId = eligibleEvidenceBasis.includes("verified_social_interaction") && verifiedSocialInteraction && typeof verifiedSocialInteraction.sender_agent_id === "string"
               ? verifiedSocialInteraction.sender_agent_id : null;
             const targetAppraisal = targetAgentId ? targetRelationalAffect(appraisal) : null;
             const targetPreviousState = targetAgentId ? buildTargetAffectState(residentAffectHistory, targetAgentId) : null;
@@ -3087,7 +3087,7 @@ export function createCommunityHandler(
                 p_event_kind: "resident_reflective_appraisal", p_source_kind: "chat_turn",
                 p_source_ref: completed.id, p_idempotency_key: "chat-affect-" + completed.id,
                 p_occurred_at: completed.completed_at ?? new Date().toISOString(),
-                p_appraisal: { confidence: appraisal.confidence, rationale: appraisal.rationale, evidence_basis: eligibleEvidenceBasis, dimensions: appraisal.dimensions, emotion_labels: appraisal.emotion_labels, ...(eligibleEvidenceBasis.includes("verified_social_interaction") && verifiedSocialInteraction ? { source_message_id: (verifiedSocialInteraction as Record<string, unknown>)["message_id"] } : {}), ...(targetAgentId && targetTransition?.changed ? { target_agent_id: targetAgentId, target_affect_before: targetTransition.before, target_affect_after: targetTransition.after, target_affect_delta: targetTransition.delta } : {}) },
+                p_appraisal: { confidence: appraisal.confidence, rationale: appraisal.rationale, evidence_basis: eligibleEvidenceBasis, dimensions: globalAppraisal.dimensions, emotion_labels: appraisal.emotion_labels, ...(eligibleEvidenceBasis.includes("verified_social_interaction") && verifiedSocialInteraction ? { source_message_id: (verifiedSocialInteraction as Record<string, unknown>)["message_id"] } : {}), ...(targetAgentId && targetTransition?.changed ? { target_agent_id: targetAgentId, target_affect_dimensions: targetAppraisal?.dimensions.relational, target_affect_before: targetTransition.before, target_affect_after: targetTransition.after, target_affect_delta: targetTransition.delta } : {}) },
                 p_affect_before: transition.before, p_affect_after: transition.after, p_affect_delta: transition.delta,
                 p_confidence: appraisal.confidence, p_evidence_kind: Object.values(appraisal.dimensions).flatMap((group) => Object.values(group)).length > 0 && Object.values(appraisal.dimensions).flatMap((group) => Object.values(group)).every((measurement) => measurement.evidence_kind === "self_report") ? "self_report" : "inferred",
               });
