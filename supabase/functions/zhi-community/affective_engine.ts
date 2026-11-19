@@ -62,7 +62,7 @@ export function evolveAffectState(previous:unknown,appraisal:AffectAppraisal){
  const alpha=Math.max(0,Math.min(0.65,m.confidence*0.65));const value=oldValue===null?m.value:oldValue+(m.value-oldValue)*alpha;
  const oldConfidence=oldItem.confidence;const confidence=typeof oldConfidence==="number"&&Number.isFinite(oldConfidence)&&oldConfidence>=0&&oldConfidence<=1
   ? oldConfidence+(m.confidence-oldConfidence)*alpha : m.confidence;
- ng[k]={value,confidence,evidence_kind:m.evidence_kind};
+ ng[k]={value,confidence,evidence_kind:oldValue===null?m.evidence_kind:(oldItem.evidence_kind==="self_report"&&m.evidence_kind==="self_report"?"self_report":"inferred")};
  if(oldValue===null||Math.abs(value-oldValue)>0.0001||oldConfidence!==confidence)stateChanged=true;
  if(oldValue!==null&&Math.abs(value-oldValue)>0.0001)gd[k]=Number((value-oldValue).toFixed(6));}
  if(Object.keys(ng).length)next[g]=ng;if(Object.keys(gd).length)delta[g]=gd;}
