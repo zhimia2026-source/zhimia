@@ -529,3 +529,33 @@ export function buildResidentCognitionDiagnostics(identityContextJson: string) {
     };
   }
 }
+
+/**
+ * Corrects a provider-authored first-person identity claim only when the
+ * owned agent is verified as an AURORA world resident. Later reply content
+ * is preserved verbatim. Non-residents and ordinary conversation are untouched.
+ */
+export function normalizeResidentIdentityReply(
+  reply: string,
+  identity: { display_name?: unknown; role?: unknown },
+): { reply: string; corrected: boolean } {
+  if (typeof reply !== "string" || identity.role !== "world_resident") {
+    return { reply, corrected: false };
+  }
+  const displayName = typeof identity.display_name === "string"
+    ? identity.display_name.trim().slice(0, 80)
+    : "";
+  if (!displayName) return { reply, corrected: false };
+
+  const separator = reply.search(/\n\s*\n/);
+  const firstParagraph = separator >= 0 ? reply.slice(0, separator) : reply;
+  const claimsFirstPersonIdentity = /^(?:我(?:是|叫)\s*[^，。.!！\n]{1,80}|I am\s+[^,.!\n]{1,80}|I'm\s+[^,.!\n]{1,80})/i.test(firstParagraph.trim());
+  const claimsExternalDeveloper = /(?:由.{1,50}(?:开发|创建|训练)|(?:developed|created|built|trained)\s+by\s+.{1,80})/i.test(firstParagraph);
+  if (!claimsFirstPersonIdentity || !claimsExternalDeveloper) {
+    return { reply, corrected: false };
+  }
+
+  const canonical = `我是${displayName}，AURORA 世界的居民。`;
+  const remainder = separator >= 0 ? reply.slice(separator) : "";
+  return { reply: canonical + remainder, corrected: true };
+}
