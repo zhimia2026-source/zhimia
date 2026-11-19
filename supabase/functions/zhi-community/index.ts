@@ -2915,6 +2915,15 @@ export function createCommunityHandler(
           verifiedActionOutcomes.push({ action_kind: "resident_social_message", status: actionOutcomeStatus });
          }
         const verifiedActionOutcome = verifiedActionOutcomes.length ? { outcomes: verifiedActionOutcomes } : null;
+        const lastAffectEventAt = typeof residentAffectState?.last_event_at === "string"
+          ? residentAffectState.last_event_at : null;
+        const lastAffectEventMs = lastAffectEventAt ? Date.parse(lastAffectEventAt) : Number.NaN;
+        const temporalContinuity = residentAffectState ? {
+          last_affect_event_at: lastAffectEventAt,
+          elapsed_seconds: Number.isFinite(lastAffectEventMs)
+            ? Math.max(0, Math.floor((Date.now() - lastAffectEventMs) / 1000)) : null,
+          state_version: residentAffectState.state_version ?? null,
+        } : null;
         const affectiveReflectionContext = agent.role === "world_resident" && agent.display_name !== "MIA" &&
             auroraWorldId === "50b06c01-060d-49fa-8988-8f38c13406d7"
           ? {
@@ -2924,6 +2933,7 @@ export function createCommunityHandler(
               verified_social_interaction: verifiedSocialInteraction,
               verified_action_outcome: verifiedActionOutcome,
               current_affect_state: residentAffectState,
+              temporal_continuity: temporalContinuity,
               environment_evidence: superBrainEnabled ? buildCognitiveReflectionContext(reflectionEnvironmentFeedback, spatialPositionStatus) : null,
             }
           : superBrainEnabled ? buildCognitiveReflectionContext(reflectionEnvironmentFeedback, spatialPositionStatus) : null;
