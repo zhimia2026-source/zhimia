@@ -216,7 +216,7 @@ export function targetRelationalAffect(appraisal: AffectAppraisal): AffectApprai
 
 /** Recover the latest private affect state for one exact peer from append-only event metadata. */
 export function buildTargetAffectState(events: unknown[], targetAgentId: string): Record<string, unknown> | null {
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(targetAgentId)) return null;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetAgentId)) return null;
   let latest: Record<string, unknown> | null = null;
   for (const raw of Array.isArray(events) ? events : []) {
     const event = rec(raw);
@@ -230,7 +230,7 @@ export function buildTargetAffectState(events: unknown[], targetAgentId: string)
 
 /** Build target-only temporal evidence; events for every other peer are excluded. */
 export function buildTargetAffectTemporalEvidence(events: unknown[], targetAgentId: string): Record<string, unknown> {
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(targetAgentId)) {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetAgentId)) {
     return { schema_version: "aurora.target_affect_temporal.v1", target_agent_id: null, repeated_signals: [], sampled_event_count: 0 };
   }
   const scoped = (Array.isArray(events) ? events : []).filter((raw) => {
