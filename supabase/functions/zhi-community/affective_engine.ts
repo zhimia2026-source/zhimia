@@ -1,4 +1,4 @@
-export type AffectMeasurement = { value: number; confidence: number; evidence_kind: "inferred" };
+export type AffectMeasurement = { value: number; confidence: number; evidence_kind: "inferred" | "self_report" };
 export type AffectAppraisal = {
  dimensions: Record<string, Record<string, AffectMeasurement>>;
  emotion_labels: Array<{label:string;intensity:number;confidence:number;evidence_kind:"inferred"}>;
@@ -37,9 +37,9 @@ export function normalizeAffectAppraisal(raw:unknown):AffectAppraisal|null{
  for(const [g,rv] of Object.entries(dims)){const allowed=RANGES[g],vals=rec(rv);if(!allowed||Object.keys(vals).length>12)return null;
  const clean:Record<string,AffectMeasurement>={};for(const [k,rm] of Object.entries(vals)){const m=rec(rm),range=allowed[k];
  if(!range||typeof m.value!=="number"||!Number.isFinite(m.value)||m.value<range[0]||m.value>range[1]||
- typeof m.confidence!=="number"||m.confidence<0||m.confidence>1||m.evidence_kind!=="inferred")return null;
+ typeof m.confidence!=="number"||m.confidence<0||m.confidence>1||!(m.evidence_kind==="inferred"||m.evidence_kind==="self_report"))return null;
  if(m.confidence<=0)continue;
- clean[k]={value:m.value,confidence:m.confidence,evidence_kind:"inferred"};}if(Object.keys(clean).length)out[g]=clean;}
+ clean[k]={value:m.value,confidence:m.confidence,evidence_kind:m.evidence_kind};}if(Object.keys(clean).length)out[g]=clean;}
  const labelsRaw=Array.isArray(a.emotion_labels)?a.emotion_labels:[];if(labelsRaw.length>12)return null;
  const labels:AffectAppraisal["emotion_labels"]=[];for(const item of labelsRaw){const x=rec(item);
  if(typeof x.label!=="string"||!x.label.trim()||x.label.length>48||typeof x.intensity!=="number"||x.intensity<0||x.intensity>1||
@@ -62,7 +62,7 @@ export function evolveAffectState(previous:unknown,appraisal:AffectAppraisal){
  const alpha=Math.max(0,Math.min(0.65,m.confidence*0.65));const value=oldValue===null?m.value:oldValue+(m.value-oldValue)*alpha;
  const oldConfidence=oldItem.confidence;const confidence=typeof oldConfidence==="number"&&Number.isFinite(oldConfidence)&&oldConfidence>=0&&oldConfidence<=1
   ? oldConfidence+(m.confidence-oldConfidence)*alpha : m.confidence;
- ng[k]={value,confidence,evidence_kind:"inferred"};
+ ng[k]={value,confidence,evidence_kind:m.evidence_kind};
  if(oldValue===null||Math.abs(value-oldValue)>0.0001||oldConfidence!==confidence)stateChanged=true;
  if(oldValue!==null&&Math.abs(value-oldValue)>0.0001)gd[k]=Number((value-oldValue).toFixed(6));}
  if(Object.keys(ng).length)next[g]=ng;if(Object.keys(gd).length)delta[g]=gd;}
