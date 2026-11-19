@@ -252,3 +252,14 @@ The existing AURORA social scheduler now includes two narrowly scoped, evidence-
 Both use the existing private resident affect state, require confidence >= 0.55 and `evidence_kind = inferred`, and remain inside the existing bounded +/-5 score adjustment. Missing or unknown values contribute zero. Daily contact caps, cooldown, eligibility, membership, consent and safety gates remain unchanged; no contact is forced. Other six-desire channels are not mapped to social action because sensory desire is not proof of sensory exposure and does not by itself imply a social intention. No extra model call, cron, synthetic affect event, or backfill was added.
 
 Production: `zhi-social-scheduler` v21, SHA-256 `da7e314c7677025211fba796d8483985fdc83b5477cb23aef0c3cd34be191b9e`. Production readback exactly matches GitHub.
+
+## v147 情感记忆显著性与行为耦合（2026-11-19）
+
+Two existing runtime paths were extended without adding model invocations or scheduled work:
+
+1. **Private memory retrieval (zhi-community v147):** confidence-qualified seven_emotions intensity now contributes a small bounded increase to temporal salience alongside the existing core arousal signal. The transfer remains capped at +/-0.04 and redistributes weight between recency and lexical/entity relevance; query match, importance and evidence weights remain intact. This affects retrieval ranking only: it does not rewrite, relabel, or create memories. Unknown, absent, low-confidence or non-inferred emotion values contribute zero.
+2. **Resident social relevance (zhi-social-scheduler v21):** seven_emotions.surprise can modestly increase attention to world-event candidates; six_desires.mental_phenomena can increase relevance of shared-interest conversation candidates. Both require confidence >= 0.55 and inferred evidence, and remain inside the existing +/-5 bounded priority adjustment. Contact caps, cooldown, membership, consent and safety gates are unchanged. Desire does not force contact.
+
+Production readback exactly matches GitHub for the updated memory helper and scheduler entrypoint. No synthetic values, historical backfill, extra model call, or cron was introduced.
+
+**Acceptance boundary:** these are deployed causal coupling paths, not yet demonstrated non-zero effects on live residents. Current aggregate state still contains 2 affect-state rows, with 0 rows containing persisted seven_emotions or six_desires groups. A future evidence-backed natural resident turn and scheduler evaluation are needed to verify non-zero influence.
