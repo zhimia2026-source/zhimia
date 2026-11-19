@@ -1677,12 +1677,38 @@ export function createCommunityHandler(
         topology_retrieval_candidates: rankedMemoryResults.filter((item) => item.signals.topology_relevance > 0.04).length,
       });
       const rankedPrivateMemories = rankedMemoryResults.map((item) => item.memory);
+      const revisionLineageResult = rankedPrivateMemories.length
+        ? await db.from("zhi_agent_memory_revisions")
+          .select("new_memory_id,prior_memory_id,created_at")
+          .eq("owner_user_id", actor.userId).eq("agent_id", agentId)
+          .order("created_at", { ascending: false }).limit(100)
+        : { data: [], error: null };
+      if (revisionLineageResult.error) throw new Error("private_memory_revision_context_unavailable");
+      const selectedMemoryIds = new Set(rankedPrivateMemories.slice(0, 8)
+        .map((memory) => memory.id).filter((id): id is string => typeof id === "string"));
+      const revisionLinksByMemoryId = new Map<string, Array<{ related_memory_id: string; relation_kind: string; created_at: string }>>();
+      for (const link of revisionLineageResult.data ?? []) {
+        const newId = String(link.new_memory_id ?? "");
+        const priorId = String(link.prior_memory_id ?? "");
+        if (!selectedMemoryIds.has(newId) && !selectedMemoryIds.has(priorId)) continue;
+        if (selectedMemoryIds.has(newId)) {
+          const items = revisionLinksByMemoryId.get(newId) ?? [];
+          items.push({ related_memory_id: priorId, relation_kind: "reinterpretation_of", created_at: String(link.created_at ?? "") });
+          revisionLinksByMemoryId.set(newId, items);
+        }
+        if (selectedMemoryIds.has(priorId)) {
+          const items = revisionLinksByMemoryId.get(priorId) ?? [];
+          items.push({ related_memory_id: newId, relation_kind: "reinterpreted_by", created_at: String(link.created_at ?? "") });
+          revisionLinksByMemoryId.set(priorId, items);
+        }
+      }
       const rankedPrivateReflectionMemories = rankedMemoryResults.map((item) => ({
         ...item.memory,
         retrieval_context: {
           topology_relevance: item.signals.topology_relevance,
           affective_relevance: item.signals.affective_relevance,
           related_memory_ids: item.related_memory_ids,
+          revision_links: revisionLinksByMemoryId.get(String(item.memory.id ?? ""))?.slice(0, 4) ?? [],
         },
       }));
       const privateContext = buildPrivateAgentContext(
@@ -3044,7 +3070,7 @@ export function createCommunityHandler(
           console.info(JSON.stringify(buildPrivateMemoryLogEvent(
             "private_memory_decision", agentId, completed.id, "eligible_for_write", reflection.importance,
           )));
-          const { error: reflectionSaveError } = await db.from("zhi_agent_micro_experiences").insert({
+          const { data: savedReflection, error: reflectionSaveError } = await db.from("zhi_agent_micro_experiences").insert({
             owner_user_id: actor.userId,
             agent_id: agentId,
             world_id: null,
@@ -3057,8 +3083,35 @@ export function createCommunityHandler(
             reflection: reflection.reflection,
             importance: reflection.importance,
             memory_status: "auto_curated",
-          });
-          if (!reflectionSaveError) {
+          }).select("id").single();
+          if (!reflectionSaveError && savedReflection?.id) {
+            const allowedReappraisalIds = new Set(rankedPrivateReflectionMemories.slice(0, 8)
+              .map((memory) => memory.id).filter((id): id is string => typeof id === "string"));
+            const reappraisedIds = (reflection.reappraised_memory_ids ?? [])
+              .filter((id) => allowedReappraisalIds.has(id) && id !== savedReflection.id)
+              .slice(0, 8);
+            if (agent.role === "world_resident" && agent.display_name !== "MIA" &&
+                auroraWorldId === "50b06c01-060d-49fa-8988-8f38c13406d7" && reappraisedIds.length) {
+              const { error: revisionWriteError } = await db.from("zhi_agent_memory_revisions").insert(
+                reappraisedIds.map((priorMemoryId) => ({
+                  owner_user_id: actor.userId,
+                  agent_id: agentId,
+                  new_memory_id: savedReflection.id,
+                  prior_memory_id: priorMemoryId,
+                  relation_kind: "reinterpretation",
+                })),
+              );
+              if (revisionWriteError && revisionWriteError.code !== "23505") {
+                console.warn(JSON.stringify({ event: "resident_memory_revision_link_write_failed",
+                  agent_id: agentId, turn_id: completed.id, error_code: revisionWriteError.code }));
+              } else {
+                console.info(JSON.stringify({ event: "resident_memory_revision_links_recorded",
+                  agent_id: agentId, turn_id: completed.id, link_count: reappraisedIds.length }));
+              }
+            }
+            console.info(JSON.stringify(buildPrivateMemoryLogEvent(
+              "private_memory_write_completed", agentId, completed.id, "saved", reflection.importance,
+            )));
             console.info(JSON.stringify(buildPrivateMemoryLogEvent(
               "private_memory_write_completed", agentId, completed.id, "saved", reflection.importance,
             )));
