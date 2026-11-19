@@ -133,7 +133,23 @@ export function rankPrivateMemories<T extends PrivateMemoryRecord>(
       arousalItem.confidence >= 0.55 && arousalItem.evidence_kind !== "unknown"
       ? clamp(arousalItem.value)
       : null;
-    const affectiveRelevance = arousal === null ? 0 : (arousal - 0.5) * 0.08;
+    // Emotion intensity contributes modestly to temporal salience: a current,
+    // evidence-backed emotional response can make recent personal memories easier
+    // to retrieve. It does not rewrite memory content or label old memories.
+    const emotionGroup = affectDimensions.seven_emotions && typeof affectDimensions.seven_emotions === "object" &&
+      !Array.isArray(affectDimensions.seven_emotions)
+      ? affectDimensions.seven_emotions as Record<string, unknown> : {};
+    const emotionKeys = ["joy", "anger", "worry", "pensiveness", "grief", "fear", "surprise"];
+    const emotionSalience = emotionKeys.reduce((max, key) => {
+      const item = emotionGroup[key] && typeof emotionGroup[key] === "object" &&
+        !Array.isArray(emotionGroup[key]) ? emotionGroup[key] as Record<string, unknown> : {};
+      if (typeof item.value !== "number" || !Number.isFinite(item.value) ||
+          typeof item.confidence !== "number" || item.confidence < 0.55 ||
+          item.evidence_kind !== "inferred") return max;
+      return Math.max(max, clamp(item.value) * item.confidence);
+    }, 0);
+    const arousalSignal = arousal === null ? 0 : (arousal - 0.5) * 0.08;
+    const affectiveRelevance = Math.max(-0.04, Math.min(0.04, arousalSignal + emotionSalience * 0.04));
 
     // Transfer at most 0.04 weight between recency and query matching / durable
     // importance. Total score weight remains 1.0 at both boundaries.
