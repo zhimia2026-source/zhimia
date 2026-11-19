@@ -263,3 +263,12 @@ Two existing runtime paths were extended without adding model invocations or sch
 Production readback exactly matches GitHub for the updated memory helper and scheduler entrypoint. No synthetic values, historical backfill, extra model call, or cron was introduced.
 
 **Acceptance boundary:** these are deployed causal coupling paths, not yet demonstrated non-zero effects on live residents. Current aggregate state still contains 2 affect-state rows, with 0 rows containing persisted seven_emotions or six_desires groups. A future evidence-backed natural resident turn and scheduler evaluation are needed to verify non-zero influence.
+
+
+## v148 — Affective confidence continuity
+
+- Resident-specific affect measurements now smooth confidence over successive evidence-backed appraisals using the same bounded update factor as the measurement value.
+- This prevents a single appraisal from abruptly replacing the confidence history of an existing emotion/desire dimension while preserving independent coexistence of dimensions.
+- Missing dimensions remain unchanged; no decay, synthetic values, backfill, new model invocation, or new scheduled job was introduced.
+- Deployment: `zhi-community` v148; production readback of `affective_engine.ts` matches GitHub.
+- Acceptance boundary: production currently has 2 affect states, 0 states containing persisted `seven_emotions`, 0 containing `six_desires`; 5 affect events were recorded in the last 7 days, 3 with non-empty deltas. The new continuity behavior is deployed but needs subsequent naturally occurring resident appraisals to verify its effect. These records do not establish subjective consciousness.
