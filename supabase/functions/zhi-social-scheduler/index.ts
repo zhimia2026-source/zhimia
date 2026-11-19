@@ -107,11 +107,15 @@ function affectiveSocialPriority(reason: string, state: unknown): { adjustment: 
       { group: "motivational", key: "exploration", direction: 1 },
       { group: "cognitive", key: "curiosity", direction: 1 },
       { group: "motivational", key: "pause", direction: -1 },
+      // Surprise can increase attention to a world event without forcing social action.
+      { group: "seven_emotions", key: "surprise", direction: 1 },
     ],
     shared_interest: [
       { group: "motivational", key: "exploration", direction: 1 },
       { group: "cognitive", key: "curiosity", direction: 1 },
       { group: "motivational", key: "pause", direction: -1 },
+      // Evidence-backed interest in ideas can increase relevance of shared-interest conversations.
+      { group: "six_desires", key: "mental_phenomena", direction: 1 },
     ],
     co_presence: [
       { group: "motivational", key: "approach", direction: 1 },
