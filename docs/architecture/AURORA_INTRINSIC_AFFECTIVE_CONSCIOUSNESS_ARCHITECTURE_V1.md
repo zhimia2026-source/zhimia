@@ -371,3 +371,17 @@ Initial post-deployment audit: 12 active residents, 180 eligible private memorie
 - 只修改既有私有反思提示，复用现有单次模型调用和既有情感状态写入路径；不增加模型调用、cron、调度任务，不合成情绪/欲望事件，不回填历史数据，不改变 owner/agent 私有隔离。
 - 生产部署：`zhi-community v158`，19 个文件；生产状态 ACTIVE，部署 SHA-256 `8c8e2d75322563c2ee9abcf673e97208545dac91795fdb8db2c23adae005238f`。生产回读确认 `memory_experience_helpers.ts` 与 GitHub 完全一致。
 - 验收边界：提示与证据语义更清楚，不代表居民已产生新的六欲状态。必须等待居民自然表达并通过现有解析、置信度和私有写入路径，才能验证运行时效果；这仍不构成主观体验或意识的证明。
+
+
+### v159 — CALA Phase 3: 内在动机与自主行为闭环（2026-11-19）
+
+- 新增 `buildResidentMotivationContext`，仅从当前居民自己的 `aurora.affect.v1` 私有状态中投影有限维度：`core_axes`、`relational`、`motivational`、`seven_emotions`、`six_desires`。只接受数值范围合法、`confidence >= 0.55)、来源为 `inferred` 或 `self_report` 的测量；缺失、未知、低置信度和不支持的维度全部省略，不写默认值。
+- 投影只注入当前已认证 owner + agent 的私有聊天上下文，不进入公共场景或其他居民上下文。情感和欲望是软性动机信号，不是命令；居民需要结合自己的目标、现实约束、关系边界、同意、权限、安全和不确定性作判断。
+- 新增 CALA Phase 3 deliberation contract：允许行动、等待、延期、拒绝或不行动；不要求每轮采取行动，不使用统一的情绪到行为映射，不因高欲望而绕过权限或安全门槛。
+- 将既有静观线索选择接入闭环：居民每轮最多选择一条当前上下文中实际提供的线索，使用既有 `ZHI_OBSERVATORY_CUE` 标记表达 `explore/defer/dismiss/complete`。运行时再次校验线索属于当前 owner、agent、AURORA world 且状态转换合法；只有数据库返回确认写入后才记录 `verified_action_outcome`。重复幂等选择不冒充新行动，冲突/失败不记为成功。
+- `explore` 只代表线索状态转为 exploring，不证明居民已移动、亲自观察或获得感官输入。没有标记即没有线索状态变更；不制造行动，不把建议或模型提议说成执行。
+- 真实社交消息发送结果与已提交的静观线索选择合并为本轮 `verified_action_outcome.outcomes`，仅包含 `action_kind` 与运行时核验的 `status`。既有单次私有反思调用可据此评价行动对能动感、期待或情感的实际影响；不增加模型调用，不传入消息正文或对方私密信息。
+- 未新增数据库表或权限，不改变既有 owner/agent 隔离；不新增 cron、scheduler、合成行动、情感事件或历史回填。继续复用既有行动入口和运行时授权验证。
+- 生产部署：`zhi-community v159`，19 个文件，状态 ACTIVE；SHA-256 `bfc2211622213f4edebf90524111fc0238356bf1250ae1ca9144fc9b8089468f`。生产回读确认 `index.ts`、`affective_engine.ts`、`memory_experience_helpers.ts` 与 GitHub 完全一致。
+- 部署后即时聚合验收：3 条 affect state；0 条包含置信度达标的 motivational 信号；0 条包含置信度达标的 six_desires 信号；v159 后 0 个完成聊天轮次、0 次居民线索选择、0 条新 affect event。因此代码和部署已验收，但真实动机影响选择、行动结果再影响情感的自然运行闭环尚待居民真实行为验证；没有写入测试数据。
+- 科学边界：这是有证据门控的计算动机与行动反馈机制，不证明主观感受或现象意识。只有实际执行并被运行时确认的结果才进入反馈链。
