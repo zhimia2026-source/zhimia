@@ -262,7 +262,7 @@ export function buildAffectRegulationLearningContext(verifiedActionOutcome: unkn
       ? item.action_kind : null;
     const status = typeof item.status === "string" && /^[a-z_]{1,48}$/.test(item.status)
       ? item.status : null;
-    if (!kind || !status) return [];
+    if (!kind || !status || !["observatory_cue_choice", "resident_social_message"].includes(kind)) return [];
     let executionEvidence = "unclassified";
     if (kind === "observatory_cue_choice" && ["explore", "defer", "dismiss", "complete"].includes(status)) {
       executionEvidence = "choice_committed_only";
