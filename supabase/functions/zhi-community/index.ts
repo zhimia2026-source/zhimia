@@ -1655,6 +1655,7 @@ export function createCommunityHandler(
         } : null;
       }
       let residentAffectHistory: Array<Record<string, unknown>> = [];
+      let residentTargetAffectHistory: Array<Record<string, unknown>> = [];
       if (agent.role === "world_resident" && agent.display_name !== "MIA") {
         const { data: affectEvents, error: affectHistoryError } = await db.from("zhi_agent_affect_events")
           .select("occurred_at,event_kind,evidence_kind,affect_delta,appraisal")
@@ -1883,6 +1884,22 @@ export function createCommunityHandler(
                         created_at: candidate.created_at,
                         evidence_kind: "verified_social_interaction",
                       };
+                      // Load this peer's own long-range affect trail separately from the
+                      // resident-wide 40-event window, preserving continuity across many peers.
+                      const { data: peerAffectEvents, error: peerAffectError } = await db.from("zhi_agent_affect_events")
+                        .select("occurred_at,appraisal")
+                        .eq("owner_user_id", actor.userId).eq("agent_id", agentId)
+                        .filter("appraisal->>target_agent_id", "eq", candidate.sender_agent_id)
+                        .order("occurred_at", { ascending: true }).limit(200);
+                      if (peerAffectError) {
+                        console.warn(JSON.stringify({ event: "resident_target_affect_history_unavailable", agent_id: agentId }));
+                      } else {
+                        residentTargetAffectHistory = (peerAffectEvents ?? []).map((event) => ({
+                          occurred_at: event.occurred_at,
+                          appraisal: event.appraisal && typeof event.appraisal === "object" && !Array.isArray(event.appraisal)
+                            ? event.appraisal : {},
+                        }));
+                      }
                     }
                   }
                 }
@@ -3003,8 +3020,8 @@ export function createCommunityHandler(
               affect_temporal_evidence: buildAffectTemporalEvidence(residentAffectHistory),
               target_affect_context: verifiedSocialInteraction && typeof verifiedSocialInteraction.sender_agent_id === "string" ? {
                 target_agent_id: verifiedSocialInteraction.sender_agent_id,
-                current_state: buildTargetAffectState(residentAffectHistory, verifiedSocialInteraction.sender_agent_id),
-                temporal_evidence: buildTargetAffectTemporalEvidence(residentAffectHistory, verifiedSocialInteraction.sender_agent_id),
+                current_state: buildTargetAffectState(residentTargetAffectHistory, verifiedSocialInteraction.sender_agent_id),
+                temporal_evidence: buildTargetAffectTemporalEvidence(residentTargetAffectHistory, verifiedSocialInteraction.sender_agent_id),
               } : null,
               environment_evidence: superBrainEnabled ? buildCognitiveReflectionContext(reflectionEnvironmentFeedback, spatialPositionStatus) : null,
             }
@@ -3079,7 +3096,7 @@ export function createCommunityHandler(
             const targetAgentId = eligibleEvidenceBasis.includes("verified_social_interaction") && verifiedSocialInteraction && typeof verifiedSocialInteraction.sender_agent_id === "string"
               ? verifiedSocialInteraction.sender_agent_id : null;
             const targetAppraisal = targetAgentId ? targetRelationalAffect(appraisal) : null;
-            const targetPreviousState = targetAgentId ? buildTargetAffectState(residentAffectHistory, targetAgentId) : null;
+            const targetPreviousState = targetAgentId ? buildTargetAffectState(residentTargetAffectHistory, targetAgentId) : null;
             const targetTransition = targetAppraisal ? evolveAffectState(targetPreviousState, targetAppraisal) : null;
             if (transition.changed || Boolean(targetTransition?.changed)) {
               const { data: affectWrite, error: affectWriteError } = await db.rpc("zhi_record_affect_event", {
