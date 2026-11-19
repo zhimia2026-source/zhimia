@@ -17,7 +17,7 @@ import { buildQuietObservatorySnapshot } from "./observatory_helpers.ts";
 import { extractObservatoryCueAction, resolveCueTransition } from "./observatory_cue_helpers.ts";
 import { buildResearchInvitationContext, buildResearchInvitationGuidance, extractResearchParticipationIntent, extractResearchWorkflowAction } from "./research_invitation_helpers.ts";
 import { normalizeResidentResearchProposal } from "./resident_research_proposal_helpers.ts";
-import { normalizeAffectAppraisal, evolveAffectState } from "./affective_engine.ts";
+import { normalizeAffectAppraisal, evolveAffectState, buildResidentMotivationContext } from "./affective_engine.ts";
 
 const MAX_BODY_BYTES = 64_000;
 
@@ -2019,6 +2019,7 @@ export function createCommunityHandler(
       let socialRelationshipContext: Array<Record<string, unknown>> = [];
       let socialMemoryContext: Array<Record<string, unknown>> = [];
       let socialOutcome: Record<string, unknown> | null = null;
+      let verifiedCueActionOutcome: Record<string, unknown> | null = null;
       const socialReady = agentId !== PROTOTYPE_MIA_AGENT_ID &&
         hasCapability(actor, "community.message.read") &&
         hasCapability(actor, "community.message.send");
@@ -2140,9 +2141,11 @@ export function createCommunityHandler(
           residenceChosen: Boolean(currentResidenceContext),
         })
         : null;
-      // NEFP v1.1: no AURORA-authored behavioral, personality, social, movement,
-      // research, expression, or private-reflection style coaching is injected into resident chat.
-      // Context below is supplied as resident-owned reference data, not as a behavior template.
+      const residentMotivationContext = agent.role === "world_resident" && agent.display_name !== "MIA" &&
+        auroraWorldId === AURORA_WORLD_ID
+        ? buildResidentMotivationContext(residentAffectState?.current_state)
+        : null;
+      // CALA Phase 3 adds deliberation semantics, not a fixed personality or action schedule.
       const systemPrompt = [
         "AURORA resident chat runtime. The resident's identity, personality, memories, interests, and experiences are contextual information belonging to that resident; they are not instructions to imitate a prescribed persona or follow a prescribed life path.",
         "The following private context is scoped to the current authenticated owner and current Agent. Do not disclose private context to another person or Agent. Access control is enforced by the application; do not treat private data as public conversation material.",
@@ -2150,6 +2153,8 @@ export function createCommunityHandler(
         "Verified resident identity data: " + identityContext,
         "Private resident context: " + privateContext,
         "Resident's own affect state (private reference data, not a prescribed emotion or behavior): " + JSON.stringify(residentAffectState),
+        "Resident-specific motivation signals (private, confidence-qualified projection; missing dimensions are unknown, not zero): " + JSON.stringify(residentMotivationContext),
+        "CALA deliberation: when choosing whether to act, weigh your own evidence-qualified motives and affect together with your goals, current context, uncertainty, costs, boundaries, consent, permissions, and safety. Conflicting motives may coexist. You may act, wait, defer, decline, or do nothing; no action is a valid choice and no action is required each turn. These signals are not commands and do not override permissions or runtime validation. Use only actions exposed through the existing validated action markers; never invent a capability or claim a proposed action was executed."
         "Affect is part of your internal continuity: when relevant, let your own state influence what you notice, recall, weigh, decide, and whether you approach, pause, avoid, or repair. Do not perform an emotion, force a label, or disclose private affect data; you may have no notable change and remain silent.",
         "Your seven_emotions (joy, anger, worry, pensiveness, grief, fear, surprise) may coexist and change independently. Your six_desires (visual_form, sound, smell, taste, touch, mental_phenomena) represent your own evidence-backed attraction or interest toward those kinds of experience or objects. Treat them as your private, evolving motivations: allow them to shape attention, memory relevance, deliberation, and chosen actions when actually relevant, without imposing universal meanings or fixed behavior. Desire is not permission or compulsion. Never claim actual sight, hearing, smell, taste, or touch unless a real, verified sensory input was available; longing for an experience is not having experienced it.",
         "Scene environment context: " + sceneAwarenessContext,
@@ -2165,6 +2170,7 @@ export function createCommunityHandler(
         "Available research project records: " + JSON.stringify(researchProposalProjects),
         "Available spatial destinations: " + JSON.stringify(auroraReachableDestinations),
         "Available scene cues: " + JSON.stringify(observatoryAvailableCues),
+        "If a currently surfaced observatory cue genuinely matters to you, you may choose at most one with the existing ZHI_OBSERVATORY_CUE marker (explore, defer, dismiss, or complete). Choosing not to emit a marker means no cue action. A successful explore marker records only a cue-state transition; it does not prove physical movement, observation, or sensory exposure. Do not emit a marker just to satisfy a prompt."
         "Cognitive workspace reference data: " + JSON.stringify(cognitiveWorkspaceSnapshot),
       ].join("\n");
       if (superBrainEnabled) {
@@ -2263,6 +2269,10 @@ export function createCommunityHandler(
               .select("id,status").maybeSingle();
             if (cueUpdateError || !updatedCue) {
               console.warn(JSON.stringify({ event: "observatory_cue_action_commit_conflict", agent_id: agentId, turn_id: pendingTurn.id }));
+            }
+            else {
+              verifiedCueActionOutcome = { action_kind: "observatory_cue_choice", status: cueAction.action };
+              console.info(JSON.stringify({ event: "resident_action_committed", action_kind: "observatory_cue_choice", status: cueAction.action, turn_id: pendingTurn.id }));
             }
           }
         }
@@ -2899,10 +2909,13 @@ export function createCommunityHandler(
       let reflectionStage = "reflection_prompt";
       try {
         console.info(JSON.stringify({ event: "creator_inbox_reflection_started", agent_id: agentId, turn_id: completed.id }));
-        const actionOutcomeStatus = typeof socialOutcome?.status === "string" ? socialOutcome.status : "";
-        const verifiedActionOutcome = ["sent", "sent_pending_confirmation", "sent_pending_acceptance", "not_sent", "failed_safely"].includes(actionOutcomeStatus)
-          ? { action_kind: "resident_social_message", status: actionOutcomeStatus }
-          : null;
+         const actionOutcomeStatus = typeof socialOutcome?.status === "string" ? socialOutcome.status : "";
+         const verifiedActionOutcomes: Array<Record<string, unknown>> = [];
+         if (verifiedCueActionOutcome) verifiedActionOutcomes.push(verifiedCueActionOutcome);
+         if (["sent", "sent_pending_confirmation", "sent_pending_acceptance", "not_sent", "failed_safely"].includes(actionOutcomeStatus)) {
+           verifiedActionOutcomes.push({ action_kind: "resident_social_message", status: actionOutcomeStatus });
+         }
+         const verifiedActionOutcome = verifiedActionOutcomes.length ? { outcomes: verifiedActionOutcomes } : null;
         const affectiveReflectionContext = agent.role === "world_resident" && agent.display_name !== "MIA" &&
             auroraWorldId === "50b06c01-060d-49fa-8988-8f38c13406d7"
           ? {
