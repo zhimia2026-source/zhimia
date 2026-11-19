@@ -1,4 +1,5 @@
 export type PrivateMemoryRecord = {
+  id?: unknown;
   experience_type?: unknown;
   source_kind?: unknown;
   source_ref?: unknown;
@@ -149,11 +150,6 @@ export function rankPrivateMemories<T extends PrivateMemoryRecord>(
     const matched = queryTokens.filter((token) => docTokens.has(token)).length;
     const lexical = queryTokens.length ? clamp(matched / queryTokens.length) : 0;
 
-    const rawEntities = Array.isArray(memory.entities)
-      ? memory.entities.filter((item): item is string => typeof item === "string")
-      : Array.isArray((memory.metadata as Record<string, unknown> | null)?.entities)
-        ? ((memory.metadata as Record<string, unknown>).entities as unknown[]).filter((item): item is string => typeof item === "string")
-        : [];
     const entityTokens = memoryEntitySets[index];
     const entity = queryTokens.length && entityTokens.size
       ? clamp(queryTokens.filter((token) => entityTokens.has(token)).length / queryTokens.length)
