@@ -1605,7 +1605,7 @@ export function createCommunityHandler(
       // experiences are never injected into model prompts.
       const memoryResult = hasCapability(actor, "agent.memory.read")
         ? await db.from("zhi_agent_micro_experiences")
-          .select("experience_type,source_kind,source_ref,world_id,observed_facts,hypotheses,unknowns,reflection,importance,occurred_at")
+          .select("id,experience_type,source_kind,source_ref,world_id,observed_facts,hypotheses,unknowns,reflection,importance,occurred_at")
           .eq("owner_user_id", actor.userId).eq("agent_id", agentId)
           .in("memory_status", ["approved", "auto_curated"]).gte("importance", 3)
           .order("occurred_at", { ascending: false }).limit(80)
@@ -1675,6 +1675,14 @@ export function createCommunityHandler(
         arousal_coupling_eligible: arousalCouplingEligible,
       });
       const rankedPrivateMemories = rankedMemoryResults.map((item) => item.memory);
+      const rankedPrivateReflectionMemories = rankedMemoryResults.map((item) => ({
+        ...item.memory,
+        retrieval_context: {
+          topology_relevance: item.signals.topology_relevance,
+          affective_relevance: item.signals.affective_relevance,
+          related_memory_ids: item.related_memory_ids,
+        },
+      }));
       const privateContext = buildPrivateAgentContext(
         agent, cognition, rankedPrivateMemories, miaBrainContext,
       );
@@ -2880,7 +2888,7 @@ export function createCommunityHandler(
             }
           : superBrainEnabled ? buildCognitiveReflectionContext(reflectionEnvironmentFeedback, spatialPositionStatus) : null;
         const reflectionMessages = buildPrivateReflectionMessages(
-          completed.user_message, completed.assistant_message, rankedPrivateMemories, affectiveReflectionContext,
+          completed.user_message, completed.assistant_message, rankedPrivateReflectionMemories, affectiveReflectionContext,
         );
         reflectionStage = "provider_request";
         const reflectionResponse = await callModel(providerUrl, {
