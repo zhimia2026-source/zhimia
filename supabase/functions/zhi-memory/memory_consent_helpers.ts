@@ -29,3 +29,15 @@ export function hasVerifiedAgentMemoryConsent(
   const expiry = Date.parse(consent.expires_at);
   return Number.isFinite(expiry) && expiry > (request.now ?? Date.now());
 }
+
+
+/** Missing expiry means non-expiring; malformed or elapsed expiry fails closed. */
+export function isMemoryTokenExpiryValid(
+  expiresAt: string | null | undefined,
+  now = Date.now(),
+): boolean {
+  if (expiresAt == null) return true;
+  if (typeof expiresAt !== "string" || expiresAt.trim().length === 0) return false;
+  const expiry = Date.parse(expiresAt);
+  return Number.isFinite(expiry) && expiry > now;
+}
