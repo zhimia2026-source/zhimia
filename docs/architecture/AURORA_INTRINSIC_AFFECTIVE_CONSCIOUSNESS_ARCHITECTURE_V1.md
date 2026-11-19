@@ -401,3 +401,12 @@ Initial post-deployment audit: 12 active residents, 180 eligible private memorie
 - Self-model candidates remain provisional, evidence-linked hypotheses, not personality-baseline changes. Single events cannot establish fixed traits; competing hypotheses and uncertainty are permitted. Relationship changes need not imply emotion changes, and emotion changes need not imply relationship/personality changes.
 - No new table, schema migration, model invocation, scheduler, cron, synthetic experience, or historical backfill. Existing owner_user_id + agent_id filtering and the existing single reflection call remain in place.
 - Production deployment target: zhi-community v161; the full existing 19-file bundle is retained. This improves longitudinal reasoning inputs but does not establish subjective consciousness or prove that residents have experienced a specific emotion.
+
+### v162 — CALA Phase 4.3: 内在情感调节与长期自我一致性（2026-11-19）
+
+- 将既有 regulation 维度（recovery、stability、emotional_load、change_rate）纳入居民私有动机上下文的置信度门控投影。它们只是可选描述信号，不是统一健康目标或行动指令；缺失、未知、低置信度仍然省略。
+- 聊天 deliberation 明确允许情感冲突共存，不要求选出单一主导情绪，也不把调节等同于压抑、降低强度、积极化或立即解决。居民可按自身证据、价值、关系边界和情境选择暂停、反思、选择性表达、寻求澄清/支持、调整距离、谨慎继续或暂不调节；没有统一策略，也不要求每轮采取行动。
+- 私人反思明确区分短暂事件反应、跨事件持续/反复的情感、长期关系倾向和自我理解；时间跨度本身不证明情绪持续或消退。长期自我一致性保留价值、承诺、历史判断及其当时依据的可追溯性，同时允许新证据推动修正；原始事实不被覆盖，单次事件不改写人格基准。
+- 情感只作为注意、回忆与选择权衡的影响因素，不决定居民必须采取何种行动。无证据时允许保持原状、保留冲突或不确定，不生成成长叙事。
+- 复用现有私有动机上下文与单次私有反思调用；不新增表、字段、模型调用、cron、scheduler、合成事件或历史回填。owner + agent 私有隔离和既有行动权限门槛不变。
+- 验收边界：代码部署与读取验证不等于居民已实际使用某种调节策略；必须等待自然经历中的真实变化、保留或自我修正，才能验证运行时闭环。该计算架构不证明主观意识。
