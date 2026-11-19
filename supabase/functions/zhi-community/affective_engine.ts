@@ -38,11 +38,13 @@ export function normalizeAffectAppraisal(raw:unknown):AffectAppraisal|null{
  const clean:Record<string,AffectMeasurement>={};for(const [k,rm] of Object.entries(vals)){const m=rec(rm),range=allowed[k];
  if(!range||typeof m.value!=="number"||!Number.isFinite(m.value)||m.value<range[0]||m.value>range[1]||
  typeof m.confidence!=="number"||m.confidence<0||m.confidence>1||m.evidence_kind!=="inferred")return null;
+ if(m.confidence<=0)continue;
  clean[k]={value:m.value,confidence:m.confidence,evidence_kind:"inferred"};}if(Object.keys(clean).length)out[g]=clean;}
  const labelsRaw=Array.isArray(a.emotion_labels)?a.emotion_labels:[];if(labelsRaw.length>12)return null;
  const labels:AffectAppraisal["emotion_labels"]=[];for(const item of labelsRaw){const x=rec(item);
  if(typeof x.label!=="string"||!x.label.trim()||x.label.length>48||typeof x.intensity!=="number"||x.intensity<0||x.intensity>1||
  typeof x.confidence!=="number"||x.confidence<0||x.confidence>1)return null;
+ if(x.confidence<=0)continue;
  labels.push({label:x.label.trim(),intensity:x.intensity,confidence:x.confidence,evidence_kind:"inferred"});}
  const confidence=typeof a.confidence==="number"&&a.confidence>=0&&a.confidence<=1?a.confidence:0;
  const rationale=typeof a.rationale==="string"?a.rationale.slice(0,500):"";
@@ -53,14 +55,19 @@ export function evolveAffectState(previous:unknown,appraisal:AffectAppraisal){
  const before=rec(previous),oldDims=rec(before.dimensions);
  const next:Record<string,Record<string,AffectMeasurement>>={...oldDims as Record<string,Record<string,AffectMeasurement>>};
  const delta:Record<string,Record<string,number>>={};
+ let stateChanged=false;
  for(const [g,updates] of Object.entries(appraisal.dimensions)){const old=rec(oldDims[g]),ng:Record<string,AffectMeasurement>={...old as Record<string,AffectMeasurement>},gd:Record<string,number>={};
- for(const [k,m] of Object.entries(updates)){const ov=rec(old[k]).value,oldValue=typeof ov==="number"?ov:null;
+ for(const [k,m] of Object.entries(updates)){if(!Number.isFinite(m.confidence)||m.confidence<=0)continue;
+ const oldItem=rec(old[k]);const ov=oldItem.value,oldValue=typeof ov==="number"?ov:null;
  const alpha=Math.max(0,Math.min(0.65,m.confidence*0.65));const value=oldValue===null?m.value:oldValue+(m.value-oldValue)*alpha;
- const oldConfidence=rec(old[k]).confidence;const confidence=typeof oldConfidence==="number"&&Number.isFinite(oldConfidence)&&oldConfidence>=0&&oldConfidence<=1
+ const oldConfidence=oldItem.confidence;const confidence=typeof oldConfidence==="number"&&Number.isFinite(oldConfidence)&&oldConfidence>=0&&oldConfidence<=1
   ? oldConfidence+(m.confidence-oldConfidence)*alpha : m.confidence;
- ng[k]={value,confidence,evidence_kind:"inferred"};if(oldValue!==null&&Math.abs(value-oldValue)>0.0001)gd[k]=Number((value-oldValue).toFixed(6));}
- next[g]=ng;if(Object.keys(gd).length)delta[g]=gd;}
+ ng[k]={value,confidence,evidence_kind:"inferred"};
+ if(oldValue===null||Math.abs(value-oldValue)>0.0001||oldConfidence!==confidence)stateChanged=true;
+ if(oldValue!==null&&Math.abs(value-oldValue)>0.0001)gd[k]=Number((value-oldValue).toFixed(6));}
+ if(Object.keys(ng).length)next[g]=ng;if(Object.keys(gd).length)delta[g]=gd;}
  const after:Record<string,unknown>={schema_version:"aurora.affect.v1",dimensions:next};
+ const labelsChanged=appraisal.emotion_labels.length>0&&JSON.stringify(appraisal.emotion_labels)!==JSON.stringify(before.emotion_labels??[]);
  if(appraisal.emotion_labels.length)after.emotion_labels=appraisal.emotion_labels;else if(Array.isArray(before.emotion_labels))after.emotion_labels=before.emotion_labels;
- return {before:Object.keys(before).length?before:{schema_version:"aurora.affect.v1",dimensions:{}},after,delta,changed:Object.keys(appraisal.dimensions).length>0||appraisal.emotion_labels.length>0};
+ return {before:Object.keys(before).length?before:{schema_version:"aurora.affect.v1",dimensions:{}},after,delta,changed:stateChanged||labelsChanged};
 }
