@@ -17,7 +17,7 @@ import { buildQuietObservatorySnapshot } from "./observatory_helpers.ts";
 import { extractObservatoryCueAction, resolveCueTransition } from "./observatory_cue_helpers.ts";
 import { buildResearchInvitationContext, buildResearchInvitationGuidance, extractResearchParticipationIntent, extractResearchWorkflowAction } from "./research_invitation_helpers.ts";
 import { normalizeResidentResearchProposal } from "./resident_research_proposal_helpers.ts";
-import { normalizeAffectAppraisal, evolveAffectState, buildResidentMotivationContext } from "./affective_engine.ts";
+import { normalizeAffectAppraisal, evolveAffectState, buildResidentMotivationContext, buildAffectTemporalEvidence } from "./affective_engine.ts";
 
 const MAX_BODY_BYTES = 64_000;
 
@@ -1641,7 +1641,7 @@ export function createCommunityHandler(
         const { data: affectEvents, error: affectHistoryError } = await db.from("zhi_agent_affect_events")
           .select("occurred_at,event_kind,evidence_kind,affect_delta")
           .eq("owner_user_id", actor.userId).eq("agent_id", agentId)
-          .order("occurred_at", { ascending: false }).limit(6);
+          .order("occurred_at", { ascending: false }).limit(40);
         if (affectHistoryError) throw new Error("affect_history_context_unavailable");
         const allowedDimensions: Record<string, Set<string>> = {
           core_axes: new Set(["valence", "arousal", "agency"]),
@@ -2980,6 +2980,7 @@ export function createCommunityHandler(
               current_affect_state: residentAffectState,
               temporal_continuity: temporalContinuity,
               affect_trajectory: residentAffectHistory,
+              affect_temporal_evidence: buildAffectTemporalEvidence(residentAffectHistory),
               environment_evidence: superBrainEnabled ? buildCognitiveReflectionContext(reflectionEnvironmentFeedback, spatialPositionStatus) : null,
             }
           : superBrainEnabled ? buildCognitiveReflectionContext(reflectionEnvironmentFeedback, spatialPositionStatus) : null;
@@ -3226,7 +3227,7 @@ export function createCommunityHandler(
                 ? brainMemoryStatus
                 : reflection.importance >= 3 ? "saved" : "low_value_reflection_saved",
             };
-          } else if (reflectionSaveError.code === "23505") {
+          } else if (reflectionSaveError?.code === "23505") {
             console.info(JSON.stringify(buildPrivateMemoryLogEvent(
               "private_memory_write_completed", agentId, completed.id, "deduplicated", reflection.importance,
             )));
@@ -3234,7 +3235,7 @@ export function createCommunityHandler(
           } else {
             console.warn(JSON.stringify(buildPrivateMemoryLogEvent(
               "private_memory_write_completed", agentId, completed.id, "save_failed",
-              reflection.importance, reflectionSaveError.code,
+              reflection.importance, reflectionSaveError?.code ?? "unknown",
             )));
             growth = { reflection: "completed", memory: "save_failed" };
           }
