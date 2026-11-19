@@ -293,6 +293,15 @@ export function buildPrivateReflectionMessages(
       observed_facts: asSafeList(item.observed_facts, 5, 300),
       hypotheses: asSafeList(item.hypotheses, 3, 200),
       unknowns: asSafeList(item.unknowns, 5, 200),
+      retrieval_context: {
+        topology_relevance: typeof retrieval.topology_relevance === "number" && Number.isFinite(retrieval.topology_relevance)
+          ? Math.max(0, Math.min(1, retrieval.topology_relevance)) : 0,
+        affective_relevance: typeof retrieval.affective_relevance === "number" && Number.isFinite(retrieval.affective_relevance)
+          ? Math.max(-0.04, Math.min(0.04, retrieval.affective_relevance)) : 0,
+        related_memory_ids: Array.isArray(retrieval.related_memory_ids)
+          ? retrieval.related_memory_ids.filter((id): id is string => typeof id === "string" && id.length <= 80).slice(0, 3)
+          : [],
+      },
       reflection: typeof item.reflection === "string" ? item.reflection.slice(0, 500) : "",
       importance: typeof item.importance === "number" && Number.isInteger(item.importance)
         ? Math.max(1, Math.min(5, item.importance)) : null,
