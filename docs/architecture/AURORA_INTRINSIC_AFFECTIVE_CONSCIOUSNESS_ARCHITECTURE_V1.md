@@ -272,3 +272,12 @@ Production readback exactly matches GitHub for the updated memory helper and sch
 - Missing dimensions remain unchanged; no decay, synthetic values, backfill, new model invocation, or new scheduled job was introduced.
 - Deployment: `zhi-community` v148; production readback of `affective_engine.ts` matches GitHub.
 - Acceptance boundary: production currently has 2 affect states, 0 states containing persisted `seven_emotions`, 0 containing `six_desires`; 5 affect events were recorded in the last 7 days, 3 with non-empty deltas. The new continuity behavior is deployed but needs subsequent naturally occurring resident appraisals to verify its effect. These records do not establish subjective consciousness.
+
+
+## v149 — Confidence-proportional affect evolution
+
+- Removed the unconditional minimum smoothing factor from affect evolution. The update factor is now proportional to the appraisal confidence (bounded at 0.65), rather than forcing a minimum 0.15 update even when confidence is zero.
+- Existing affect values and confidence are therefore not moved by a zero-confidence appraisal; low-confidence appraisals exert correspondingly smaller influence. Missing dimensions remain unchanged, and the existing evidence-basis gate remains required.
+- This does not add neutral defaults, synthetic affect, history backfill, model calls, or scheduled jobs.
+- Deployment: `zhi-community` v149. Production readback of `affective_engine.ts` matches GitHub.
+- Acceptance boundary: the current database still has 2 affect states, 0 states with persisted `seven_emotions`, 0 with `six_desires`; recent event counts are reported separately from proof of subjective experience. Natural future resident turns are needed to verify this confidence calibration in operation.
