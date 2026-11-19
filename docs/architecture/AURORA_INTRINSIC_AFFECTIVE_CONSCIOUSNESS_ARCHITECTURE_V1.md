@@ -329,3 +329,14 @@ A production inspection found that v152 computed associative retrieval metadata 
 Production deployment: zhi-community v153, SHA-256 5cee3597591b391ec4d1422ddd020f00fd158d16658bc27de3cac63074a02776. All 19 function files were retained; production readback exactly matched GitHub for index.ts and memory_experience_helpers.ts.
 
 Initial post-deployment audit: 12 active residents, 180 eligible private memories, 0 completed turns after the deployment cutoff, 1 new private memory, and 0 new affect events. Because the audit did not yet show a completed post-deployment turn or affect event, this is not evidence that the full reflection/reappraisal loop has executed. The new memory count is recorded as a database observation only and is not attributed to v153 without a matching turn trace.
+
+
+## v154 — CALA phase 2: append-only, owner-scoped reappraisal lineage (2026-11-19)
+
+- Added `zhi_agent_memory_revisions`, an append-only relation ledger connecting a newly saved reflection to the exact prior private memories it explicitly reappraises. The source and target memory foreign keys both include `agent_id + owner_user_id`, so PostgreSQL rejects cross-resident or cross-owner links.
+- The relation table has RLS enabled, no client-role grants or policies, and only server-side `service_role` SELECT/INSERT privileges. It is not exposed as a client read/write surface. Duplicate links are prevented; deleting either memory cascades its dependent relation.
+- The existing private reflection call may optionally return `reappraised_memory_ids`. The parser accepts at most eight UUIDs, and runtime further restricts them to the exact first eight memory IDs supplied to that resident's reflection context. A retrieval association, topic mention, or model-invented ID is not enough.
+- New reflections remain separate rows; prior memory facts and text are never updated. Subsequent private reflection receives bounded lineage hints for selected memories, allowing later reinterpretation to build on prior revisions without treating newer interpretations as automatically true.
+- No additional model invocation, scheduler, cron, synthetic memory, historical backfill, or shared-memory access was introduced.
+
+**Acceptance boundary:** the schema and code path are deployed and readback-verifiable. No real resident reappraisal has yet been observed; a naturally occurring AURORA resident turn must explicitly cite a supplied prior memory, save a new reflection, and create a valid same-owner/same-agent relation before the behavioral loop can be marked verified. This is structured computational self-revision, not proof of subjective consciousness.
