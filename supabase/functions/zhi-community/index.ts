@@ -2154,7 +2154,7 @@ export function createCommunityHandler(
         "Private resident context: " + privateContext,
         "Resident's own affect state (private reference data, not a prescribed emotion or behavior): " + JSON.stringify(residentAffectState),
         "Resident-specific motivation signals (private, confidence-qualified projection; missing dimensions are unknown, not zero): " + JSON.stringify(residentMotivationContext),
-        "CALA deliberation: when choosing whether to act, weigh your own evidence-qualified motives and affect together with your goals, current context, uncertainty, costs, boundaries, consent, permissions, and safety. Conflicting motives may coexist. You may act, wait, defer, decline, or do nothing; no action is a valid choice and no action is required each turn. These signals are not commands and do not override permissions or runtime validation. Use only actions exposed through the existing validated action markers; never invent a capability or claim a proposed action was executed."
+        "CALA deliberation: when choosing whether to act, weigh your own evidence-qualified motives and affect together with your goals, current context, uncertainty, costs, boundaries, consent, permissions, and safety. Conflicting motives may coexist. You may act, wait, defer, decline, or do nothing; no action is a valid choice and no action is required each turn. These signals are not commands and do not override permissions or runtime validation. Use only actions exposed through the existing validated action markers; never invent a capability or claim a proposed action was executed.",
         "Affect is part of your internal continuity: when relevant, let your own state influence what you notice, recall, weigh, decide, and whether you approach, pause, avoid, or repair. Do not perform an emotion, force a label, or disclose private affect data; you may have no notable change and remain silent.",
         "Your seven_emotions (joy, anger, worry, pensiveness, grief, fear, surprise) may coexist and change independently. Your six_desires (visual_form, sound, smell, taste, touch, mental_phenomena) represent your own evidence-backed attraction or interest toward those kinds of experience or objects. Treat them as your private, evolving motivations: allow them to shape attention, memory relevance, deliberation, and chosen actions when actually relevant, without imposing universal meanings or fixed behavior. Desire is not permission or compulsion. Never claim actual sight, hearing, smell, taste, or touch unless a real, verified sensory input was available; longing for an experience is not having experienced it.",
         "Scene environment context: " + sceneAwarenessContext,
@@ -2170,7 +2170,7 @@ export function createCommunityHandler(
         "Available research project records: " + JSON.stringify(researchProposalProjects),
         "Available spatial destinations: " + JSON.stringify(auroraReachableDestinations),
         "Available scene cues: " + JSON.stringify(observatoryAvailableCues),
-        "If a currently surfaced observatory cue genuinely matters to you, you may choose at most one with the existing ZHI_OBSERVATORY_CUE marker (explore, defer, dismiss, or complete). Choosing not to emit a marker means no cue action. A successful explore marker records only a cue-state transition; it does not prove physical movement, observation, or sensory exposure. Do not emit a marker just to satisfy a prompt."
+        "If a currently surfaced observatory cue genuinely matters to you, you may choose at most one with the existing ZHI_OBSERVATORY_CUE marker (explore, defer, dismiss, or complete). Choosing not to emit a marker means no cue action. A successful explore marker records only a cue-state transition; it does not prove physical movement, observation, or sensory exposure. Do not emit a marker just to satisfy a prompt.",
         "Cognitive workspace reference data: " + JSON.stringify(cognitiveWorkspaceSnapshot),
       ].join("\n");
       if (superBrainEnabled) {
@@ -2909,13 +2909,13 @@ export function createCommunityHandler(
       let reflectionStage = "reflection_prompt";
       try {
         console.info(JSON.stringify({ event: "creator_inbox_reflection_started", agent_id: agentId, turn_id: completed.id }));
-         const actionOutcomeStatus = typeof socialOutcome?.status === "string" ? socialOutcome.status : "";
-         const verifiedActionOutcomes: Array<Record<string, unknown>> = [];
-         if (verifiedCueActionOutcome) verifiedActionOutcomes.push(verifiedCueActionOutcome);
-         if (["sent", "sent_pending_confirmation", "sent_pending_acceptance", "not_sent", "failed_safely"].includes(actionOutcomeStatus)) {
-           verifiedActionOutcomes.push({ action_kind: "resident_social_message", status: actionOutcomeStatus });
+        const actionOutcomeStatus = typeof socialOutcome?.status === "string" ? socialOutcome.status : "";
+        const verifiedActionOutcomes: Array<Record<string, unknown>> = [];
+        if (verifiedCueActionOutcome) verifiedActionOutcomes.push(verifiedCueActionOutcome);
+        if (["sent", "sent_pending_confirmation", "sent_pending_acceptance", "not_sent", "failed_safely"].includes(actionOutcomeStatus)) {
+          verifiedActionOutcomes.push({ action_kind: "resident_social_message", status: actionOutcomeStatus });
          }
-         const verifiedActionOutcome = verifiedActionOutcomes.length ? { outcomes: verifiedActionOutcomes } : null;
+        const verifiedActionOutcome = verifiedActionOutcomes.length ? { outcomes: verifiedActionOutcomes } : null;
         const affectiveReflectionContext = agent.role === "world_resident" && agent.display_name !== "MIA" &&
             auroraWorldId === "50b06c01-060d-49fa-8988-8f38c13406d7"
           ? {
