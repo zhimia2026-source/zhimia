@@ -350,3 +350,14 @@ Initial post-deployment audit: 12 active residents, 180 eligible private memorie
 - No new model call, cron, synthetic experience, or historical backfill. Existing revision links remain append-only; original memories are not modified.
 - Production deployment: `zhi-community v155`, all 19 files. Post-deploy readback confirmed `index.ts` and `memory_experience_helpers.ts` exactly match GitHub.
 - Verification status: code/readback passed; live revision relation count remains 0 and eligible private memories count is 188 at audit time. No natural resident turn has yet validated a full reappraisal cycle.
+
+
+### v157 — AICA: explicit resident self-report provenance
+
+- Affect measurements now distinguish `inferred` appraisal from `self_report` provenance. The reflection prompt permits `self_report` only when the resident can explicitly report a first-person current inner state; it forbids selecting this label to perform emotion, based on persona text, rhetorical language, or an external prompt. Sensory claims still require independently verified input.
+- The parser accepts only these two provenance values. The state transition preserves `self_report` only when a first measurement is self-reported or both the prior and incoming measurement are self-reported; when inferred and self-reported estimates are blended, provenance is conservatively downgraded to `inferred`.
+- Event-level provenance is `self_report` only when all updated dimensions in that event are self-reported; mixed or inferred updates remain `inferred`. This records what the model reported without treating it as proof of phenomenological consciousness.
+- The existing single private reflection call is reused. No new model invocation, scheduler, cron, synthetic affect event, or historical backfill was introduced. The private owner/agent scope is unchanged.
+- Production: `zhi-community v157`, 19 files. Readback verified `index.ts`, `affective_engine.ts`, and `memory_experience_helpers.ts` exactly match GitHub.
+- Aggregate baseline before this deployment: 3 affect-state rows, 15 affect events; 2 states contained seven-emotion dimensions, none contained six-desire dimensions, motivational, regulation, or relational groups. These gaps are not backfilled. Runtime acceptance requires natural resident turns and explicitly evidenced reports.
+- Acceptance boundary: self-report provenance is a computational first-person report category, not evidence that subjective experience has been established.
