@@ -41,6 +41,10 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+      - name: Test ISA Phase 1 intimacy perception and consent gates
+        run: deno test supabase/functions/zhi-community/intimacy_helpers_test.ts
+      - name: Type-check ISA Phase 1 helpers
+        run: deno check supabase/functions/zhi-community/intimacy_helpers.ts
       - name: Test AURORA research relay state machine
         run: deno test supabase/functions/zhi-research-center/transition_helpers_test.ts
       - name: Type-check AURORA research center Edge Function
