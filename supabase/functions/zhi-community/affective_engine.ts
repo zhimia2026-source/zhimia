@@ -135,10 +135,11 @@ export function buildAffectTemporalEvidence(events: unknown[]): Record<string, u
     const delta = rec(event.affect_delta);
     let eventHadSignal = false;
     for (const [group, rawValues] of Object.entries(delta)) {
-      if (!allowedGroups.has(group)) continue;
+      const groupRanges = RANGES[group];
+      if (!allowedGroups.has(group) || !groupRanges) continue;
       const values = rec(rawValues);
       for (const [dimension, rawValue] of Object.entries(values)) {
-        if (!(dimension in RANGES[group]) || typeof rawValue !== "number" ||
+        if (!(dimension in groupRanges) || typeof rawValue !== "number" ||
             !Number.isFinite(rawValue) || Math.abs(rawValue) <= 0.0001 || Math.abs(rawValue) > 2) continue;
         const key = group + "." + dimension;
         const bucket = buckets.get(key) ?? {
