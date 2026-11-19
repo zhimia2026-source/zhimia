@@ -316,3 +316,16 @@ The first production increment of **CALA (Continuous Affective Life Architecture
 Production deployment: zhi-community v152, SHA-256 e804a1c347240aa3b8bebf4ed039055fb0ff5e4b1bea9d2014bdb0786c925f94. All 19 function files were included in the deployment; production readback exactly matched GitHub for the three changed files: index.ts, long_term_memory_helpers.ts, and memory_experience_helpers.ts.
 
 **Initial runtime audit:** 12 active AURORA residents and 175 eligible private memories were present. At the immediate post-deployment audit, 0 completed resident turns, 0 new private memories, and 0 new affect events had occurred after deployment. Therefore the code path is deployed and readback-verified, but a natural resident turn is still required to demonstrate that topology changes actual memory selection and that a later experience causes a genuine reappraisal. No test data was inserted. This is a computational memory-retrieval and reflection mechanism, not evidence of subjective feeling or consciousness.
+
+## v153 — CALA phase 1.1: close the retrieval-to-reflection handoff (2026-11-19)
+
+A production inspection found that v152 computed associative retrieval metadata and attached it to the reflection input objects, but the private-reflection serializer did not include that metadata in the final model payload. v153 closes this handoff.
+
+- The reflection serializer now forwards bounded topology relevance, affective relevance, and up to three related private-memory IDs alongside each selected memory.
+- The reflection instructions continue to treat associations as retrieval hints only, not proof of causation, shared events, or shared emotion. Reappraisal remains optional; original memory records are not overwritten.
+- Runtime ranking telemetry now records only aggregate candidate counts for linked topology candidates and candidates receiving propagated topology relevance. It does not log private memory content, relation IDs, or reflection text.
+- No extra model call, scheduler, cron, table, or synthetic experience was added.
+
+Production deployment: zhi-community v153, SHA-256 5cee3597591b391ec4d1422ddd020f00fd158d16658bc27de3cac63074a02776. All 19 function files were retained; production readback exactly matched GitHub for index.ts and memory_experience_helpers.ts.
+
+Initial post-deployment audit: 12 active residents, 180 eligible private memories, 0 completed turns after the deployment cutoff, 1 new private memory, and 0 new affect events. Because the audit did not yet show a completed post-deployment turn or affect event, this is not evidence that the full reflection/reappraisal loop has executed. The new memory count is recorded as a database observation only and is not attributed to v153 without a matching turn trace.
