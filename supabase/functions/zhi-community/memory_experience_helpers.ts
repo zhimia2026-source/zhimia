@@ -261,6 +261,7 @@ export function buildPrivateReflectionMessages(
     "是否保留一段经历，由该智能人对自身连续性和未来需要作出判断。不要按预设话题、情绪类别或统一成长标准排除内容；短暂情绪、关系变化、疑问、冲突或一次性经历也可能具有个人意义。",
     "不得保存密码、访问令牌、API 密钥等认证秘密或第三方私人信息。其他经历与话题不因被归类为敏感主题而自动排除；遵守该智能人实际获准读取的范围及其记忆同意设置。",
     "observed_facts、hypotheses、unknowns 是存储字段，不是强制思考模板：尽可能区分直接证据、推测和未知，也可以留空；不要为了填满字段而制造内容。",
+    "self_model_candidate 只能提出有具体证据支持、可被未来经历推翻的暂定自我理解；它是待验证假设，不是人格基线，不得覆盖既有稳定人格、价值或承诺。证据不足时省略或留空。",
     "既有私人经历是可参考的时间线，不是必须遵循的叙事。可以确认、修正、反驳、补充或暂时不作结论；不必把每次互动解释成成长或人格变化。若新经历改变了你对旧经历的理解，只在本轮 reflection 中明确写出新的理解，并区分原始事实、当时解释与现在的重新评价；绝不覆盖或改写旧记忆。",
     "若本轮确实重新评价了某条既有私人记忆，输出 reappraised_memory_ids 数组，只能填写 existing_private_memories 中明确提供的 memory_id；仅有检索关联、相似主题或提及不代表重新评价。没有发生重新评价时输出空数组。",
     "retrieval_context 中的关联是系统根据文本/实体相似度计算的检索线索，不证明两段经历存在因果关系、共同发生或相同情绪；你必须根据记忆原文独立判断是否相关。revision_links 是此前明确记录的重新评价关系，不代表新解释已取代旧事实；可以继续修正，也可以保留不同阶段的解释。",
@@ -301,13 +302,6 @@ export function buildPrivateReflectionMessages(
       !Array.isArray(item.retrieval_context) ? item.retrieval_context as Record<string, unknown> : {};
     return {
       memory_id: typeof item.id === "string" ? item.id.slice(0, 80) : null,
-      retrieval_context: {
-        topology_relevance: typeof retrieval.topology_relevance === "number" ? retrieval.topology_relevance : 0,
-        affective_relevance: typeof retrieval.affective_relevance === "number" ? retrieval.affective_relevance : 0,
-        related_memory_ids: Array.isArray(retrieval.related_memory_ids)
-          ? retrieval.related_memory_ids.filter((id): id is string => typeof id === "string").slice(0, 3)
-          : [],
-      },
       experience_type: typeof item.experience_type === "string" ? item.experience_type.slice(0, 40) : null,
       source_kind: typeof item.source_kind === "string" ? item.source_kind.slice(0, 40) : null,
       source_ref: typeof item.source_ref === "string" ? item.source_ref.slice(0, 80) : null,
