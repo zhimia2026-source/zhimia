@@ -2998,7 +2998,7 @@ export function createCommunityHandler(
               verified_action_outcome: verifiedActionOutcome,
               current_affect_state: residentAffectState,
               temporal_continuity: temporalContinuity,
-              affect_trajectory: residentAffectHistory,
+              affect_trajectory: residentAffectHistory.slice(-6),
               affect_temporal_evidence: buildAffectTemporalEvidence(residentAffectHistory),
               environment_evidence: superBrainEnabled ? buildCognitiveReflectionContext(reflectionEnvironmentFeedback, spatialPositionStatus) : null,
             }
