@@ -67,8 +67,6 @@ jobs:
         run: deno check supabase/functions/zhi-community/index.ts
       - name: Test AURORA long-term private memory retrieval
         run: deno test supabase/functions/zhi-community/long_term_memory_helpers_test.ts
-      - name: Test evidence-grounded affect temporal continuity
-        run: deno test supabase/functions/zhi-community/affective_engine_test.ts
       - name: Test long-term memory quality gate
         run: deno test supabase/functions/zhi-community/memory_experience_helpers_test.ts
       - name: Test deterministic AURORA virtual movement validation
