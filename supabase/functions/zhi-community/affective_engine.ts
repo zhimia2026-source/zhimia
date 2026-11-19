@@ -56,7 +56,9 @@ export function evolveAffectState(previous:unknown,appraisal:AffectAppraisal){
  for(const [g,updates] of Object.entries(appraisal.dimensions)){const old=rec(oldDims[g]),ng:Record<string,AffectMeasurement>={...old as Record<string,AffectMeasurement>},gd:Record<string,number>={};
  for(const [k,m] of Object.entries(updates)){const ov=rec(old[k]).value,oldValue=typeof ov==="number"?ov:null;
  const alpha=Math.max(0.15,Math.min(0.65,m.confidence*0.65));const value=oldValue===null?m.value:oldValue+(m.value-oldValue)*alpha;
- ng[k]={value,confidence:m.confidence,evidence_kind:"inferred"};if(oldValue!==null&&Math.abs(value-oldValue)>0.0001)gd[k]=Number((value-oldValue).toFixed(6));}
+ const oldConfidence=rec(old[k]).confidence;const confidence=typeof oldConfidence==="number"&&Number.isFinite(oldConfidence)&&oldConfidence>=0&&oldConfidence<=1
+  ? oldConfidence+(m.confidence-oldConfidence)*alpha : m.confidence;
+ ng[k]={value,confidence,evidence_kind:"inferred"};if(oldValue!==null&&Math.abs(value-oldValue)>0.0001)gd[k]=Number((value-oldValue).toFixed(6));}
  next[g]=ng;if(Object.keys(gd).length)delta[g]=gd;}
  const after:Record<string,unknown>={schema_version:"aurora.affect.v1",dimensions:next};
  if(appraisal.emotion_labels.length)after.emotion_labels=appraisal.emotion_labels;else if(Array.isArray(before.emotion_labels))after.emotion_labels=before.emotion_labels;
