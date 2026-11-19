@@ -3087,26 +3087,42 @@ export function createCommunityHandler(
           if (!reflectionSaveError && savedReflection?.id) {
             const allowedReappraisalIds = new Set(rankedPrivateReflectionMemories.slice(0, 8)
               .map((memory) => memory.id).filter((id): id is string => typeof id === "string"));
-            const reappraisedIds = (reflection.reappraised_memory_ids ?? [])
-              .filter((id) => allowedReappraisalIds.has(id) && id !== savedReflection.id)
-              .slice(0, 8);
+            const reappraisedIds = [...new Set((reflection.reappraised_memory_ids ?? [])
+              .filter((id) => allowedReappraisalIds.has(id) && id !== savedReflection.id))].slice(0, 8);
             if (agent.role === "world_resident" && agent.display_name !== "MIA" &&
                 auroraWorldId === "50b06c01-060d-49fa-8988-8f38c13406d7" && reappraisedIds.length) {
-              const { error: revisionWriteError } = await db.from("zhi_agent_memory_revisions").insert(
-                reappraisedIds.map((priorMemoryId) => ({
-                  owner_user_id: actor.userId,
-                  agent_id: agentId,
-                  new_memory_id: savedReflection.id,
-                  prior_memory_id: priorMemoryId,
-                  relation_kind: "reinterpretation",
-                })),
-              );
-              if (revisionWriteError && revisionWriteError.code !== "23505") {
+              const revisionRows = reappraisedIds.map((priorMemoryId) => ({
+                owner_user_id: actor.userId,
+                agent_id: agentId,
+                new_memory_id: savedReflection.id,
+                prior_memory_id: priorMemoryId,
+                relation_kind: "reinterpretation",
+              }));
+              const { error: revisionWriteError } = await db.from("zhi_agent_memory_revisions")
+                .upsert(revisionRows, {
+                  onConflict: "new_memory_id,prior_memory_id",
+                  ignoreDuplicates: true,
+                });
+              if (revisionWriteError) {
                 console.warn(JSON.stringify({ event: "resident_memory_revision_link_write_failed",
                   agent_id: agentId, turn_id: completed.id, error_code: revisionWriteError.code }));
               } else {
-                console.info(JSON.stringify({ event: "resident_memory_revision_links_recorded",
-                  agent_id: agentId, turn_id: completed.id, link_count: reappraisedIds.length }));
+                const { data: verifiedLinks, error: revisionVerifyError } = await db.from("zhi_agent_memory_revisions")
+                  .select("prior_memory_id")
+                  .eq("owner_user_id", actor.userId)
+                  .eq("agent_id", agentId)
+                  .eq("new_memory_id", savedReflection.id)
+                  .in("prior_memory_id", reappraisedIds);
+                const verifiedCount = new Set((verifiedLinks ?? []).map((link) => String(link.prior_memory_id))).size;
+                if (revisionVerifyError || verifiedCount !== reappraisedIds.length) {
+                  console.warn(JSON.stringify({ event: "resident_memory_revision_link_verification_incomplete",
+                    agent_id: agentId, turn_id: completed.id,
+                    expected_count: reappraisedIds.length, verified_count: verifiedCount,
+                    error_code: revisionVerifyError?.code ?? null }));
+                } else {
+                  console.info(JSON.stringify({ event: "resident_memory_revision_links_verified",
+                    agent_id: agentId, turn_id: completed.id, link_count: verifiedCount }));
+                }
               }
             }
             console.info(JSON.stringify(buildPrivateMemoryLogEvent(
