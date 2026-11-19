@@ -247,3 +247,43 @@ export function buildTargetAffectTemporalEvidence(events: unknown[], targetAgent
     ...buildAffectTemporalEvidence(scoped),
   };
 }
+
+
+/**
+ * Describe what the runtime actually confirmed about a resident's regulation-related
+ * actions. This records execution status only; it never scores emotional effectiveness.
+ */
+export function buildAffectRegulationLearningContext(verifiedActionOutcome: unknown): Record<string, unknown> {
+  const root = rec(verifiedActionOutcome);
+  const rawOutcomes = Array.isArray(root.outcomes) ? root.outcomes : [];
+  const outcomes = rawOutcomes.slice(0, 8).flatMap((raw) => {
+    const item = rec(raw);
+    const kind = typeof item.action_kind === "string" && /^[a-z_]{1,48}$/.test(item.action_kind)
+      ? item.action_kind : null;
+    const status = typeof item.status === "string" && /^[a-z_]{1,48}$/.test(item.status)
+      ? item.status : null;
+    if (!kind || !status || !["observatory_cue_choice", "resident_social_message"].includes(kind)) return [];
+    let executionEvidence = "unclassified";
+    if (kind === "observatory_cue_choice" && ["explore", "defer", "dismiss", "complete"].includes(status)) {
+      executionEvidence = "choice_committed_only";
+    } else if (kind === "resident_social_message" && status === "sent") {
+      executionEvidence = "send_confirmed_read_and_response_unknown";
+    } else if (kind === "resident_social_message" && ["sent_pending_confirmation", "sent_pending_acceptance"].includes(status)) {
+      executionEvidence = "sent_followup_unconfirmed";
+    } else if (["not_sent", "failed_safely"].includes(status)) {
+      executionEvidence = "not_executed_or_failed";
+    }
+    return [{ action_kind: kind, status, execution_evidence: executionEvidence }];
+  });
+  return {
+    schema_version: "cala.regulation_outcome_evidence.v1",
+    outcomes,
+    learning_limits: [
+      "action execution status does not prove emotional relief or regulation effectiveness",
+      "a committed cue choice does not prove movement, perception, or completed exploration",
+      "a sent message does not prove it was read, accepted, or reciprocated",
+      "strategy effectiveness requires separate, resident-owned outcome evidence across context and time",
+      "absence of evidence is not evidence of failure or success",
+    ],
+  };
+}

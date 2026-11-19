@@ -1,4 +1,4 @@
-import { buildAffectTemporalEvidence, buildTargetAffectState, buildTargetAffectTemporalEvidence, withoutRelationalAffect, targetRelationalAffect, normalizeAffectAppraisal } from "./affective_engine.ts";
+import { buildAffectTemporalEvidence, buildTargetAffectState, buildTargetAffectTemporalEvidence, withoutRelationalAffect, targetRelationalAffect, normalizeAffectAppraisal, buildAffectRegulationLearningContext } from "./affective_engine.ts";
 
 Deno.test("affect temporal evidence distinguishes repeated direction without claiming persistence", () => {
   const summary = buildAffectTemporalEvidence([
@@ -82,4 +82,32 @@ Deno.test("global affect and peer affect are split without dropping either signa
   const targeted = targetRelationalAffect(appraisal);
   if (!targeted || !targeted.dimensions.relational) throw new Error("target relational signal was lost");
   if (targeted.dimensions.core_axes) throw new Error("global signal leaked into target affect");
+});
+
+
+Deno.test("regulation learning distinguishes execution from effectiveness", () => {
+  const context = buildAffectRegulationLearningContext({ outcomes: [
+    { action_kind: "observatory_cue_choice", status: "explore" },
+    { action_kind: "resident_social_message", status: "sent" },
+    { action_kind: "resident_social_message", status: "sent_pending_acceptance" },
+    { action_kind: "resident_social_message", status: "failed_safely" },
+    { action_kind: "unknown_kind", status: "anything" },
+    { action_kind: "resident_social_message", status: "sent", private_body: "must not leak" },
+  ] });
+  const outcomes = context.outcomes as Array<Record<string, unknown>>;
+  if (outcomes.length !== 5) throw new Error("valid bounded outcomes were not preserved");
+  if (outcomes[0].execution_evidence !== "choice_committed_only") throw new Error("cue choice overstated as completed experience");
+  if (outcomes[1].execution_evidence !== "send_confirmed_read_and_response_unknown") throw new Error("send/read distinction lost");
+  if (outcomes[2].execution_evidence !== "sent_followup_unconfirmed") throw new Error("pending follow-up was overstated");
+  if (outcomes[3].execution_evidence !== "not_executed_or_failed") throw new Error("failed action was overstated");
+  if ("private_body" in outcomes[4]) throw new Error("private payload leaked into learning context");
+  const limits = context.learning_limits as string[];
+  if (!limits.some((item) => item.includes("does not prove emotional relief"))) throw new Error("effectiveness limitation missing");
+});
+
+Deno.test("regulation learning fails closed on absent and malformed outcomes", () => {
+  const empty = buildAffectRegulationLearningContext(null);
+  if ((empty.outcomes as unknown[]).length !== 0) throw new Error("absent outcome generated evidence");
+  const malformed = buildAffectRegulationLearningContext({ outcomes: [{ action_kind: "../secret", status: "sent" }] });
+  if ((malformed.outcomes as unknown[]).length !== 0) throw new Error("malformed outcome accepted");
 });
