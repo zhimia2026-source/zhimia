@@ -12,7 +12,9 @@ const RANGES:Record<string,Record<string,[number,number]>>={
  cognitive:{curiosity:[0,1],surprise:[0,1],confusion:[0,1],certainty:[0,1],meaning:[0,1],anticipation:[0,1]},
  motivational:{approach:[0,1],avoidance:[0,1],exploration:[0,1],expression:[0,1],repair:[0,1],persistence:[0,1],pause:[0,1]},
  regulation:{recovery:[0,1],stability:[0,1],emotional_load:[0,1],change_rate:[0,1]},
- embodied_context:{comfort:[0,1],discomfort:[0,1],sensory_load:[0,1],environment_resonance:[0,1]}
+ embodied_context:{comfort:[0,1],discomfort:[0,1],sensory_load:[0,1],environment_resonance:[0,1]},
+ seven_emotions:{joy:[0,1],anger:[0,1],worry:[0,1],pensiveness:[0,1],grief:[0,1],fear:[0,1],surprise:[0,1]},
+ six_desires:{visual_form:[0,1],sound:[0,1],smell:[0,1],taste:[0,1],touch:[0,1],mental_phenomena:[0,1]}
 };
 const rec=(v:unknown):Record<string,unknown>=>v&&typeof v==="object"&&!Array.isArray(v)?v as Record<string,unknown>:{};
 function parse(raw:unknown):Record<string,unknown>|null{
