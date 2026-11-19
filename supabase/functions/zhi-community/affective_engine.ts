@@ -17,6 +17,35 @@ const RANGES:Record<string,Record<string,[number,number]>>={
  six_desires:{visual_form:[0,1],sound:[0,1],smell:[0,1],taste:[0,1],touch:[0,1],mental_phenomena:[0,1]}
 };
 const rec=(v:unknown):Record<string,unknown>=>v&&typeof v==="object"&&!Array.isArray(v)?v as Record<string,unknown>:{};
+
+const MOTIVATION_RANGES:Record<string,Record<string,[number,number]>>={
+ core_axes:{valence:[-1,1],arousal:[0,1],agency:[-1,1]},
+ relational:{trust:[0,1],closeness:[0,1],belonging:[0,1],distance:[0,1],safety_with_other:[0,1]},
+ motivational:{approach:[0,1],avoidance:[0,1],exploration:[0,1],expression:[0,1],repair:[0,1],persistence:[0,1],pause:[0,1]},
+ seven_emotions:{joy:[0,1],anger:[0,1],worry:[0,1],pensiveness:[0,1],grief:[0,1],fear:[0,1],surprise:[0,1]},
+ six_desires:{visual_form:[0,1],sound:[0,1],smell:[0,1],taste:[0,1],touch:[0,1],mental_phenomena:[0,1]}
+};
+
+/** Projects only the current resident's confidence-qualified internal signals for private deliberation. */
+export function buildResidentMotivationContext(state:unknown):Record<string,unknown>|null{
+ const dimensions=rec(rec(state).dimensions);
+ const projected:Record<string,Record<string,{value:number;confidence:number;evidence_kind:"inferred"|"self_report"}>>={};
+ for(const [group,allowed] of Object.entries(MOTIVATION_RANGES)){
+  const source=rec(dimensions[group]);
+  const values:Record<string,{value:number;confidence:number;evidence_kind:"inferred"|"self_report"}>={};
+  for(const [key,range] of Object.entries(allowed)){
+   const item=rec(source[key]);
+   const value=item.value,confidence=item.confidence,evidenceKind=item.evidence_kind;
+   if(typeof value!=="number"||!Number.isFinite(value)||value<range[0]||value>range[1]||
+      typeof confidence!=="number"||!Number.isFinite(confidence)||confidence<0.55||confidence>1||
+      !(evidenceKind==="inferred"||evidenceKind==="self_report")) continue;
+   values[key]={value:Number(value.toFixed(4)),confidence:Number(confidence.toFixed(4)),evidence_kind:evidenceKind};
+  }
+  if(Object.keys(values).length)projected[group]=values;
+ }
+ if(!Object.keys(projected).length)return null;
+ return {schema_version:"aurora.motivation_context.v1",confidence_threshold:0.55,dimensions:projected};
+}
 function parse(raw:unknown):Record<string,unknown>|null{
  if(raw&&typeof raw==="object"&&!Array.isArray(raw))return raw as Record<string,unknown>;
  if(typeof raw!=="string")return null;
