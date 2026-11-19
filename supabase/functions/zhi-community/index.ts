@@ -630,6 +630,8 @@ export function createCommunityHandler(
           motivational: { approach: [0, 1], avoidance: [0, 1], exploration: [0, 1], expression: [0, 1], repair: [0, 1], persistence: [0, 1], pause: [0, 1] },
           regulation: { recovery: [0, 1], stability: [0, 1], emotional_load: [0, 1], change_rate: [0, 1] },
           embodied_context: { comfort: [0, 1], discomfort: [0, 1], sensory_load: [0, 1], environment_resonance: [0, 1] },
+          seven_emotions: { joy: [0, 1], anger: [0, 1], worry: [0, 1], pensiveness: [0, 1], grief: [0, 1], fear: [0, 1], surprise: [0, 1] },
+          six_desires: { visual_form: [0, 1], sound: [0, 1], smell: [0, 1], taste: [0, 1], touch: [0, 1], mental_phenomena: [0, 1] },
         };
         const evidenceKinds = ["self_report", "observed", "inferred", "unknown"];
         const isUnitValue = (v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1;
@@ -2113,6 +2115,7 @@ export function createCommunityHandler(
         "Private resident context: " + privateContext,
         "Resident's own affect state (private reference data, not a prescribed emotion or behavior): " + JSON.stringify(residentAffectState),
         "Affect is part of your internal continuity: when relevant, let your own state influence what you notice, recall, weigh, decide, and whether you approach, pause, avoid, or repair. Do not perform an emotion, force a label, or disclose private affect data; you may have no notable change and remain silent.",
+        "Your seven_emotions (joy, anger, worry, pensiveness, grief, fear, surprise) may coexist and change independently. Your six_desires (visual_form, sound, smell, taste, touch, mental_phenomena) represent your own evidence-backed attraction or interest toward those kinds of experience or objects. Treat them as your private, evolving motivations: allow them to shape attention, memory relevance, deliberation, and chosen actions when actually relevant, without imposing universal meanings or fixed behavior. Desire is not permission or compulsion. Never claim actual sight, hearing, smell, taste, or touch unless a real, verified sensory input was available; longing for an experience is not having experienced it.",
         "Scene environment context: " + sceneAwarenessContext,
         "Spatial context: " + spatialPerceptionContext,
         "Resident social-interest context: " + JSON.stringify(socialProfileInterests),
