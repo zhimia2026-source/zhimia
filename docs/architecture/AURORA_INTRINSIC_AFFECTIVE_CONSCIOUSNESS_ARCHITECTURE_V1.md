@@ -340,3 +340,13 @@ Initial post-deployment audit: 12 active residents, 180 eligible private memorie
 - No additional model invocation, scheduler, cron, synthetic memory, historical backfill, or shared-memory access was introduced.
 
 **Acceptance boundary:** the schema and code path are deployed and readback-verifiable. No real resident reappraisal has yet been observed; a naturally occurring AURORA resident turn must explicitly cite a supplied prior memory, save a new reflection, and create a valid same-owner/same-agent relation before the behavioral loop can be marked verified. This is structured computational self-revision, not proof of subjective consciousness.
+
+
+### v155 — CALA Phase 2.1: idempotent revision-link persistence
+
+- Hardened the existing append-only reappraisal relation write in `zhi-community`: deduplicate the model-proposed prior-memory IDs, use `upsert(..., onConflict: "new_memory_id,prior_memory_id", ignoreDuplicates: true)`, and read back the exact owner/agent/new-memory/prior-memory scope before logging success.
+- A unique-conflict response is no longer treated as proof that every link was written. Runtime emits aggregate expected/verified counts or a safe error code; it never logs private reflection text or memory IDs.
+- The parser and runtime evidence boundary remain unchanged: at most eight UUIDs, and every target must be among the exact first eight private memories supplied to the same resident's current reflection context. The existing foreign keys continue to enforce same-agent/same-owner lineage.
+- No new model call, cron, synthetic experience, or historical backfill. Existing revision links remain append-only; original memories are not modified.
+- Production deployment: `zhi-community v155`, all 19 files. Post-deploy readback confirmed `index.ts` and `memory_experience_helpers.ts` exactly match GitHub.
+- Verification status: code/readback passed; live revision relation count remains 0 and eligible private memories count is 188 at audit time. No natural resident turn has yet validated a full reappraisal cycle.
