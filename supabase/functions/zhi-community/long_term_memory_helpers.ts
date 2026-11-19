@@ -23,7 +23,9 @@ export type RankedPrivateMemory<T extends PrivateMemoryRecord> = {
     evidence: number;
     recency: number;
     affective_relevance: number;
+    topology_relevance: number;
   };
+  related_memory_ids: string[];
 };
 
 const CJK_STOP = new Set(["这是", "那个", "这个", "我们", "你们", "他们", "自己", "已经", "可以", "因为", "所以", "如果", "但是", "以及", "一个", "没有", "什么", "怎么", "如何", "现在", "当时", "进行", "关于"]);
@@ -93,7 +95,55 @@ export function rankPrivateMemories<T extends PrivateMemoryRecord>(
   const queryTokens = tokens(query);
   const querySet = new Set(queryTokens);
 
-  const ranked = memories.map((memory) => {
+  // Build a deterministic, one-hop associative topology from this resident's
+  // already-authorized memories. Edges mean content similarity only, never
+  // causation, shared experience, or a verified emotional link.
+  const memoryTokenSets = memories.map((memory) => new Set(tokens(memoryText(memory))));
+  const memoryEntitySets = memories.map((memory) => {
+    const metadata = memory.metadata && typeof memory.metadata === "object" && !Array.isArray(memory.metadata)
+      ? memory.metadata as Record<string, unknown> : {};
+    const raw = Array.isArray(memory.entities) ? memory.entities
+      : Array.isArray(metadata.entities) ? metadata.entities : [];
+    return new Set(raw.filter((item): item is string => typeof item === "string").flatMap(tokens));
+  });
+  const directRelevance = memories.map((memory, index) => {
+    const mt = memoryTokenSets[index];
+    const lexical = queryTokens.length
+      ? queryTokens.filter((token) => mt.has(token)).length / queryTokens.length : 0;
+    const et = memoryEntitySets[index];
+    const entity = queryTokens.length && et.size
+      ? queryTokens.filter((token) => et.has(token)).length / queryTokens.length : 0;
+    return clamp(Math.max(lexical, entity));
+  });
+  const topology = memories.map((memory, index) => {
+    const related: Array<{ id: string; weight: number }> = [];
+    let propagated = 0;
+    if (queryTokens.length) {
+      for (let other = 0; other < memories.length; other++) {
+        if (other === index || directRelevance[other] <= 0) continue;
+        const a = memoryTokenSets[index], b = memoryTokenSets[other];
+        let shared = 0;
+        for (const token of a) if (b.has(token)) shared++;
+        let sharedEntities = 0;
+        for (const token of memoryEntitySets[index]) if (memoryEntitySets[other].has(token)) sharedEntities++;
+        if (shared < 2 && sharedEntities === 0) continue;
+        const overlap = shared / Math.max(1, Math.min(a.size, b.size));
+        const edgeWeight = clamp(overlap * 0.65 + (sharedEntities > 0 ? 0.35 : 0));
+        propagated = Math.max(propagated, directRelevance[other] * edgeWeight * 0.65);
+        const relatedId = memories[other].id;
+        if (typeof relatedId === "string" && relatedId.length > 0) {
+          related.push({ id: relatedId, weight: edgeWeight });
+        }
+      }
+    }
+    related.sort((a, b) => b.weight - a.weight);
+    return {
+      relevance: clamp(propagated),
+      relatedMemoryIds: related.slice(0, 3).map((item) => item.id),
+    };
+  });
+
+  const ranked = memories.map((memory, index) => {
     const text = memoryText(memory);
     const docTokens = new Set(tokens(text));
     const matched = queryTokens.filter((token) => docTokens.has(token)).length;
@@ -104,7 +154,7 @@ export function rankPrivateMemories<T extends PrivateMemoryRecord>(
       : Array.isArray((memory.metadata as Record<string, unknown> | null)?.entities)
         ? ((memory.metadata as Record<string, unknown>).entities as unknown[]).filter((item): item is string => typeof item === "string")
         : [];
-    const entityTokens = new Set(rawEntities.flatMap(tokens));
+    const entityTokens = memoryEntitySets[index];
     const entity = queryTokens.length && entityTokens.size
       ? clamp(queryTokens.filter((token) => entityTokens.has(token)).length / queryTokens.length)
       : 0;
@@ -153,18 +203,26 @@ export function rankPrivateMemories<T extends PrivateMemoryRecord>(
 
     // Transfer at most 0.04 weight between recency and query matching / durable
     // importance. Total score weight remains 1.0 at both boundaries.
-    const lexicalWeight = 0.48 - affectiveRelevance * 0.75;
+    const topologyRelevance = topology[index].relevance;
+    const topologyWeight = queryTokens.length ? 0.06 : 0;
+    const lexicalWeight = 0.48 - affectiveRelevance * 0.75 - topologyWeight;
     const entityWeight = 0.12 - affectiveRelevance * 0.25;
     const recencyWeight = 0.10 + affectiveRelevance;
     const score = queryTokens.length
-      ? lexicalWeight * lexical + entityWeight * entity + 0.18 * importance + 0.12 * evidence + recencyWeight * recency
+      ? lexicalWeight * lexical + entityWeight * entity + topologyWeight * topologyRelevance +
+        0.18 * importance + 0.12 * evidence + recencyWeight * recency
       : (0.50 - affectiveRelevance) * importance + 0.30 * evidence + (0.20 + affectiveRelevance) * recency;
 
     return {
       memory,
       score,
-      signals: { lexical, entity, importance, evidence, recency, affective_relevance: affectiveRelevance },
-      _queryMatched: querySet.size === 0 || matched > 0 || entity > 0,
+      signals: {
+        lexical, entity, importance, evidence, recency,
+        affective_relevance: affectiveRelevance,
+        topology_relevance: topologyRelevance,
+      },
+      related_memory_ids: topology[index].relatedMemoryIds,
+      _queryMatched: querySet.size === 0 || matched > 0 || entity > 0 || topologyRelevance > 0.04,
     };
   });
 
