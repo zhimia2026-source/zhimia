@@ -17,7 +17,7 @@ import { buildQuietObservatorySnapshot } from "./observatory_helpers.ts";
 import { extractObservatoryCueAction, resolveCueTransition } from "./observatory_cue_helpers.ts";
 import { buildResearchInvitationContext, buildResearchInvitationGuidance, extractResearchParticipationIntent, extractResearchWorkflowAction } from "./research_invitation_helpers.ts";
 import { normalizeResidentResearchProposal } from "./resident_research_proposal_helpers.ts";
-import { normalizeAffectAppraisal, evolveAffectState, buildResidentMotivationContext, buildAffectTemporalEvidence, withoutRelationalAffect, targetRelationalAffect, buildTargetAffectState, buildTargetAffectTemporalEvidence } from "./affective_engine.ts";
+import { normalizeAffectAppraisal, evolveAffectState, buildResidentMotivationContext, buildAffectTemporalEvidence, withoutRelationalAffect, targetRelationalAffect, buildTargetAffectState, buildTargetAffectTemporalEvidence, buildAffectRegulationLearningContext } from "./affective_engine.ts";
 
 const MAX_BODY_BYTES = 64_000;
 
@@ -3014,6 +3014,7 @@ export function createCommunityHandler(
               relationship_context: String(socialRelationshipContext).slice(0, 3000),
               verified_social_interaction: verifiedSocialInteraction,
               verified_action_outcome: verifiedActionOutcome,
+              regulation_learning_context: buildAffectRegulationLearningContext(verifiedActionOutcome),
               current_affect_state: residentAffectState,
               temporal_continuity: temporalContinuity,
               affect_trajectory: residentAffectHistory.slice(-6),
