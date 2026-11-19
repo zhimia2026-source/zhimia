@@ -2269,8 +2269,7 @@ export function createCommunityHandler(
               .select("id,status").maybeSingle();
             if (cueUpdateError || !updatedCue) {
               console.warn(JSON.stringify({ event: "observatory_cue_action_commit_conflict", agent_id: agentId, turn_id: pendingTurn.id }));
-            }
-            else {
+            } else {
               verifiedCueActionOutcome = { action_kind: "observatory_cue_choice", status: cueAction.action };
               console.info(JSON.stringify({ event: "resident_action_committed", action_kind: "observatory_cue_choice", status: cueAction.action, turn_id: pendingTurn.id }));
             }
