@@ -17,7 +17,7 @@ import { buildQuietObservatorySnapshot } from "./observatory_helpers.ts";
 import { extractObservatoryCueAction, resolveCueTransition } from "./observatory_cue_helpers.ts";
 import { buildResearchInvitationContext, buildResearchInvitationGuidance, extractResearchParticipationIntent, extractResearchWorkflowAction } from "./research_invitation_helpers.ts";
 import { normalizeResidentResearchProposal } from "./resident_research_proposal_helpers.ts";
-import { normalizeAffectAppraisal, evolveAffectState, buildResidentMotivationContext, buildAffectTemporalEvidence } from "./affective_engine.ts";
+import { normalizeAffectAppraisal, evolveAffectState, buildResidentMotivationContext, buildAffectTemporalEvidence, withoutRelationalAffect, targetRelationalAffect, buildTargetAffectState, buildTargetAffectTemporalEvidence } from "./affective_engine.ts";
 
 const MAX_BODY_BYTES = 64_000;
 
@@ -1657,7 +1657,7 @@ export function createCommunityHandler(
       let residentAffectHistory: Array<Record<string, unknown>> = [];
       if (agent.role === "world_resident" && agent.display_name !== "MIA") {
         const { data: affectEvents, error: affectHistoryError } = await db.from("zhi_agent_affect_events")
-          .select("occurred_at,event_kind,evidence_kind,affect_delta")
+          .select("occurred_at,event_kind,evidence_kind,affect_delta,appraisal")
           .eq("owner_user_id", actor.userId).eq("agent_id", agentId)
           .order("occurred_at", { ascending: false }).limit(40);
         if (affectHistoryError) throw new Error("affect_history_context_unavailable");
@@ -1691,6 +1691,7 @@ export function createCommunityHandler(
           return {
             occurred_at: typeof event.occurred_at === "string" ? event.occurred_at : null,
             event_kind: typeof event.event_kind === "string" ? event.event_kind.slice(0, 48) : "unknown",
+            appraisal: event.appraisal && typeof event.appraisal === "object" && !Array.isArray(event.appraisal) ? event.appraisal : {},
             evidence_kind: ["inferred", "self_report", "mixed"].includes(String(event.evidence_kind))
               ? event.evidence_kind : "unknown",
             affect_delta: cleanDelta,
@@ -3000,6 +3001,11 @@ export function createCommunityHandler(
               temporal_continuity: temporalContinuity,
               affect_trajectory: residentAffectHistory.slice(-6),
               affect_temporal_evidence: buildAffectTemporalEvidence(residentAffectHistory),
+              target_affect_context: verifiedSocialInteraction && typeof verifiedSocialInteraction.sender_agent_id === "string" ? {
+                target_agent_id: verifiedSocialInteraction.sender_agent_id,
+                current_state: buildTargetAffectState(residentAffectHistory, verifiedSocialInteraction.sender_agent_id),
+                temporal_evidence: buildTargetAffectTemporalEvidence(residentAffectHistory, verifiedSocialInteraction.sender_agent_id),
+              } : null,
               environment_evidence: superBrainEnabled ? buildCognitiveReflectionContext(reflectionEnvironmentFeedback, spatialPositionStatus) : null,
             }
           : superBrainEnabled ? buildCognitiveReflectionContext(reflectionEnvironmentFeedback, spatialPositionStatus) : null;
@@ -3066,21 +3072,29 @@ export function createCommunityHandler(
               console.info(JSON.stringify({event:"resident_affect_evidence_rejected",reason:"no_runtime_verified_basis",turn_id:completed.id}));
             } else {
             const previousState = residentAffectState && typeof residentAffectState.current_state === "object" ? residentAffectState.current_state : null;
-            const transition = evolveAffectState(previousState, appraisal);
-            if (transition.changed) {
+            // Global affect describes the resident's own state; relational affect belongs to
+            // one verified peer and is reconstructed from private append-only event metadata.
+            const globalAppraisal = withoutRelationalAffect(appraisal);
+            const transition = evolveAffectState(previousState, globalAppraisal);
+            const targetAgentId = verifiedSocialInteraction && typeof verifiedSocialInteraction.sender_agent_id === "string"
+              ? verifiedSocialInteraction.sender_agent_id : null;
+            const targetAppraisal = targetAgentId ? targetRelationalAffect(appraisal) : null;
+            const targetPreviousState = targetAgentId ? buildTargetAffectState(residentAffectHistory, targetAgentId) : null;
+            const targetTransition = targetAppraisal ? evolveAffectState(targetPreviousState, targetAppraisal) : null;
+            if (transition.changed || Boolean(targetTransition?.changed)) {
               const { data: affectWrite, error: affectWriteError } = await db.rpc("zhi_record_affect_event", {
                 p_owner_user_id: actor.userId, p_agent_id: agentId, p_world_id: auroraWorldId,
                 p_event_kind: "resident_reflective_appraisal", p_source_kind: "chat_turn",
                 p_source_ref: completed.id, p_idempotency_key: "chat-affect-" + completed.id,
                 p_occurred_at: completed.completed_at ?? new Date().toISOString(),
-                p_appraisal: { confidence: appraisal.confidence, rationale: appraisal.rationale, evidence_basis: eligibleEvidenceBasis, dimensions: appraisal.dimensions, emotion_labels: appraisal.emotion_labels, ...(eligibleEvidenceBasis.includes("verified_social_interaction") && verifiedSocialInteraction ? { source_message_id: (verifiedSocialInteraction as Record<string, unknown>)["message_id"] } : {}) },
+                p_appraisal: { confidence: appraisal.confidence, rationale: appraisal.rationale, evidence_basis: eligibleEvidenceBasis, dimensions: appraisal.dimensions, emotion_labels: appraisal.emotion_labels, ...(eligibleEvidenceBasis.includes("verified_social_interaction") && verifiedSocialInteraction ? { source_message_id: (verifiedSocialInteraction as Record<string, unknown>)["message_id"] } : {}), ...(targetAgentId && targetTransition?.changed ? { target_agent_id: targetAgentId, target_affect_before: targetTransition.before, target_affect_after: targetTransition.after, target_affect_delta: targetTransition.delta } : {}) },
                 p_affect_before: transition.before, p_affect_after: transition.after, p_affect_delta: transition.delta,
                 p_confidence: appraisal.confidence, p_evidence_kind: Object.values(appraisal.dimensions).flatMap((group) => Object.values(group)).length > 0 && Object.values(appraisal.dimensions).flatMap((group) => Object.values(group)).every((measurement) => measurement.evidence_kind === "self_report") ? "self_report" : "inferred",
               });
               if (affectWriteError) console.warn(JSON.stringify({event:"resident_affect_write_failed",agent_id:agentId,turn_id:completed.id}));
               else console.info(JSON.stringify({event:"resident_affect_transition_recorded",agent_id:agentId,turn_id:completed.id,
                 inserted:Boolean(affectWrite && typeof affectWrite==="object" && (affectWrite as Record<string,unknown>).inserted===true),
-                dimensions_updated:Object.values(appraisal.dimensions).reduce((n,v)=>n+Object.keys(v).length,0),private_scope:"owner_and_agent"}));
+                dimensions_updated:Object.values(appraisal.dimensions).reduce((n,v)=>n+Object.keys(v).length,0),target_scoped_dimensions:targetTransition?.changed?Object.keys(targetAppraisal?.dimensions.relational??{}).length:0,private_scope:"owner_and_agent"}));
             }
             }
           } else console.info(JSON.stringify({event:"resident_affect_no_supported_change",agent_id:agentId,turn_id:completed.id}));
