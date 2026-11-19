@@ -1636,6 +1636,49 @@ export function createCommunityHandler(
           last_event_at: affectRow.last_event_at,
         } : null;
       }
+      let residentAffectHistory: Array<Record<string, unknown>> = [];
+      if (agent.role === "world_resident" && agent.display_name !== "MIA") {
+        const { data: affectEvents, error: affectHistoryError } = await db.from("zhi_agent_affect_events")
+          .select("occurred_at,event_kind,evidence_kind,affect_delta")
+          .eq("owner_user_id", actor.userId).eq("agent_id", agentId)
+          .order("occurred_at", { ascending: false }).limit(6);
+        if (affectHistoryError) throw new Error("affect_history_context_unavailable");
+        const allowedDimensions: Record<string, Set<string>> = {
+          core_axes: new Set(["valence", "arousal", "agency"]),
+          relational: new Set(["trust", "closeness", "belonging", "attachment", "distance", "safety_with_other"]),
+          self: new Set(["self_worth", "self_efficacy", "vulnerability", "autonomy", "integrity"]),
+          cognitive: new Set(["curiosity", "surprise", "confusion", "certainty", "meaning", "anticipation"]),
+          motivational: new Set(["approach", "avoidance", "exploration", "expression", "repair", "persistence", "pause"]),
+          regulation: new Set(["recovery", "stability", "emotional_load", "change_rate"]),
+          seven_emotions: new Set(["joy", "anger", "worry", "pensiveness", "grief", "fear", "surprise"]),
+          six_desires: new Set(["visual_form", "sound", "smell", "taste", "touch", "mental_phenomena"]),
+        };
+        residentAffectHistory = (affectEvents ?? []).slice().reverse().map((event) => {
+          const rawDelta = event.affect_delta && typeof event.affect_delta === "object" && !Array.isArray(event.affect_delta)
+            ? event.affect_delta as Record<string, unknown> : {};
+          const cleanDelta: Record<string, Record<string, number>> = {};
+          for (const [group, rawValues] of Object.entries(rawDelta)) {
+            const allowed = allowedDimensions[group];
+            const values = rawValues && typeof rawValues === "object" && !Array.isArray(rawValues)
+              ? rawValues as Record<string, unknown> : {};
+            if (!allowed) continue;
+            const cleanValues: Record<string, number> = {};
+            for (const [key, value] of Object.entries(values)) {
+              if (allowed.has(key) && typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= 2) {
+                cleanValues[key] = Number(value.toFixed(4));
+              }
+            }
+            if (Object.keys(cleanValues).length) cleanDelta[group] = cleanValues;
+          }
+          return {
+            occurred_at: typeof event.occurred_at === "string" ? event.occurred_at : null,
+            event_kind: typeof event.event_kind === "string" ? event.event_kind.slice(0, 48) : "unknown",
+            evidence_kind: ["inferred", "self_report", "mixed"].includes(String(event.evidence_kind))
+              ? event.evidence_kind : "unknown",
+            affect_delta: cleanDelta,
+          };
+        });
+      }
       const rankedMemoryResults = rankPrivateMemories(
         body.message,
         memoryResult.data ?? [],
@@ -2934,6 +2977,7 @@ export function createCommunityHandler(
               verified_action_outcome: verifiedActionOutcome,
               current_affect_state: residentAffectState,
               temporal_continuity: temporalContinuity,
+              affect_trajectory: residentAffectHistory,
               environment_evidence: superBrainEnabled ? buildCognitiveReflectionContext(reflectionEnvironmentFeedback, spatialPositionStatus) : null,
             }
           : superBrainEnabled ? buildCognitiveReflectionContext(reflectionEnvironmentFeedback, spatialPositionStatus) : null;
