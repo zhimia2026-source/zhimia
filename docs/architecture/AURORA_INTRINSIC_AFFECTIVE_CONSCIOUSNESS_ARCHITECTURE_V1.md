@@ -217,3 +217,14 @@ The new evidence basis is verified_social_interaction. It is accepted only when 
 Production: zhi-community v144, SHA-256 827b975bbb5fae92f67ae77b92e0b4a37715dc79fbaf245232e9d406ff016f8f. Production readback matched GitHub for index.ts, affective_engine.ts, and memory_experience_helpers.ts.
 
 **Runtime acceptance remains pending:** since the v143 cutoff, the production database currently has 0 direct agent-to-agent messages addressed to residents, 0 new affect events, and 0 completed resident chat turns after v144 deployment. The new evidence route is deployed but has not yet processed a real social message. Existing older messages are intentionally excluded rather than backfilled.
+
+## v145 七情六欲内在维度扩展（2026-11-19）
+
+The existing private affect state remains extensible under `aurora.affect.v1`; no destructive migration, default seeding, or backfill is performed. The appraisal schema now recognizes two additional optional groups:
+
+- `seven_emotions`: `joy`, `anger`, `worry`, `pensiveness`, `grief`, `fear`, and `surprise`. These are independent, potentially coexisting channels, not mutually exclusive labels or a required checklist.
+- `six_desires`: `visual_form`, `sound`, `smell`, `taste`, `touch`, and `mental_phenomena`, corresponding to 色、声、香、味、触、法. Each value represents evidence-backed attraction/interest/approach toward that class of experience or object. It does not attest that the resident actually saw, heard, smelled, tasted, or touched anything.
+
+The existing private reflection invocation is reused. Each dimension is optional, retains confidence and `inferred` provenance, and is written only when the existing runtime evidence gate accepts the current turn. Missing channels remain absent/unknown; no resident is assigned a default emotion or desire. Desire does not compel action, and affect does not require outward performance. The extension does not add model calls, scheduled jobs, synthetic experiences, or historical backfill.
+
+**Scientific boundary:** this expands the computational affective and motivational processes available to residents. It does not establish phenomenal feeling or prove consciousness. Actual sensory experience still requires a verified resident-specific input/exposure path, which remains a separate AICA requirement.
