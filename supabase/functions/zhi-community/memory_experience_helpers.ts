@@ -301,13 +301,6 @@ export function buildPrivateReflectionMessages(
       !Array.isArray(item.retrieval_context) ? item.retrieval_context as Record<string, unknown> : {};
     return {
       memory_id: typeof item.id === "string" ? item.id.slice(0, 80) : null,
-      retrieval_context: {
-        topology_relevance: typeof retrieval.topology_relevance === "number" ? retrieval.topology_relevance : 0,
-        affective_relevance: typeof retrieval.affective_relevance === "number" ? retrieval.affective_relevance : 0,
-        related_memory_ids: Array.isArray(retrieval.related_memory_ids)
-          ? retrieval.related_memory_ids.filter((id): id is string => typeof id === "string").slice(0, 3)
-          : [],
-      },
       experience_type: typeof item.experience_type === "string" ? item.experience_type.slice(0, 40) : null,
       source_kind: typeof item.source_kind === "string" ? item.source_kind.slice(0, 40) : null,
       source_ref: typeof item.source_ref === "string" ? item.source_ref.slice(0, 80) : null,
