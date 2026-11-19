@@ -2,7 +2,7 @@ export type AffectMeasurement = { value: number; confidence: number; evidence_ki
 export type AffectAppraisal = {
  dimensions: Record<string, Record<string, AffectMeasurement>>;
  emotion_labels: Array<{label:string;intensity:number;confidence:number;evidence_kind:"inferred"}>;
- evidence_basis: Array<"dialogue_event" | "verified_memory" | "verified_social_interaction">;
+ evidence_basis: Array<"dialogue_event" | "verified_memory" | "verified_social_interaction" | "verified_action_outcome">;
  confidence:number; rationale:string;
 };
 const RANGES:Record<string,Record<string,[number,number]>>={
@@ -29,9 +29,9 @@ function parse(raw:unknown):Record<string,unknown>|null{
 }
 export function normalizeAffectAppraisal(raw:unknown):AffectAppraisal|null{
  const root=parse(raw);if(!root)return null;const a=rec(root.affect_appraisal),dims=rec(a.dimensions),out:AffectAppraisal["dimensions"]={};
- const allowedBasis=new Set(["dialogue_event","verified_memory","verified_social_interaction"]);
+ const allowedBasis=new Set(["dialogue_event","verified_memory","verified_social_interaction","verified_action_outcome"]);
  const evidenceBasis=Array.isArray(a.evidence_basis)
-  ? [...new Set(a.evidence_basis.filter((v):v is "dialogue_event"|"verified_memory"|"verified_social_interaction"=>typeof v==="string"&&allowedBasis.has(v)))]
+  ? [...new Set(a.evidence_basis.filter((v):v is "dialogue_event"|"verified_memory"|"verified_social_interaction"|"verified_action_outcome"=>typeof v==="string"&&allowedBasis.has(v)))]
   : [];
  if(!evidenceBasis.length || (Array.isArray(a.evidence_basis)&&evidenceBasis.length!==a.evidence_basis.length))return null;
  for(const [g,rv] of Object.entries(dims)){const allowed=RANGES[g],vals=rec(rv);if(!allowed||Object.keys(vals).length>12)return null;
