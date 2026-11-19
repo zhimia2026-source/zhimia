@@ -1,4 +1,4 @@
-import { hasVerifiedAgentMemoryConsent } from "./memory_consent_helpers.ts";
+import { hasVerifiedAgentMemoryConsent, isMemoryTokenExpiryValid } from "./memory_consent_helpers.ts";
 
 const request = {
   agent_id: "mia",
@@ -35,5 +35,15 @@ Deno.test("private memory requires exact verified Agent consent", () => {
   }
   if (hasVerifiedAgentMemoryConsent({ ...consent, scopes: ["memory.summary"] }, request)) {
     throw new Error("scope mismatch must be denied");
+  }
+});
+
+
+Deno.test("memory token expiry fails closed for malformed and elapsed values", () => {
+  const now = Date.parse("2026-11-20T00:00:00.000Z");
+  if (!isMemoryTokenExpiryValid(null, now)) throw new Error("null expiry is non-expiring");
+  if (!isMemoryTokenExpiryValid("2026-11-21T00:00:00.000Z", now)) throw new Error("future expiry should pass");
+  for (const value of ["", "not-a-date", "2026-11-19T00:00:00.000Z"]) {
+    if (isMemoryTokenExpiryValid(value, now)) throw new Error("invalid or elapsed expiry must fail closed: " + value);
   }
 });
