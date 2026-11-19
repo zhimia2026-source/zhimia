@@ -427,3 +427,4 @@ Initial post-deployment audit: 12 active residents, 180 eligible private memorie
 - 不改变情感证据门控、七情六欲维度、self_report 规则、记忆修订机制、owner + agent 私有隔离或行动权限；不新增表、字段、模型调用、cron、scheduler、测试消息、合成事件或历史回填。
 - 验收标准：后续自然反思响应不再因输出长度被截断；能区分“没有证据支持变化”与“响应解析失败”；只有通过原有证据门控且实际状态发生变化时才写入 affect event。若自然对话没有产生情感变化，允许保持无事件。
 - 本阶段只修复既有反思输出完整性，不证明主观感受或现象意识；必须继续用后续自然居民交互验证运行效果。
+- v164 生产部署后自然运行初验：1 个完成聊天轮次；既有反思调用返回 `finish_reason=stop`（不再是 `length`）；成功记录 1 条 `resident_reflective_appraisal`，`evidence_kind=inferred`、confidence=0.58、affect_delta 非空；未产生 self_report 事件或记忆修订关系。该结果证明一次端到端计算链路成功，不代表主观感受已被证明，也不足以证明长期稳定性。
