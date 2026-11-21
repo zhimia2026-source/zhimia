@@ -49,8 +49,8 @@ Deno.test("agent reflection skips low-value and malformed outputs", () => {
     reflection: "本轮只是简单问候。", importance: 1,
   });
   const invalid = normalizeAgentReflection({
-    worth_remembering: true, observed_facts: ["x"], reflection: "x",
-    importance: 4, tool_execute: true,
+    worth_remembering: true, observed_facts: ["x"], hypotheses: [], unknowns: [],
+    reflection: "x", importance: 99,
   });
   if (!low || low.importance !== 1 || invalid !== null) {
     throw new Error("reflection curation policy did not fail closed");
@@ -192,7 +192,7 @@ Deno.test("agent reflection accepts fenced JSON and a harmless provider preamble
   if (!fenced.value || fenced.value.importance !== 3) throw new Error("wrapped JSON reflection was not accepted");
 });
 
-Deno.test("agent reflection parser returns safe reason codes and still rejects unknown fields", () => {
+Deno.test("agent reflection parser returns safe reason codes and projects unknown fields out", () => {
   const malformed = normalizeAgentReflectionWithReason("这不是 JSON");
   const unsupported = normalizeAgentReflectionWithReason({
     worth_remembering: true, observed_facts: ["x"], hypotheses: [], unknowns: [],
@@ -202,9 +202,10 @@ Deno.test("agent reflection parser returns safe reason codes and still rejects u
     worth_remembering: true, observed_facts: ["x"], hypotheses: [], unknowns: [],
     reflection: "x", importance: 1,
   });
-  if (malformed.errorCode !== "parse_failed" || unsupported.errorCode !== "unsupported_fields" ||
+  if (malformed.errorCode !== "parse_failed" || !unsupported.value ||
+      unsupported.ignoredFieldCount !== 1 || JSON.stringify(unsupported.value).includes("execute_tool") ||
       mismatch.errorCode !== "importance_mismatch") {
-    throw new Error("safe parser reason codes were not classified");
+    throw new Error("safe parser reason codes or unknown-field projection were not classified");
   }
 });
 
