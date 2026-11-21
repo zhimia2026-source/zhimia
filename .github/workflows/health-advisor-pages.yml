@@ -71,6 +71,8 @@ jobs:
           node --input-type=module --check < _site/zhi-resident.js
           grep -q 'id="ceesConsole"' _site/zhi-resident.html
           grep -q '/cees-contributions' _site/zhi-resident.js
+          grep -q '/cees-library' _site/zhi-resident.js
+          grep -q 'id="ceesLibrary"' _site/zhi-resident.html
           grep -q '请居民自主判断是否发表' _site/zhi-resident.js
           test -s _site/zhi-memory.html
           test -s _site/zhi-memory.js
