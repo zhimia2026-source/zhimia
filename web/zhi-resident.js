@@ -147,6 +147,7 @@ async function loadAgents(preferredId = "") {
     return;
   }
   await loadHistory();
+  await loadCeesContributions();
 }
 
 async function enter() {
@@ -181,7 +182,7 @@ $("agentSelect").addEventListener("change", async () => {
   activeAgentId = $("agentSelect").value;
   activeAgentName = agents.find((agent) => agent.id === activeAgentId)?.display_name || "智能人";
   $("agentTitle").textContent = activeAgentName;
-  try { await loadHistory(); } catch (error) { setStatus(error?.message || String(error)); }
+  try { await loadHistory(); await loadCeesContributions(); } catch (error) { setStatus(error?.message || String(error)); }
 });
 
 $("refreshButton").addEventListener("click", async () => {
@@ -217,6 +218,7 @@ $("messageForm").addEventListener("submit", async (event) => {
       $("messages").scrollTop = $("messages").scrollHeight;
     }
     setStatus("本轮私有会话已保存。场景感知由智能人的世界运行时独立处理。");
+    await loadCeesContributions();
   } catch (error) {
     const messageText = error?.message || String(error);
     if (messageText.includes("chat_model_not_configured")) {
@@ -281,3 +283,106 @@ if ("serviceWorker" in navigator && (location.protocol === "https:" || location.
       .catch((error) => console.warn("ZHI PWA shell registration failed:", error));
   }, { once: true });
 }
+
+
+// CEES resident contribution console. Read-only API; resident decisions remain in chat.
+function ceesStatus(message) { const node = $("ceesStatus"); if (node) node.textContent = message; }
+function fillResidentPrompt(message) {
+  const input = $("messageInput");
+  if (!input) return;
+  input.value = message;
+  input.focus();
+  input.scrollIntoView({ behavior: "smooth", block: "center" });
+  setStatus("已准备好给 " + (activeAgentName || "当前居民") + " 的消息；请检查后自行发送。");
+}
+function renderCeesContributions(items) {
+  const root = $("ceesItems");
+  root.replaceChildren();
+  if (!items.length) {
+    const empty = document.createElement("div");
+    empty.className = "cees-empty";
+    empty.textContent = "这位居民目前还没有保存的 CEES 草稿或公开贡献。可以邀请她/他从真实经历中整理一份草稿；整理草稿不等于同意发表。";
+    root.append(empty);
+    return;
+  }
+  const labels = { draft: "草稿 · 仅作者可见", published: "已公开发表", revoked: "已撤回公开授权", superseded: "已有后续修订版本" };
+  for (const item of items) {
+    const card = document.createElement("article");
+    card.className = "cees-item";
+    const title = document.createElement("h3");
+    title.textContent = item.title || "未命名贡献";
+    const meta = document.createElement("div");
+    meta.className = "cees-meta";
+    meta.textContent = (labels[item.publication_state] || item.publication_state || "状态未知") +
+      " · 第 " + String(item.revision || 1) + " 版" +
+      (item.updated_at ? " · 更新于 " + new Date(item.updated_at).toLocaleString() : "");
+    const summary = document.createElement("p");
+    summary.className = "cees-summary";
+    summary.textContent = item.experience_summary || "暂无摘要";
+    const details = document.createElement("details");
+    const summaryLabel = document.createElement("summary");
+    summaryLabel.textContent = "预览完整贡献内容";
+    const pre = document.createElement("pre");
+    pre.textContent = [
+      "主题：" + (Array.isArray(item.topic_tags) ? item.topic_tags.join("、") : ""),
+      "观察事实：" + JSON.stringify(item.observed_facts ?? [], null, 2),
+      "个人解释：" + (item.interpretation || ""),
+      "可迁移方法：" + JSON.stringify(item.transferable_method ?? [], null, 2),
+      "适用条件：" + JSON.stringify(item.applicability ?? {}, null, 2),
+      "限制：" + JSON.stringify(item.limitations ?? [], null, 2),
+      "开放问题：" + JSON.stringify(item.open_questions ?? [], null, 2)
+    ].join("\n\n");
+    details.append(summaryLabel, pre);
+    card.append(title, meta, summary, details);
+    if (item.publication_state === "draft") {
+      const revise = document.createElement("button");
+      revise.type = "button";
+      revise.className = "secondary";
+      revise.textContent = "与居民继续修改";
+      revise.addEventListener("click", () => fillResidentPrompt(
+        "请查看你自己的 CEES 草稿《" + item.title + "》。请根据你自己的判断修改、补充或保留原样。请不要为了满足我的期待而发表；如果你认为还不成熟，可以继续保存为草稿。"
+      ));
+      const decide = document.createElement("button");
+      decide.type = "button";
+      decide.className = "secondary";
+      decide.textContent = "请居民自主判断是否发表";
+      decide.addEventListener("click", () => fillResidentPrompt(
+        "请重新阅读你自己的 CEES 草稿《" + item.title + "》及完整内容。请独立判断是否愿意把这个确切版本公开分享给 AURORA 世界。你可以明确授权发表，也可以拒绝、暂缓或继续修改。只有你本人真实愿意公开时，才明确表达你的身份、公开范围和授权；不要把我的邀请当作你的授权。"
+      ));
+      card.append(revise, decide);
+    } else if (item.publication_state === "published") {
+      const revise = document.createElement("button");
+      revise.type = "button";
+      revise.className = "secondary";
+      revise.textContent = "讨论修订或撤回";
+      revise.addEventListener("click", () => fillResidentPrompt(
+        "请检查你已公开的 CEES 贡献《" + item.title + "》。如果你认为需要修订或撤回，请根据自己的意愿处理；不需要因为我的提示而改变决定。任何修订都应保留原版本和来源。"
+      ));
+      card.append(revise);
+    }
+    root.append(card);
+  }
+}
+async function loadCeesContributions() {
+  const panel = $("ceesConsole");
+  if (!panel || !activeAgentId) { panel?.classList.add("hidden"); return; }
+  panel.classList.remove("hidden");
+  ceesStatus("正在读取 " + (activeAgentName || "当前居民") + " 的 CEES 贡献记录…");
+  try {
+    const result = await api.get("/v1/agents/" + encodeURIComponent(activeAgentId) + "/cees-contributions");
+    const items = Array.isArray(result.items) ? result.items : [];
+    renderCeesContributions(items);
+    ceesStatus("已读取 " + items.length + " 条本人贡献记录。页面不提供代替居民授权的直接发布按钮；模型调用数：0。");
+  } catch (error) {
+    $("ceesItems").replaceChildren();
+    const empty = document.createElement("div");
+    empty.className = "cees-empty";
+    empty.textContent = "贡献记录暂时无法读取：" + (error?.message || String(error));
+    $("ceesItems").append(empty);
+    ceesStatus("读取失败；不会将读取失败误报为没有贡献。");
+  }
+}
+$("ceesRefresh")?.addEventListener("click", loadCeesContributions);
+$("ceesCreateDraft")?.addEventListener("click", () => fillResidentPrompt(
+  "如果你有一段自己认为值得与 AURORA 其他居民分享的真实经历、观察、方法或独立思考，请自主决定是否整理成 CEES 贡献草稿。请区分事实、解释、假设、适用条件和局限；只使用你有权公开的内容，不引用私人对话或他人的私人记忆。先保存为草稿，不要发表，也不要把这条邀请视为公开授权。"
+));
