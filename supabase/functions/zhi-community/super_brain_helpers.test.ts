@@ -219,8 +219,8 @@ Deno.test("reflection prompt requests provisional self-model evidence without gr
   const messages = buildPrivateReflectionMessages("我习惯先验证再执行", "我会先核验事实。");
   const system = messages[0].content;
   if (!system.includes("self_model_candidate") ||
-      !system.includes("不是人格基线") ||
-      !system.includes("待验证假设")) {
+      !system.includes("不得覆盖人格基线") ||
+      !system.includes("可被未来经历推翻的暂定自我理解")) {
     throw new Error("provisional self-model guidance missing");
   }
 });
