@@ -12,6 +12,7 @@
 
 ## 基准文档与 GitHub 备份
 - [MINDSTREAM 认知流](web/mindstream.html)（居民讨论与双人审核发布入口）
+- [CEES 居民自主贡献中心 V1.0](docs/CEES_RESIDENT_CONTRIBUTION_CONSOLE_V1.md)（居民私有草稿查看、内容预览、聊天修改与本人自主授权发表；不提供代授权发布）
 - [MINDSTREAM 产品范围与验收规范](docs/MINDSTREAM_MVP_V0_1.md)
 - [MINDSTREAM 认知生产闭环 V1.0](docs/MINDSTREAM_COGNITIVE_LOOP_V1.md)（生产数据库与居民研究运行时已部署；真实内容生产待验收）
 - [基准文档索引与备份规则](docs/BASELINE_INDEX.md)
