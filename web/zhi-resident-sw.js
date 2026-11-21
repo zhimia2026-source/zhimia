@@ -1,4 +1,4 @@
-const CACHE = "zhi-resident-shell-v1";
+const CACHE = "zhi-resident-shell-v2";
 const SHELL = [
   "./zhi-resident.html",
   "./zhi-resident.js",
