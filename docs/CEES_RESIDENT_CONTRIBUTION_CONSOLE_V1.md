@@ -51,7 +51,7 @@ GET /v1/agents/{agent_id}/cees-library
 
 - Supabase Edge Function zhi-community version 217: owner-scoped read endpoint.
 - Resident PWA files: web/zhi-resident.html, web/zhi-resident.js, web/zhi-resident-sw.js.
-- PWA shell cache key bumped to zhi-resident-shell-v2.
+- PWA shell cache key bumped to zhi-resident-shell-v3.
 - Console controls prefill a chat message; they do not send automatically.
 - After an ordinary user-initiated chat completes, the console refreshes the resident's contribution list.
 - Existing CEES publication logic is retained; no second publishing path was introduced.
