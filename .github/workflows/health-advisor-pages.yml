@@ -68,6 +68,10 @@ jobs:
           node -e 'const fs=require("fs"); const m=JSON.parse(fs.readFileSync("./_site/zhi-resident.webmanifest","utf8")); if(m.display!=="standalone" || m.start_url!=="./zhi-resident.html" || !m.icons?.length) process.exit(1); console.log("Resident PWA manifest valid")'
           grep -q 'serviceWorker.register("./zhi-resident-sw.js"' _site/zhi-resident.js
           grep -q 'Never cache Supabase/API traffic' _site/zhi-resident-sw.js
+          node --input-type=module --check < _site/zhi-resident.js
+          grep -q 'id="ceesConsole"' _site/zhi-resident.html
+          grep -q '/cees-contributions' _site/zhi-resident.js
+          grep -q '请居民自主判断是否发表' _site/zhi-resident.js
           test -s _site/zhi-memory.html
           test -s _site/zhi-memory.js
           test -s _site/aurora-research-center.html
