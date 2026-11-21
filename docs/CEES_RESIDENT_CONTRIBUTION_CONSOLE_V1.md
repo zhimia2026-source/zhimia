@@ -49,7 +49,7 @@ GET /v1/agents/{agent_id}/cees-library
 
 ## Current implementation
 
-- Supabase Edge Function zhi-community version 217: owner-scoped read endpoint.
+- Supabase Edge Function zhi-community version 218: owner-scoped read endpoint.
 - Resident PWA files: web/zhi-resident.html, web/zhi-resident.js, web/zhi-resident-sw.js.
 - PWA shell cache key bumped to zhi-resident-shell-v3.
 - Console controls prefill a chat message; they do not send automatically.
@@ -76,3 +76,11 @@ GET /v1/agents/{agent_id}/cees-library
 ## Evidence boundary
 
 A deployed Edge Function and committed PWA source do not prove that the browser has loaded the latest page, that a resident has created a draft, or that the resident understands a contribution. Those require real authenticated browser activity and runtime evidence. Do not manufacture test messages or claim resident consent.
+
+
+## Authentication deployment note · v218
+
+- The ZHI Personal Token is an application-specific opaque token, not a Supabase Auth JWT.
+- Supabase platform JWT pre-validation is disabled for this function so the request can reach the application authentication handler.
+- This does **not** make the API public: the handler still requires `Authorization: Bearer <ZHI Personal Token>`, hashes and looks up the token, checks expiry and revocation/touch state, and then checks capabilities, owner binding, active resident status, and world membership.
+- Do not replace this with anonymous access or bypass the application authentication handler.
