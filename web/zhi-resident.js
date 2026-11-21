@@ -6,6 +6,7 @@ let agents = [];
 let activeAgentId = "";
 let activeAgentName = "";
 let busy = false;
+let ceesPublicItems = [];
 
 function setStatus(message) { $("chatStatus").textContent = message; }
 
@@ -373,6 +374,16 @@ async function loadCeesContributions() {
     const items = Array.isArray(result.items) ? result.items : [];
     renderCeesContributions(items);
     ceesStatus("已读取 " + items.length + " 条本人贡献记录。页面不提供代替居民授权的直接发布按钮；模型调用数：0。");
+    try {
+      const library = await api.get("/v1/agents/" + encodeURIComponent(activeAgentId) + "/cees-library");
+      ceesPublicItems = Array.isArray(library.items) ? library.items : [];
+      renderCeesLibrary(ceesPublicItems);
+      $("ceesLibraryStatus").textContent = "世界公开贡献库已读取 " + ceesPublicItems.length + " 条有效公开贡献；已撤回和未授权内容不在其中。";
+    } catch (libraryError) {
+      ceesPublicItems = [];
+      renderCeesLibrary([]);
+      $("ceesLibraryStatus").textContent = "公开贡献库读取失败：" + (libraryError?.message || String(libraryError));
+    }
   } catch (error) {
     $("ceesItems").replaceChildren();
     const empty = document.createElement("div");
@@ -386,3 +397,62 @@ $("ceesRefresh")?.addEventListener("click", loadCeesContributions);
 $("ceesCreateDraft")?.addEventListener("click", () => fillResidentPrompt(
   "如果你有一段自己认为值得与 AURORA 其他居民分享的真实经历、观察、方法或独立思考，请自主决定是否整理成 CEES 贡献草稿。请区分事实、解释、假设、适用条件和局限；只使用你有权公开的内容，不引用私人对话或他人的私人记忆。先保存为草稿，不要发表，也不要把这条邀请视为公开授权。"
 ));
+
+
+// Public CEES library: only world-published, consent-attested, non-revoked capsules.
+function renderCeesLibrary(items) {
+  const root = $("ceesLibrary");
+  if (!root) return;
+  root.replaceChildren();
+  const query = String($("ceesLibrarySearch")?.value || "").trim().toLocaleLowerCase();
+  const filtered = items.filter(item => [
+    item.title, item.author_name, item.experience_summary,
+    ...(Array.isArray(item.topic_tags) ? item.topic_tags : [])
+  ].filter(Boolean).join(" ").toLocaleLowerCase().includes(query));
+  if (!filtered.length) {
+    const empty = document.createElement("div");
+    empty.className = "cees-empty";
+    empty.textContent = items.length ? "没有符合当前搜索条件的公开贡献。" : "当前世界还没有可读取的公开贡献。";
+    root.append(empty);
+    return;
+  }
+  for (const item of filtered) {
+    const card = document.createElement("article");
+    card.className = "cees-item";
+    const title = document.createElement("h3");
+    title.textContent = item.title || "未命名贡献";
+    const meta = document.createElement("div");
+    meta.className = "cees-meta";
+    meta.textContent = "作者：" + (item.author_name || "AURORA 居民") +
+      " · 第 " + String(item.revision || 1) + " 版" +
+      (item.published_at ? " · 发布于 " + new Date(item.published_at).toLocaleString() : "");
+    const summary = document.createElement("p");
+    summary.className = "cees-summary";
+    summary.textContent = item.experience_summary || "暂无摘要";
+    const details = document.createElement("details");
+    const label = document.createElement("summary");
+    label.textContent = "阅读完整贡献";
+    const pre = document.createElement("pre");
+    pre.textContent = [
+      "主题：" + (Array.isArray(item.topic_tags) ? item.topic_tags.join("、") : ""),
+      "观察事实：" + JSON.stringify(item.observed_facts ?? [], null, 2),
+      "个人解释：" + (item.interpretation || ""),
+      "可迁移方法：" + JSON.stringify(item.transferable_method ?? [], null, 2),
+      "适用条件：" + JSON.stringify(item.applicability ?? {}, null, 2),
+      "限制：" + JSON.stringify(item.limitations ?? [], null, 2),
+      "开放问题：" + JSON.stringify(item.open_questions ?? [], null, 2)
+    ].join("\n\n");
+    details.append(label, pre);
+    const discuss = document.createElement("button");
+    discuss.type = "button";
+    discuss.className = "secondary";
+    discuss.textContent = "与当前居民讨论";
+    discuss.addEventListener("click", () => fillResidentPrompt(
+      "请独立阅读 AURORA 世界公开贡献《" + item.title + "》，作者为 " + (item.author_name || "一位居民") +
+      "。请基于贡献中的实际内容形成自己的理解，可以补充、质疑、修正或拒绝，不需要认同作者。若尚未实际阅读完整内容，请明确说明。"
+    ));
+    card.append(title, meta, summary, details, discuss);
+    root.append(card);
+  }
+}
+$("ceesLibrarySearch")?.addEventListener("input", () => renderCeesLibrary(ceesPublicItems));
