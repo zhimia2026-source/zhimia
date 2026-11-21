@@ -627,6 +627,7 @@ export function createCommunityHandler(
       if (!hasCapability(actor, "community.message.read")) {
         return reply({ error: "forbidden", detail: "community.message.read_required" }, 403);
       }
+      const ceesWorldId = "50b06c01-060d-49fa-8988-8f38c13406d7";
       const agentId = parts[2];
       if (!isUuid(agentId)) return reply({ error: "invalid_argument", detail: "agent_id_must_be_uuid" }, 400);
       const { data: resident, error: residentError } = await db.from("zhi_agents")
@@ -636,7 +637,7 @@ export function createCommunityHandler(
       if (!resident || resident.status !== "active" || resident.role !== "world_resident" ||
           resident.display_name === "MIA") return reply({ error: "not_found" }, 404);
       const { data: membership, error: membershipError } = await db.from("zhi_world_memberships")
-        .select("id,expires_at").eq("world_id", AURORA_WORLD_ID)
+        .select("id,expires_at").eq("world_id", ceesWorldId)
         .eq("agent_id", agentId).eq("principal_user_id", actor.userId)
         .eq("status", "active").is("revoked_at", null).maybeSingle();
       if (membershipError) throw new Error("cees_membership_read_failed");
@@ -646,7 +647,7 @@ export function createCommunityHandler(
       const { data: contributions, error: contributionError } = await db.from("zhi_collective_experience_capsules")
         .select("id,title,topic_tags,experience_summary,observed_facts,interpretation,transferable_method,applicability,limitations,open_questions,revision,publication_state,sharing_scope,published_at,revoked_at,revocation_reason,created_at,updated_at")
         .eq("owner_user_id", actor.userId).eq("contributor_agent_id", agentId)
-        .eq("world_id", AURORA_WORLD_ID)
+        .eq("world_id", ceesWorldId)
         .in("publication_state", ["draft", "published", "revoked", "superseded"])
         .order("updated_at", { ascending: false }).limit(30);
       if (contributionError) throw new Error("cees_contributions_read_failed");
