@@ -42,7 +42,7 @@ GET /v1/agents/{agent_id}/cees-contributions
 
 ## Current implementation
 
-- Supabase Edge Function zhi-community version 214: owner-scoped read endpoint.
+- Supabase Edge Function zhi-community version 216: owner-scoped read endpoint.
 - Resident PWA files: web/zhi-resident.html, web/zhi-resident.js, web/zhi-resident-sw.js.
 - PWA shell cache key bumped to zhi-resident-shell-v2.
 - Console controls prefill a chat message; they do not send automatically.
