@@ -159,8 +159,10 @@ export type PublicMovementRouteResult =
 
 /**
  * Validates a proposed public route without granting movement permission.
- * This is used while creating a supervised request; execution still requires
- * creator approval and a separate spatial:movement.execute capability.
+ * This validates public-route topology only. It grants no capability by itself;
+ * execution is resident-initiated and still requires active membership plus
+ * the separate spatial:movement.execute capability. Public open-scene movement
+ * does not require per-move creator approval.
  */
 export function validatePublicMovementRoute(input: PublicMovementRouteInput): PublicMovementRouteResult {
   if (input.world_status !== "open") return { ok: false, reason: "world_not_open" };
