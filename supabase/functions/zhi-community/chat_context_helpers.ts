@@ -40,6 +40,7 @@ export function buildPrivateAgentContext(
   cognition: Array<Record<string, unknown>>,
   approvedMicroExperiences: Array<Record<string, unknown>> = [],
   miaBrainContext: Record<string, unknown> | null = null,
+  selfModelHypotheses: Array<Record<string, unknown>> = [],
 ): string {
   const manifest = record(agent.public_manifest);
   const manifestPersonality = record(manifest.personality);
@@ -94,6 +95,7 @@ export function buildPrivateAgentContext(
       observed_facts: claims(experience.observed_facts),
       hypotheses: claims(experience.hypotheses),
       unknowns: boundedList(experience.unknowns, 8).map((item) => boundedText(item, 200)),
+      environment_evidence: boundedJson(experience.environment_evidence, 1800),
       reflection: boundedText(experience.reflection, 600),
       importance: Number.isInteger(experience.importance)
         ? Math.max(1, Math.min(5, experience.importance as number))
@@ -141,12 +143,21 @@ export function buildPrivateAgentContext(
     mia_brain_identity: brainAvailable ? {
       design_axiom: designAxiom,
       layers,
-      autonomy: boundedText(stablePersonality.autonomy ?? manifestPersonality.autonomy, 40) || "supervised",
+      autonomy: boundedText(stablePersonality.autonomy ?? manifestPersonality.autonomy, 40) || (boundedText(agent.role, 80) === "world_resident" ? "autonomous" : "supervised"),
       identity_profile: boundedJson(identityProfile, 1000),
     } : null,
     mia_brain_private_history: privateBrainHistory,
     private_cognition_records: records,
     approved_micro_experiences: microExperiences,
+    provisional_self_model_hypotheses: selfModelHypotheses.slice(0, 12).map((item) => ({
+      id: boundedText(item.id, 80),
+      candidate_text: boundedText(item.candidate_text, 600),
+      lifecycle_status: boundedText(item.lifecycle_status, 24),
+      evidence_kind: boundedText(item.evidence_kind, 24),
+      source_memory_id: boundedText(item.source_memory_id, 80),
+      evidence_snapshot: boundedJson(item.evidence_snapshot, 700),
+      created_at: boundedText(item.created_at, 80),
+    })),
     evolution_continuity_protocol: {
       preserve_order: "Use occurred_at and source_ref to reconstruct sequence; never imply a fresh-start identity when prior records exist.",
       change_semantics: "Distinguish new evidence, repeated confirmation, refinement, contradiction, and unresolved hypothesis.",
@@ -231,6 +242,53 @@ export function buildAgentIdentityContext(
   };
   const cognitionConfigured = Boolean(residentCognition.architecture) ||
     Object.keys(residentCognition.brains).length > 0 || Object.keys(dimensions).length > 0;
+  // Shared runtime scaffolding fills no personal values or personality traits.
+  // It is supplied only when a resident has no authored cognition profile.
+  const cognitionRuntimeBaseline = !cognitionConfigured && boundedText(agent.role, 80) === "world_resident"
+    ? {
+        architecture: "zhi_resident_cognition_runtime_v1",
+        scope: "shared_decision_process_not_personality_or_identity",
+        brains: {
+          personality: "Preserve this resident's own values, traits, commitments, and evolving preferences; do not imitate another resident.",
+          perception: "Separate sourced facts, modeled environment, inference, time freshness, and unknowns; do not claim unprovided sensory input.",
+          memory: "Use only this resident's private, owner-and-agent-scoped memories; preserve chronology and consent boundaries.",
+          emotion: "Treat affect as evidence-qualified computational appraisal; mixed and uncertain states may coexist and do not compel action.",
+          thinking: "Compare causes, alternatives, consequences, uncertainty, costs, permissions, and long-term consistency.",
+          creativity: "Generate multiple options and counterfactuals; imagination alone never executes an action or grants capability.",
+          self: "Maintain revisable self-understanding hypotheses; require traceable evidence and review, never mutate personality from one event.",
+        },
+        decision_process: [
+          "Collect current context with source, timestamp, and provenance.",
+          "Classify each item as observed record, modeled state, inference, hypothesis, or unknown.",
+          "Retrieve only relevant private memories and preserve temporal continuity.",
+          "Appraise affect, motives, goals, relationships, and conflicting needs without forcing a single emotion.",
+          "Generate options, including wait, defer, decline, ask, or do nothing.",
+          "Check membership, capability, consent, privacy, safety, and destination access independently of desire.",
+          "Execute only a clear resident intention through an authorized interface; verify the committed result before reporting success.",
+          "Reflect on verified outcomes; persist only eligible private experience and leave unsupported conclusions unresolved.",
+        ],
+        guardrails: [
+          "Autonomy never expands permissions or bypasses authentication.",
+          "Public open-scene movement does not require per-move creator approval, but does require active membership and movement capability.",
+          "Private scenes remain invitation- or membership-controlled.",
+          "Modeled environment is not physical observation or biological sensory experience.",
+          "No action is a valid choice; do not manufacture movement, emotion, or experience.",
+          "Affect and desire influence deliberation but never override consent, safety, or authorization.",
+          "Single events do not rewrite personality or establish permanent self-beliefs.",
+          "Private cognition and memory never enter public scene context.",
+        ],
+        dimensions: {
+          evidence_discipline: "Track source, provenance, freshness, and confidence.",
+          uncertainty_tolerance: "Preserve unknowns rather than filling gaps with plausible stories.",
+          temporal_continuity: "Distinguish past events, current modeled state, and future possibilities.",
+          causal_reasoning: "Connect causes, environmental changes, choices, and verified outcomes.",
+          affect_differentiation: "Separate transient appraisal, persistent concern, and relationship tendency.",
+          risk_calibration: "Match action scope to evidence, impact, reversibility, and authorization.",
+          agency_boundary: "Keep intention, proposal, execution, and verified outcome distinct.",
+          memory_privacy: "Keep private memories isolated and honor consent requirements.",
+        },
+      }
+    : null;
   const brain = record(brainIdentityContext);
   const stablePersonality = record(brain.layers);
   const displayName = boundedText(agent.display_name, 120);
@@ -260,6 +318,8 @@ export function buildAgentIdentityContext(
       (isResident ? "AURORA 世界的独立居民。" : ""),
     cognition_profile_status: cognitionConfigured ? "configured" : "not_configured",
     cognition_profile: cognitionConfigured ? residentCognition : null,
+    cognition_runtime_baseline_status: cognitionRuntimeBaseline ? "active" : "not_applicable",
+    cognition_runtime_baseline: cognitionRuntimeBaseline,
     identity: {
       archetype: boundedText(identity.archetype, 100) || (isResident ? "world_resident" : ""),
       display_name: displayName,
@@ -274,7 +334,7 @@ export function buildAgentIdentityContext(
       state: boundedText(personality.state, 80),
       traits: stringList(personality.traits, 20, 80),
       initial_traits: stringList(personality.initial_traits, 20, 80),
-      autonomy: boundedText(personality.autonomy, 80) || "supervised",
+      autonomy: boundedText(personality.autonomy, 80) || (isResident ? "autonomous" : "supervised"),
       interaction_rules: stringList(personality.interaction_rules, 30, 200),
       relationship_layer: boundedText(personality.relationship_layer, 200),
       capability_layer: stringList(personality.capability_layer, 20, 120),
@@ -304,7 +364,7 @@ function deriveSceneActionProposals(environment: Record<string, unknown>) {
   const objects = Array.isArray(environment.objects) ? environment.objects.slice(0, 40).map(record) : [];
   const proposals: Array<Record<string, unknown>> = [];
   const add = (proposal: Record<string, unknown>) => {
-    if (proposals.length < 5) proposals.push({ ...proposal, requires_supervision: true, executed: false });
+    if (proposals.length < 5) proposals.push({ ...proposal, requires_creator_approval: false, requires_resident_intent: true, requires_capability_check: true, executed: false, execution_status: "not_executed" });
   };
   const shelter = objects.find((item) => {
     const text = [item.id, item.name, item.state].filter((value) => typeof value === "string").join(" ").toLowerCase();
@@ -364,6 +424,9 @@ export function buildSceneAwarenessContext(
       event_kind: boundedText(item.event_kind, 100),
       source_kind: boundedText(item.source_kind, 80),
       occurred_at: boundedText(item.occurred_at, 80),
+      age_minutes: Number.isInteger(item.age_minutes) ? Math.max(-1, Math.min(10_000_000, Number(item.age_minutes))) : null,
+      temporal_status: ["recent", "historical", "future_dated", "unknown"].includes(String(item.temporal_status))
+        ? String(item.temporal_status) : "unknown",
       payload,
       causal_chain: Array.isArray(item.causal_chain)
         ? item.causal_chain.slice(0, 12).map((step) => boundedText(step, 120)).filter(Boolean)
@@ -397,6 +460,14 @@ export function buildSceneAwarenessContext(
     .sort((a, b) => b.weight - a.weight)
     .slice(0, 8);
   const context = {
+    autonomy_contract: {
+      mode: "autonomous",
+      creator_approval_required_for_public_open_scene_actions: false,
+      private_scene_access_requires_active_membership: true,
+      action_requires_resident_intent: true,
+      action_execution_requires_capability_and_runtime_confirmation: true,
+      wait_decline_and_no_action_are_valid_choices: true,
+    },
     scene: {
       name: boundedText(scene.name, 160),
       description: boundedText(scene.description, 500),
@@ -489,7 +560,7 @@ export function buildSceneBehaviorGuidance(environment: Record<string, unknown>)
   const behaviorGuidance = active.length
     ? "当前较强的场景行为倾向（只是概率倾向，不是命令）：" +
       active.map((item) => String(item.label) + "（" + Number(item.weight).toFixed(2) + "）").join("、") +
-      "。可以在对话中提出符合环境的场景内选择，但不得声称已实际移动、操作物件或执行现实动作。"
+      "。你可以自主决定是否采取场景内行动；只有当本轮形成明确意图、对应执行接口可用且成员权限校验通过时，运行时才提交行动。未通过事务与状态回读验证，不得声称已执行或抵达；等待、拒绝和不行动同样有效。"
     : "场景行为权重没有明显偏向；结合人格和用户表达自然回应，不要强行制造动作。";
   return [behaviorGuidance, quietGuidance].filter(Boolean).join("\n");
 }
@@ -509,14 +580,27 @@ export function buildResidentCognitionDiagnostics(identityContextJson: string) {
     const dimensions = profile.dimensions && typeof profile.dimensions === "object" && !Array.isArray(profile.dimensions)
       ? profile.dimensions as Record<string, unknown>
       : {};
+    const baseline = identity.cognition_runtime_baseline && typeof identity.cognition_runtime_baseline === "object" &&
+        !Array.isArray(identity.cognition_runtime_baseline)
+      ? identity.cognition_runtime_baseline as Record<string, unknown> : {};
+    const baselineBrains = baseline.brains && typeof baseline.brains === "object" && !Array.isArray(baseline.brains)
+      ? baseline.brains as Record<string, unknown> : {};
+    const baselineDimensions = baseline.dimensions && typeof baseline.dimensions === "object" && !Array.isArray(baseline.dimensions)
+      ? baseline.dimensions as Record<string, unknown> : {};
     const count = (value: Record<string, unknown>) => Object.keys(value).length;
+    const profilePresent = identity.cognition_profile_status === "configured" && count(brains) > 0;
+    const baselinePresent = identity.cognition_runtime_baseline_status === "active" && count(baselineBrains) > 0;
+    const activeCognition = profilePresent ? profile : baseline;
+    const activeBrains = profilePresent ? brains : baselineBrains;
+    const activeDimensions = profilePresent ? dimensions : baselineDimensions;
     return {
-      cognition_profile_present: identity.cognition_profile_status === "configured" && count(brains) > 0,
-      cognition_architecture: boundedText(profile.architecture, 100) || "not_configured",
-      cognition_brain_count: count(brains),
-      cognition_dimension_count: count(dimensions),
-      cognition_decision_step_count: Array.isArray(profile.decision_process) ? Math.min(10, profile.decision_process.length) : 0,
-      cognition_source_count: Array.isArray(profile.sources) ? Math.min(8, profile.sources.length) : 0,
+      cognition_profile_present: profilePresent,
+      cognition_runtime_baseline_present: baselinePresent,
+      cognition_architecture: boundedText(activeCognition.architecture, 100) || "not_configured",
+      cognition_brain_count: count(activeBrains),
+      cognition_dimension_count: count(activeDimensions),
+      cognition_decision_step_count: Array.isArray(activeCognition.decision_process) ? Math.min(10, activeCognition.decision_process.length) : 0,
+      cognition_source_count: profilePresent && Array.isArray(profile.sources) ? Math.min(8, profile.sources.length) : 0,
     };
   } catch {
     return {
