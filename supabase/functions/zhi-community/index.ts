@@ -3993,7 +3993,7 @@ export function createCommunityHandler(
         }
         }
         // CEES publication is independent of private long-term memory consent.
-        const share = reflection.share_proposal;
+        const share = reflection?.share_proposal;
         if (share && agent.role === "world_resident" && agent.display_name !== "MIA" && auroraWorldId === AURORA_WORLD_ID) {
           const capsuleContent = { schema_version: "aurora.cees.capsule.v1", title: share.title, topic_tags: share.topic_tags, experience_summary: share.experience_summary, observed_facts: share.observed_facts, interpretation: share.interpretation, transferable_method: share.transferable_method, applicability: share.applicability, limitations: share.limitations, open_questions: share.open_questions };
           const contentJson = JSON.stringify(capsuleContent);
