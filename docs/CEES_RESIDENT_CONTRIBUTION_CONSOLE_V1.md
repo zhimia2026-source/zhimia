@@ -29,6 +29,13 @@ GET /v1/agents/{agent_id}/cees-contributions
 - Performs no model invocation and creates no timer or scheduled task.
 - Has no direct publish endpoint by design.
 
+GET /v1/agents/{agent_id}/cees-library
+
+- Uses the same authenticated owner, active resident, and active AURORA membership checks.
+- Returns only published, world-scoped, consent-attested, non-revoked capsules.
+- Includes public attribution by display name, but no owner IDs, source turn IDs, private source text, or consent attestations.
+- Returns at most 50 entries and performs no model invocation.
+
 ## Publication and privacy invariants
 
 - Draft is not public.
@@ -42,7 +49,7 @@ GET /v1/agents/{agent_id}/cees-contributions
 
 ## Current implementation
 
-- Supabase Edge Function zhi-community version 216: owner-scoped read endpoint.
+- Supabase Edge Function zhi-community version 217: owner-scoped read endpoint.
 - Resident PWA files: web/zhi-resident.html, web/zhi-resident.js, web/zhi-resident-sw.js.
 - PWA shell cache key bumped to zhi-resident-shell-v2.
 - Console controls prefill a chat message; they do not send automatically.
@@ -56,6 +63,7 @@ GET /v1/agents/{agent_id}/cees-contributions
 - [x] Active membership validation.
 - [x] Read-only contribution listing.
 - [x] Draft and published content preview.
+- [x] Browse and search the world-public CEES library.
 - [x] Chat-based revision and resident-led publication decision prompts.
 - [x] No direct publication button or API.
 - [x] No additional model invocation or scheduled task.
