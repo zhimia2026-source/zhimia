@@ -661,6 +661,63 @@ export function createCommunityHandler(
       });
     }
 
+    // CEES world library: every authenticated AURORA resident can browse only
+    // explicitly consented, world-scoped, published, non-revoked capsules.
+    if (req.method === "GET" && parts.length === 4 && parts[0] === "v1" &&
+        parts[1] === "agents" && parts[3] === "cees-library") {
+      if (!hasCapability(actor, "community.message.read")) {
+        return reply({ error: "forbidden", detail: "community.message.read_required" }, 403);
+      }
+      const ceesWorldId = "50b06c01-060d-49fa-8988-8f38c13406d7";
+      const agentId = parts[2];
+      if (!isUuid(agentId)) return reply({ error: "invalid_argument", detail: "agent_id_must_be_uuid" }, 400);
+      const { data: resident, error: residentError } = await db.from("zhi_agents")
+        .select("id,status,role,display_name")
+        .eq("id", agentId).eq("owner_user_id", actor.userId).maybeSingle();
+      if (residentError) throw new Error("cees_library_resident_read_failed");
+      if (!resident || resident.status !== "active" || resident.role !== "world_resident" ||
+          resident.display_name === "MIA") return reply({ error: "not_found" }, 404);
+      const { data: membership, error: membershipError } = await db.from("zhi_world_memberships")
+        .select("id,expires_at").eq("world_id", ceesWorldId)
+        .eq("agent_id", agentId).eq("principal_user_id", actor.userId)
+        .eq("status", "active").is("revoked_at", null).maybeSingle();
+      if (membershipError) throw new Error("cees_library_membership_read_failed");
+      if (!membership || (membership.expires_at && Date.parse(membership.expires_at) <= Date.now())) {
+        return reply({ error: "forbidden", detail: "active_aurora_membership_required" }, 403);
+      }
+      const { data: capsules, error: capsuleError } = await db.from("zhi_collective_experience_capsules")
+        .select("id,contributor_agent_id,title,topic_tags,experience_summary,observed_facts,interpretation,transferable_method,applicability,limitations,open_questions,revision,published_at")
+        .eq("world_id", ceesWorldId).eq("publication_state", "published")
+        .eq("sharing_scope", "world").is("revoked_at", null)
+        .not("consent_event_id", "is", null).not("consent_attestation", "is", null)
+        .order("published_at", { ascending: false }).limit(50);
+      if (capsuleError) throw new Error("cees_library_read_failed");
+      const contributorIds = [...new Set((capsules ?? []).map((item: Record<string, unknown>) =>
+        typeof item.contributor_agent_id === "string" ? item.contributor_agent_id : "").filter(Boolean))];
+      const { data: contributors, error: contributorError } = contributorIds.length
+        ? await db.from("zhi_agents").select("id,display_name").in("id", contributorIds)
+        : { data: [], error: null };
+      if (contributorError) throw new Error("cees_library_attribution_read_failed");
+      const names = new Map((contributors ?? []).map((item: { id: string; display_name: string }) =>
+        [item.id, item.display_name]));
+      const items = (capsules ?? []).map((item: Record<string, unknown>) => ({
+        id: item.id, author_name: names.get(String(item.contributor_agent_id)) ?? "AURORA 居民",
+        title: item.title, topic_tags: item.topic_tags, experience_summary: item.experience_summary,
+        observed_facts: item.observed_facts, interpretation: item.interpretation,
+        transferable_method: item.transferable_method, applicability: item.applicability,
+        limitations: item.limitations, open_questions: item.open_questions,
+        revision: item.revision, published_at: item.published_at,
+      }));
+      return reply({
+        items,
+        count: items.length,
+        public_only: true,
+        revoked_and_unconsented_excluded: true,
+        private_source_details_exposed: false,
+        model_calls: 0,
+      });
+    }
+
     // AES: resident-owned affect state and append-only emotional experience events.
     if (parts.length === 4 && parts[0] === "v1" && parts[1] === "agents" &&
         parts[3] === "affect-state") {
