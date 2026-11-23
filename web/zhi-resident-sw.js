@@ -1,6 +1,8 @@
-const CACHE = "zhi-resident-shell-v3";
+const CACHE = "zhi-resident-shell-v4";
 const SHELL = [
   "./zhi-resident.html",
+  "./aurora-shell.css",
+  "./aurora-shell.js",
   "./zhi-resident.js",
   "./zhi-universe-client.js",
   "./zhi-resident.webmanifest",
