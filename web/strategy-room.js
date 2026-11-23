@@ -122,6 +122,11 @@ function renderRecords(records) {
     if (record.record_type === "agenda") {
       card.append(node("h3", "", content.title || "会议议题"));
       card.append(node("p", "", content.brief || ""));
+    } else if (record.record_type === "decision") {
+      const decisionName = content.decision === "approve" ? "创造者批准" :
+        content.decision === "reject" ? "创造者否决" : "创造者暂缓";
+      card.append(node("h3", "", decisionName));
+      card.append(node("p", "", content.rationale || "未填写理由"));
     } else if (typeof content.response === "string") {
       card.append(node("pre", "response", content.response));
     } else {
@@ -181,6 +186,7 @@ async function refreshActive() {
   $("startBtn").disabled = !["draft", "scheduled"].includes(status);
   $("runBtn").disabled = !["running", "deliberation", "paused"].includes(status) || running;
   $("autoBtn").disabled = !["running", "deliberation", "paused"].includes(status) || running;
+  $("decisionPanel").classList.toggle("hidden", !["decision_pending", "paused"].includes(status));
   renderSessions(sessionsData.items || []);
 }
 
@@ -293,6 +299,26 @@ async function autoRun() {
   }
 }
 
+async function submitDecision(decision) {
+  if (!selectedId || running) return;
+  const buttons = ["approveBtn", "rejectBtn", "pauseBtn"];
+  for (const id of buttons) $(id).disabled = true;
+  try {
+    const result = await api.strategyPost("/v1/sessions/" + encodeURIComponent(selectedId) + "/decision", {
+      decision,
+      rationale: $("decisionRationale").value.trim(),
+    });
+    const label = decision === "approve" ? "已批准，进入执行跟踪阶段" :
+      decision === "reject" ? "已否决，本轮会议关闭" : "已暂缓，仍可继续作出最终决策";
+    setStatus(label + "。决策已写入共享会议记录。");
+    await refreshActive();
+  } catch (error) {
+    setStatus("决策未完成：" + error.message);
+  } finally {
+    for (const id of buttons) $(id).disabled = false;
+  }
+}
+
 async function initialize() {
   setAuth("正在验证当前标签页的 ZHI Personal Token…");
   try {
@@ -339,5 +365,8 @@ $("startBtn").addEventListener("click", startSession);
 $("runBtn").addEventListener("click", runOne);
 $("autoBtn").addEventListener("click", autoRun);
 $("stopBtn").addEventListener("click", () => { stopRequested = true; $("stopBtn").disabled = true; });
+$("approveBtn").addEventListener("click", () => submitDecision("approve"));
+$("rejectBtn").addEventListener("click", () => submitDecision("reject"));
+$("pauseBtn").addEventListener("click", () => submitDecision("pause"));
 
 initialize();
