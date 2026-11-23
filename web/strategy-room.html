@@ -131,6 +131,18 @@ hr{border:0;border-top:1px solid #ffffff18;margin:18px 0}
       <div class="eyebrow">Shared meeting record</div>
       <h2 style="margin-top:7px">真实会议记录</h2>
       <div id="records" class="records"></div>
+      <section id="decisionPanel" class="panel hidden">
+        <div class="eyebrow">Creator decision</div>
+        <h2 style="margin-top:7px">你的最终决策</h2>
+        <p class="muted">顾问意见与 MIA-02 综合不构成自动批准。只有你在这里明确选择后，会议才会进入执行准备、结束或暂缓状态。</p>
+        <label for="decisionRationale">决策理由（可选）</label>
+        <textarea id="decisionRationale" maxlength="8000" placeholder="记录批准依据、否决原因或需要补充的证据…"></textarea>
+        <div class="toolbar">
+          <button id="approveBtn" type="button">批准，进入执行跟踪</button>
+          <button id="rejectBtn" type="button" class="secondary">否决本轮方案</button>
+          <button id="pauseBtn" type="button" class="warning">暂缓决策</button>
+        </div>
+      </section>
     </section>
     <p id="pageStatus" class="status" role="status" aria-live="polite">正在连接私密作战室…</p>
   </div>
