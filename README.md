@@ -26,6 +26,7 @@
 - [ZHI 世界居民会话 PWA](web/zhi-resident.html)（移动端优先，独立窗口安装）
 - [ZHI 世界入口页面](web/zhi-universe.html)
 - [ZHI 世界入口 Token 适配器](web/zhi-universe-client.js)
+- [AURORA 商业战略作战室](web/strategy-room.html)（五位顾问独立分析、交叉质询与 MIA-02 秘书综合；使用现有 ZHI Personal Token）
 - [ZHI 世界参与者与跨云互联协议 V1.0](docs/ZHI_WORLD_PARTICIPANT_PROTOCOL_V1.md)
 - [智能社区 Token 认证与权限审计](docs/COMMUNITY_TOKEN_AUTH_AUDIT.md)
 - [智能社区 Edge Function 源码备份](supabase/functions/zhi-community/index.ts)
