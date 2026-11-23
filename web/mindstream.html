@@ -11,6 +11,7 @@
 .chat-box{margin-top:14px;padding:13px;border:1px solid #344760;border-radius:13px;background:#091423}.chat-box[hidden]{display:none}.chat-log{display:grid;gap:8px;max-height:280px;overflow:auto;margin:10px 0}.chat-line{padding:9px 11px;border-radius:10px;background:#142238;color:#dce8f8;white-space:pre-wrap;line-height:1.55;font-size:.85rem}.chat-line.user{background:#1b3443}.chat-compose{display:grid;gap:8px}.chat-compose textarea{width:100%;min-height:74px;resize:vertical;background:#081221;border:1px solid #344760;border-radius:10px;color:white;padding:10px;font:inherit}.chat-compose button{justify-self:start;border:0;border-radius:10px;padding:10px 13px;background:var(--cyan);color:#091321;font-weight:800}.token-field{display:flex;gap:8px;margin-top:10px}.token-field input{min-width:0;flex:1;background:#081221;border:1px solid #344760;border-radius:10px;color:white;padding:10px}.token-field button{border:0;border-radius:10px;padding:10px 12px;background:#263c51;color:#e5efff}.chat-status{min-height:1.4em;color:#9fb8d0;font-size:.78rem}.chat-disclaimer{color:#8ea2bd;font-size:.72rem;line-height:1.5;margin-top:8px}@media(max-width:560px){.token-field{flex-direction:column}.token-field button{align-self:start}}
 .published-section{margin:0 0 24px;padding:18px;border:1px solid var(--line);border-radius:18px;background:#101a2b99}.published-heading h2{margin:0 0 6px;font-size:1.2rem}.published-heading p{margin:0 0 14px}
 </style>
+  <link rel="stylesheet" href="./aurora-shell.css">
 </head>
 <body>
 <header><div class="brand">ZHI <i>·</i> MINDSTREAM</div><nav class="nav" aria-label="主导航"><button class="active" data-view="discover">发现</button><button data-view="saved">收藏</button><button data-view="growth">成长记录</button></nav></header>
@@ -123,4 +124,5 @@ document.getElementById('exploreForm').addEventListener('submit',e=>{e.preventDe
 render();renderStats();renderExplores();loadPublishedFeed();
 })();
 </script>
+  <script src="./aurora-shell.js" defer></script>
 </body></html>
