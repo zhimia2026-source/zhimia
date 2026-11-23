@@ -2,6 +2,8 @@ const SUPABASE_URL = "https://lvxmygrgqtmzqgailmyl.supabase.co";
 const API_KEY = "sb_publishable_VUdhz93MURXgJgT10_SJ_A_oZe4QmWE";
 const COMMUNITY_API = SUPABASE_URL + "/functions/v1/zhi-community";
 const TOKEN_GATEWAY = SUPABASE_URL + "/functions/v1/zhi-token-gateway";
+const STRATEGY_API = SUPABASE_URL + "/functions/v1/zhi-strategy-room";
+const STRATEGY_ORCHESTRATOR_API = SUPABASE_URL + "/functions/v1/zhi-strategy-orchestrator";
 const TOKEN_KEY = "zhi_personal_token";
 const REFRESH_KEY = "zhi_refresh_token";
 
@@ -78,6 +80,27 @@ export function createUniverseClient() {
     return data;
   }
 
+  async function strategyRequest(base, method, path, body) {
+    const send = () => fetch(base + path, {
+      method,
+      cache: "no-store",
+      headers: {
+        "apikey": API_KEY,
+        "authorization": "Bearer " + token,
+        ...(body === undefined ? {} : { "content-type": "application/json" })
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) })
+    });
+    let response = await send();
+    if (response.status === 401 && refreshToken && await renew()) response = await send();
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail = data.detail ? "（" + data.detail + "）" : "";
+      throw new Error((data.error || "作战室请求失败") + detail + " · HTTP " + response.status);
+    }
+    return data;
+  }
+
   return {
     async login(value) {
       const supplied = String(value || "").trim();
@@ -107,6 +130,10 @@ export function createUniverseClient() {
     },
     get: path => community("GET", path),
     post: (path, body) => community("POST", path, body),
+    strategyGet: path => strategyRequest(STRATEGY_API, "GET", path),
+    strategyPost: (path, body) => strategyRequest(STRATEGY_API, "POST", path, body),
+    orchestratorGet: path => strategyRequest(STRATEGY_ORCHESTRATOR_API, "GET", path),
+    orchestratorPost: (path, body) => strategyRequest(STRATEGY_ORCHESTRATOR_API, "POST", path, body),
     async chat(agentId, message) {
       if (!globalThis.crypto?.randomUUID) throw new Error("当前浏览器不支持安全请求编号，请更新浏览器后重试。");
       return community("POST", "/v1/agents/" + encodeURIComponent(agentId) + "/chat",
