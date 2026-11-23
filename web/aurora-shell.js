@@ -35,5 +35,6 @@
   state.textContent = "AURORA · CONNECTED INTERFACES";
   nav.append(brand,menu,spacer,state);
   document.body.classList.add("aurora-shell");
+  if (document.getElementById("authPanel") && document.getElementById("chatTitle")) document.body.classList.add("aurora-health-chat");
   document.body.prepend(nav);
 })();
