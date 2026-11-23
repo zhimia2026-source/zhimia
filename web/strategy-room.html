@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#090f1c">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>AURORA｜商业战略作战室</title>
+<style>
+:root{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:#e9edf5;background:#090f1c}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 12% 0%,#26385a 0,transparent 38%),radial-gradient(ellipse at 90% 70%,#39284b 0,transparent 36%),#090f1c}
+header{height:66px;padding:0 max(18px,calc((100vw - 1180px)/2));display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ffffff18;background:#0a1220dd;position:sticky;top:0;z-index:5;backdrop-filter:blur(16px)}
+header strong{letter-spacing:.08em}header nav{display:flex;gap:18px}a{color:#c8b5ff;text-decoration:none}
+main{max-width:1180px;margin:0 auto;padding:36px 20px 80px}
+.eyebrow{font-size:.72rem;letter-spacing:.16em;color:#b9a0ff;text-transform:uppercase}
+h1{font-size:clamp(2rem,5vw,3.4rem);line-height:1.08;margin:12px 0}
+h2{font-size:1.2rem;margin:0 0 14px}h3{font-size:1rem;margin:14px 0 8px}
+p{line-height:1.65;color:#b9c4d7}.lead{max-width:780px;font-size:1.04rem}
+.panel{padding:22px;border:1px solid #ffffff20;border-radius:20px;background:#111b2bd9;box-shadow:0 18px 65px #0004;margin-top:18px}
+.grid{display:grid;grid-template-columns:1.05fr .95fr;gap:18px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+input,textarea{width:100%;padding:12px 14px;border:1px solid #ffffff25;border-radius:11px;background:#0b1424;color:#eef3fb;font:inherit}
+textarea{min-height:130px;resize:vertical}
+label{display:block;color:#d4dced;font-size:.9rem;margin:12px 0 7px}
+button{border:0;border-radius:11px;padding:11px 16px;background:#bba3ff;color:#171126;font-weight:750;cursor:pointer}
+button.secondary{background:#2a3850;color:#e7eef9}button.warning{background:#613c4a;color:#fff}
+button:disabled{opacity:.42;cursor:not-allowed}
+.muted{font-size:.86rem;color:#92a2bb;line-height:1.6}
+.status{min-height:1.6em;color:#d7e0ef;white-space:pre-wrap;margin:12px 0 0}
+.error{color:#ff9caa}.hidden{display:none!important}
+.members{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:9px}
+.member,.job{padding:12px;border:1px solid #ffffff15;border-radius:12px;background:#ffffff08}
+.member b,.job b{display:block;font-size:.9rem}.member small,.job small{display:block;color:#93a2b9;margin-top:5px}
+.session-list{display:grid;gap:8px}
+.session-choice{width:100%;text-align:left;background:#101a2a;color:#e7edf8;border:1px solid #ffffff16;display:flex;justify-content:space-between;gap:12px;align-items:center}
+.session-choice small{display:block;color:#95a5bd;font-weight:400;margin-top:5px}
+.session-choice.selected{border-color:#bba3ff;background:#292342}
+.toolbar{display:flex;gap:9px;flex-wrap:wrap;margin:14px 0}
+.progress{font-variant-numeric:tabular-nums;color:#c6b6ff}
+.jobs{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin:12px 0}
+.job span{display:block;margin-top:5px;font-size:.82rem}
+.records{display:grid;gap:12px;margin-top:14px}
+.record{padding:17px;border:1px solid #ffffff18;border-radius:15px;background:#0b1422}
+.record-heading{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.record-heading b{font-size:.95rem}
+.tag{font-size:.72rem;padding:4px 8px;border-radius:99px;background:#30294b;color:#d4c5ff}
+.response{white-space:pre-wrap;overflow-wrap:anywhere;font: .9rem/1.7 ui-sans-serif,system-ui;color:#e0e7f2;margin:8px 0}
+.record p{white-space:pre-wrap}
+hr{border:0;border-top:1px solid #ffffff18;margin:18px 0}
+@media(max-width:800px){main{padding:28px 14px 60px}.grid{grid-template-columns:1fr}header{padding:0 14px}header nav{gap:10px;font-size:.85rem}.panel{padding:17px}}
+</style>
+</head>
+<body>
+<header>
+  <strong>✦ AURORA / STRATEGY ROOM</strong>
+  <nav><a href="./zhi-universe.html">ZHI 世界</a><a href="./zhi-resident.html">居民会话</a></nav>
+</header>
+<main>
+  <div class="eyebrow">Private deliberation workspace · Creator controlled</div>
+  <h1>商业战略作战室</h1>
+  <p class="lead">五位独立顾问围绕真实议题提出判断、相互质疑；MIA-02负责整理分歧、证据与行动建议。你保留最终决策权。</p>
+
+  <section class="panel">
+    <div class="row">
+      <div>
+        <div class="eyebrow">Authentication</div>
+        <h2 style="margin:6px 0 0">当前账号身份</h2>
+      </div>
+      <span id="authState" class="muted">正在检查 ZHI Personal Token…</span>
+    </div>
+    <div id="loginPanel" class="hidden">
+      <p>请使用已授权的 ZHI Personal Token。令牌只会通过 HTTPS 发送给 ZHI 服务端，不会显示或写入会议记录。</p>
+      <form id="loginForm" class="row">
+        <input id="personalToken" type="password" autocomplete="off" required maxlength="512" placeholder="ZHI Personal Token" style="flex:1;min-width:240px">
+        <button id="loginBtn" type="submit">验证并进入</button>
+      </form>
+      <p class="muted">如果你已在同一标签页登录 ZHI 世界，本页会自动沿用当前会话，无需重复输入。</p>
+    </div>
+  </section>
+
+  <div id="workspace" class="hidden">
+    <section class="panel">
+      <div class="eyebrow">Room members</div>
+      <h2 style="margin-top:7px">已授权成员</h2>
+      <div id="members" class="members"></div>
+      <p class="muted">顾问是 AURORA 内的原创模拟角色，借鉴公开可见的方法论，不代表现实人物本人。每位居民通过自己的真实聊天运行时独立作答；只把该回合输出写入会议共享记录，不读取或交换其他居民的私有记忆。</p>
+    </section>
+
+    <div class="grid">
+      <section class="panel">
+        <div class="eyebrow">New session</div>
+        <h2 style="margin-top:7px">创建真实议题</h2>
+        <form id="createForm">
+          <label for="sessionTitle">会议标题</label>
+          <input id="sessionTitle" maxlength="240" required placeholder="例如：AURORA 的第一项可持续商业业务">
+          <label for="sessionBrief">背景、目标与约束</label>
+          <textarea id="sessionBrief" maxlength="12000" required placeholder="说明要解决的问题、目标客户、现有资源、时间限制、预算边界和你希望作出的决策。信息越具体，讨论越有价值。"></textarea>
+          <div class="toolbar"><button id="createBtn" type="submit">创建会议草稿</button></div>
+        </form>
+        <p class="muted">创建草稿不调用模型。点击“排队并开始”也只建立任务；只有你推进会议时才调用居民聊天运行时。</p>
+      </section>
+
+      <section class="panel">
+        <div class="eyebrow">Session archive</div>
+        <h2 style="margin-top:7px">会议列表</h2>
+        <div id="sessions" class="session-list"></div>
+      </section>
+    </div>
+
+    <section id="activePanel" class="panel hidden">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <div class="eyebrow">Active session</div>
+          <h2 id="activeTitle" style="margin:7px 0">当前会议</h2>
+          <div id="activeMeta" class="muted"></div>
+        </div>
+        <span id="progress" class="progress">0 / 12 次模型调用已完成</span>
+      </div>
+      <div class="toolbar">
+        <button id="startBtn" type="button">排队并开始会议（不调用模型）</button>
+        <button id="runBtn" type="button" class="secondary">推进下一位（1次模型调用）</button>
+        <button id="autoBtn" type="button">连续推进本场（最多12次调用）</button>
+        <button id="stopBtn" type="button" class="warning" disabled>停止后续调用</button>
+      </div>
+      <p class="muted">完整流程：五位顾问独立分析 → MIA-02第一轮秘书综合 → 五位顾问交叉质询 → MIA-02最终综合 → 等待你作出决策。单步推进每次只运行一位居民；连续推进可随时停止后续请求。模型调用可能产生现有服务费用。</p>
+      <hr>
+      <h3>运行任务</h3>
+      <div id="jobs" class="jobs"></div>
+      <hr>
+      <div class="eyebrow">Shared meeting record</div>
+      <h2 style="margin-top:7px">真实会议记录</h2>
+      <div id="records" class="records"></div>
+    </section>
+    <p id="pageStatus" class="status" role="status" aria-live="polite">正在连接私密作战室…</p>
+  </div>
+</main>
+<script type="module" src="./strategy-room.js"></script>
+</body>
+</html>
