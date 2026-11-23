@@ -28,6 +28,8 @@ body.aurora-shell{color:var(--aurora-text)!important;background:
 body.aurora-shell>header:not(.aurora-globalbar),
 body.aurora-shell header.topbar{top:54px!important;background:rgba(9,16,29,.86)!important;border-color:var(--aurora-line)!important;color:var(--aurora-text)!important;backdrop-filter:blur(18px)}
 body.aurora-shell main{color:var(--aurora-text)}
+body.aurora-shell.aurora-health-chat main{height:calc(100dvh - 114px)!important}
+@media(max-width:600px){body.aurora-shell.aurora-health-chat main{height:calc(100dvh - 104px)!important}}
 body.aurora-shell h1,body.aurora-shell h2,body.aurora-shell h3,body.aurora-shell h4{color:var(--aurora-text)}
 body.aurora-shell p{color:#b8c6da}
 body.aurora-shell .muted,body.aurora-shell .subtitle,body.aurora-shell .sub,
