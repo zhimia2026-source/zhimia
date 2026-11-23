@@ -1,0 +1,110 @@
+:root{
+  color-scheme:dark;
+  --aurora-bg:#070b14;
+  --aurora-surface:rgba(16,25,42,.88);
+  --aurora-surface-2:rgba(21,33,54,.9);
+  --aurora-line:rgba(150,181,225,.17);
+  --aurora-text:#edf3ff;
+  --aurora-muted:#91a2bd;
+  --aurora-cyan:#78dce8;
+  --aurora-violet:#b5a0ff;
+  --aurora-green:#8ed8b4;
+}
+html{background:var(--aurora-bg);scroll-padding-top:120px}
+body.aurora-shell{color:var(--aurora-text)!important;background:
+ radial-gradient(ellipse at 12% 0%,rgba(46,83,133,.25),transparent 42%),
+ radial-gradient(ellipse at 90% 24%,rgba(102,67,151,.18),transparent 38%),
+ var(--aurora-bg)!important}
+.aurora-globalbar{height:54px;position:sticky;top:0;z-index:1000;display:flex;align-items:center;gap:20px;padding:0 max(14px,calc((100vw - 1180px)/2));background:rgba(5,10,19,.94);border-bottom:1px solid var(--aurora-line);backdrop-filter:blur(18px);color:var(--aurora-text)}
+.aurora-globalbrand{display:flex;align-items:center;gap:9px;flex:none;color:#eef4ff;text-decoration:none;font-size:.78rem;font-weight:850;letter-spacing:.13em;white-space:nowrap}
+.aurora-globalbrand .mark{width:27px;height:27px;display:grid;place-items:center;border:1px solid #8edfe766;border-radius:9px;color:var(--aurora-cyan);background:linear-gradient(145deg,#19364b,#28203e);font-size:1rem}
+.aurora-globalnav{display:flex;align-items:center;gap:5px;min-width:0;overflow-x:auto;scrollbar-width:none}
+.aurora-globalnav::-webkit-scrollbar{display:none}
+.aurora-globalnav a{flex:none;padding:7px 10px;border:1px solid transparent;border-radius:9px;color:#aebdd3;text-decoration:none;font-size:.78rem;white-space:nowrap;transition:background .16s,border-color .16s,color .16s}
+.aurora-globalnav a:hover{background:#18263b;color:#f2f6ff}
+.aurora-globalnav a[aria-current=page]{background:#1c2d43;border-color:#79dce855;color:#a7f0f0}
+.aurora-global-spacer{flex:1}
+.aurora-globalstate{font-size:.68rem;color:#7f93ae;white-space:nowrap;letter-spacing:.08em}
+body.aurora-shell>header:not(.aurora-globalbar),
+body.aurora-shell header.topbar{top:54px!important;background:rgba(9,16,29,.86)!important;border-color:var(--aurora-line)!important;color:var(--aurora-text)!important;backdrop-filter:blur(18px)}
+body.aurora-shell main{color:var(--aurora-text)}
+body.aurora-shell h1,body.aurora-shell h2,body.aurora-shell h3,body.aurora-shell h4{color:var(--aurora-text)}
+body.aurora-shell p{color:#b8c6da}
+body.aurora-shell .muted,body.aurora-shell .subtitle,body.aurora-shell .sub,
+body.aurora-shell .hint,body.aurora-shell .footnote{color:var(--aurora-muted)!important}
+body.aurora-shell .panel,body.aurora-shell .card,body.aurora-shell .chat-shell,
+body.aurora-shell .story,body.aurora-shell .member,body.aurora-shell .task-card{
+  background:linear-gradient(145deg,rgba(19,31,51,.94),rgba(11,19,34,.94))!important;
+  border-color:var(--aurora-line)!important;color:var(--aurora-text)!important;
+  box-shadow:0 18px 56px rgba(0,0,0,.22)!important
+}
+body.aurora-shell input:not([type=checkbox]):not([type=radio]),
+body.aurora-shell textarea,body.aurora-shell select{
+  color:var(--aurora-text)!important;background:#091321!important;
+  border:1px solid #34465f!important;border-radius:12px!important;
+  box-shadow:none!important
+}
+body.aurora-shell input::placeholder,body.aurora-shell textarea::placeholder{color:#72839d!important}
+body.aurora-shell button{
+  border-radius:11px;transition:filter .15s,transform .15s;
+}
+body.aurora-shell button:not(:disabled):hover{filter:brightness(1.1)}
+body.aurora-shell button:focus-visible,body.aurora-shell a:focus-visible,
+body.aurora-shell input:focus-visible,body.aurora-shell textarea:focus-visible,
+body.aurora-shell select:focus-visible{outline:2px solid var(--aurora-cyan)!important;outline-offset:2px}
+body.aurora-shell button.primary,body.aurora-shell button.send,
+body.aurora-shell .primary,body.aurora-shell .send,
+body.aurora-shell #sendBtn,body.aurora-shell #loginBtn,
+body.aurora-shell #loginButton{
+  background:linear-gradient(110deg,#82e1e7,#b5a0ff)!important;color:#081321!important;
+  border:0!important;font-weight:800
+}
+body.aurora-shell button.secondary,body.aurora-shell .secondary,
+body.aurora-shell .ghost,body.aurora-shell .navlink{
+  background:#1a2940!important;color:#dce8f8!important;border:1px solid #354b68!important
+}
+body.aurora-shell .context-strip,body.aurora-shell .notice,body.aurora-shell .hint,
+body.aurora-shell .world-setup,body.aurora-shell .chat-box{
+  background:rgba(22,39,60,.8)!important;border-color:var(--aurora-line)!important;color:#b9c9df!important
+}
+body.aurora-shell #messages,body.aurora-shell .chat-log{
+  background:rgba(5,12,23,.72)!important;border-color:var(--aurora-line)!important
+}
+body.aurora-shell .bubble,body.aurora-shell .message,body.aurora-shell .chat-line{
+  color:#e8f0fb!important;border:1px solid rgba(139,183,220,.15);
+  background:linear-gradient(145deg,#172941,#142033)!important
+}
+body.aurora-shell .bubble.user,body.aurora-shell .message.user,body.aurora-shell .chat-line.user{
+  background:linear-gradient(135deg,#35466d,#3a3a68)!important;border-color:#b6a6ff55!important
+}
+body.aurora-shell .bubble.assistant,body.aurora-shell .message.agent{
+  background:linear-gradient(145deg,#173348,#17243a)!important;border-color:#78dce833!important
+}
+body.aurora-shell .composer,body.aurora-shell .chat-compose,body.aurora-shell #messageForm{
+  border-color:var(--aurora-line)!important
+}
+body.aurora-shell .tag,body.aurora-shell .pill,body.aurora-shell .live-chip{
+  border-color:#526a89!important;color:#b8d7e8!important
+}
+body.aurora-shell .danger-button,body.aurora-shell button.danger,body.aurora-shell button.warning{
+  background:#593440!important;color:#ffe6eb!important
+}
+body.aurora-shell hr{border-color:var(--aurora-line)!important}
+body.aurora-shell .status{color:#b6c9df}
+@media(max-width:760px){
+ .aurora-globalbar{height:50px;padding:0 10px;gap:9px}
+ .aurora-globalbrand{font-size:.68rem;letter-spacing:.07em;gap:6px}
+ .aurora-globalbrand .mark{width:24px;height:24px}
+ .aurora-globalnav{gap:2px}
+ .aurora-globalnav a{font-size:.72rem;padding:7px 8px}
+ .aurora-globalstate{display:none}
+ body.aurora-shell>header:not(.aurora-globalbar),body.aurora-shell header.topbar{top:50px!important}
+}
+@media(max-width:520px){
+ .aurora-globalbar{gap:7px}
+ .aurora-globalbrand .brand-word{display:none}
+ .aurora-globalnav a{padding:7px 7px;font-size:.69rem}
+}
+@media(prefers-reduced-motion:reduce){
+ .aurora-globalnav a,body.aurora-shell button{transition:none}
+}
