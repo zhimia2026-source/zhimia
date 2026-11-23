@@ -36,5 +36,6 @@
   nav.append(brand,menu,spacer,state);
   document.body.classList.add("aurora-shell");
   if (document.getElementById("authPanel") && document.getElementById("chatTitle")) document.body.classList.add("aurora-health-chat");
+  if (document.getElementById("agentSelect") && document.getElementById("ceesConsole")) document.body.classList.add("aurora-resident-chat");
   document.body.prepend(nav);
 })();
