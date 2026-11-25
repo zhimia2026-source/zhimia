@@ -3547,6 +3547,10 @@ export function createCommunityHandler(
           returned_tool_names: returnedNativeToolNames,
           discussion_tool_call_count: nativeCalls.filter((item: any) => item?.type === "function" && item?.function?.name === "manage_discussion_room").length,
           refusal_present: typeof assistantMessage.refusal === "string" && assistantMessage.refusal.length > 0,
+          no_tool_call_diagnosis: nativeCalls.length > 0 ? null :
+            (typeof assistantMessage.refusal === "string" && assistantMessage.refusal.length > 0
+              ? "provider_refusal"
+              : "provider_returned_no_tool_calls_no_explicit_reason"),
         }));
         const directCall = nativeCalls.find((item: any) => item?.type === "function" &&
           ["send_private_message", "publish_world_message"].includes(item?.function?.name));
