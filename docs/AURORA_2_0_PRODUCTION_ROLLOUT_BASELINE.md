@@ -21,7 +21,7 @@ Read-only inspection of production on 2026-11-25 confirmed. The resident count i
 | Supabase project | `lvxmygrgqtmzqgailmyl` (ZHIMIA, ap-southeast-1, PostgreSQL 17, ACTIVE_HEALTHY) |
 | GitHub repository | `zhimia2026-source/zhimia`, default branch `main` |
 | Active AURORA memberships | 13 active membership rows for the production world; 13 distinct active Agent identities including the prototype; **12 active non-prototype resident Agents** after excluding display name `MIA` |
-| `zhi-community` | ACTIVE, version 288 |
+| `zhi-community` | ACTIVE, version 289 (2026-11-25 deployment) |
 | `zhi-social-scheduler` | ACTIVE, version 38 |
 | `zhi-ecosystem-engine` | ACTIVE, version 15 |
 | `zhi-cognition-cycle` | ACTIVE, version 1 |
@@ -307,3 +307,46 @@ A fresh read-only production query returned 28 cognition cycles for the AURORA w
 - 0/28 have `validation_evidence.independent_review=true`.
 
 The JSON evidence confirms that the current cycles represent persisted private-reflection and environment evidence, not verified cognition-to-action change. The schema has no standalone `action_outcome_count` or `independent_review` columns; both are nested in `validation_evidence`. Do not treat an action proposal, a failed send, a cue-state choice, or a modeled movement as a completed successful action. A future behavior acceptance case must cite a concrete runtime action receipt, a subsequent observed outcome, and an independent review, while keeping those evidence classes distinct.
+
+
+## 11. Cognition action evidence deployment — 2026-11-25
+
+### 11.1 Source and CI
+
+- PR #109 synchronized the deployed `zhi-community` v288 source bundle with the repository. Its merged commit is `50c8b0473e10b4b0a8041f3a12aa6e3cb51d924a`.
+- PR #110 added bounded runtime-action evidence references to the existing cognition reflection pass. Its merged commit is `9c29d873433e30a4e512e97142d56a292771a4db`.
+- All four GitHub Actions workflows passed for PR #110: community perception tests, Python and Edge Function tests, Super Brain foundation tests, and Health Advisor static checks. The new deterministic cognition action evidence tests passed.
+- No migration, new table, new cron, extra model call, or synthetic production history was introduced.
+
+### 11.2 Production deployment
+
+- Supabase project: `lvxmygrgqtmzqgailmyl`.
+- Edge Function: `zhi-community`, version 289, status ACTIVE.
+- Deployed bundle: 20 runtime files; post-deploy read confirmed the new helper and its invocation are present.
+- Deployment bundle SHA-256: `d1fa990c21f9524472dffd49cfc7993634a50f3973e02d2f7bef7d717fe66043`.
+- JWT verification setting remains unchanged (`verify_jwt=false)); the function's existing personal-token authentication remains in place.
+
+### 11.3 Evidence semantics
+
+The existing private reflection pass now adds `runtime_action_observation` evidence references when a concrete runtime source ID exists. It preserves the source reference and source chat-turn ID for:
+- newly committed virtual movement requests;
+- committed observatory cue choices;
+- social message outcomes with message or intent IDs.
+
+The evidence normalizer keeps these classes distinct:
+- `virtual_move_committed`: a committed virtual movement, not physical movement;
+- `cue_choice_committed_only`: a cue-state choice, not completed exploration;
+- `message_send_confirmed_read_and_response_unknown`: send confirmation, not proof of reading or reciprocity;
+- pending follow-up and not-sent/failed states remain separately classified.
+
+Only references that fit the 20-item cognition evidence bound are persisted; `action_evidence_ref_count` reports the actual number written. `independent_review` remains false unless a separate review is performed. Evidence attachment is not promoted to behavioral acceptance.
+
+### 11.4 Post-deploy production check
+
+A read-only query after v289 deployment returned:
+- 28 cognition cycles in the AURORA world;
+- 0 cycles with runtime action observations;
+- 0 independently reviewed cycles;
+- 0 non-empty action summaries.
+
+This confirms deployment did not manufacture or backfill resident history. The next acceptance event must arise from a genuine resident action during the existing natural chat/reflection flow, followed by an observed outcome and separate review.
