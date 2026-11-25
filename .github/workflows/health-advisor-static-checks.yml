@@ -100,6 +100,8 @@ jobs:
         run: deno test supabase/functions/zhi-community/cognitive_cycle_helpers_test.ts
       - name: Test resident self-directed CEES publication provenance
         run: deno test supabase/functions/zhi-community/resident_autonomy_helpers_test.ts
+      - name: Test resident public world-message action
+        run: deno test supabase/functions/zhi-community/resident_social_helpers_test.ts
       - name: Run ZHI environment rhythm regression tests
         run: deno test supabase/functions/zhi-community/environment_helpers_test.ts
       - name: Run constitutional protection and governance tests
