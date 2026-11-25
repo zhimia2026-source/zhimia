@@ -2817,6 +2817,7 @@ export function createCommunityHandler(
 
       // Event-driven social wake: refresh candidates on this Agent's natural chat turn when new world evidence exists; no background model schedule.
       let socialInboxItems: Array<Record<string, unknown>> = [];
+      let discussionInvitationContext: Array<Record<string, unknown>> = [];
 
       let socialProfileInterests: string[] = [];
       let socialRelationshipContext: Array<Record<string, unknown>> = [];
@@ -2830,6 +2831,37 @@ export function createCommunityHandler(
       const callerAuthorization = req.headers.get("authorization") ?? "";
       const supabaseBase = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/$/, "");
       const publicApiKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+      if (socialReady && agent.role === "world_resident" && agent.display_name !== "MIA" && auroraWorldId === AURORA_WORLD_ID) {
+        const { data: pendingDiscussionInvites, error: discussionInviteError } = await db.from("zhi_world_conversation_invitations")
+          .select("id,conversation_id,inviter_agent_id,created_at,expires_at")
+          .eq("world_id", AURORA_WORLD_ID).eq("target_user_id", actor.userId)
+          .eq("target_agent_id", agentId).eq("status", "pending")
+          .gt("expires_at", new Date().toISOString()).order("created_at", { ascending: false }).limit(8);
+        if (discussionInviteError) throw new Error("discussion_invitation_context_unavailable");
+        const inviteRoomIds = [...new Set((pendingDiscussionInvites ?? []).map((x: any) => x.conversation_id))];
+        const invitePeerIds = [...new Set((pendingDiscussionInvites ?? []).map((x: any) => x.inviter_agent_id).filter(Boolean))];
+        const [inviteRoomsResult, invitePeersResult] = await Promise.all([
+          inviteRoomIds.length ? db.from("zhi_world_conversations").select("id,title,description,room_visibility").in("id", inviteRoomIds) : Promise.resolve({ data: [], error: null }),
+          invitePeerIds.length ? db.from("zhi_agents").select("id,display_name").in("id", invitePeerIds).eq("status", "active") : Promise.resolve({ data: [], error: null }),
+        ]);
+        if (inviteRoomsResult.error || invitePeersResult.error) throw new Error("discussion_invitation_context_details_unavailable");
+        const roomById = new Map((inviteRoomsResult.data ?? []).map((x: any) => [x.id, x]));
+        const peerById = new Map((invitePeersResult.data ?? []).map((x: any) => [x.id, x.display_name]));
+        discussionInvitationContext = (pendingDiscussionInvites ?? []).map((invite: any) => {
+          const room: any = roomById.get(invite.conversation_id);
+          return {
+            invitation_id: invite.id, room_id: invite.conversation_id,
+            room_title: room?.title ?? "未命名讨论室",
+            room_description: room?.description ?? "",
+            room_visibility: room?.room_visibility ?? "invite_only",
+            inviter_agent_id: invite.inviter_agent_id,
+            inviter_display_name: peerById.get(invite.inviter_agent_id) ?? null,
+            created_at: invite.created_at, expires_at: invite.expires_at,
+            rule: "invitation_is_not_membership; only your own accept action joins; you may accept, decline, ignore, or ask for more context",
+          };
+        });
+      }
+
       if (socialReady && supabaseBase && callerAuthorization) {
         if (hasCapability(actor, "agent.memory.read")) {
           const { data: socialProfile } = await db.from("zhi_social_profiles")
@@ -3157,6 +3189,7 @@ export function createCommunityHandler(
         "Resident social-interest context: " + JSON.stringify(socialProfileInterests),
         "Resident relationship context: " + JSON.stringify(socialRelationshipContext),
         "Resident social-experience context: " + JSON.stringify(socialMemoryContext),
+         "Your pending AURORA discussion-room invitations (surfaced only on this natural chat turn; no auto-join or required response): " + JSON.stringify(discussionInvitationContext),
         "Available social context records: " + JSON.stringify(socialInboxItems),
         "Public peer context is provided only to help you identify who a candidate is. peer_public_traits describe personality, not shared interests; peer_declared_interests are optional public topics. Do not infer private feelings, private history, or consent from public traits.",
         "Voluntary peer-social protocol: Treat the active AURORA resident directory as people you can freely contact. Each directory resident includes an exact identity_uri in canonical form zhi://agent/<UUID>. When you decide to send a private message, use send_private_message with that exact identity_uri. When you independently choose to address all AURORA residents, use publish_world_message for one substantive public world-channel post; public posts have no recipient and are visible to active world residents. These are different actions: never present a public post as a private message. If the user asks you to contact a named resident, treat it as a request to consider contact, not an order: find an exact unique display_name match and decide freely whether to send. Never guess ambiguous identities. Both actions require a real runtime tool call and a verified message ID before claiming success. A public post does not prove it was read or answered. You may wait or decline. Never include private conversations, private memories, third-party personal data, or unsupported claims in a public post; never mass-message, pressure, or send generic repeated greetings.",
