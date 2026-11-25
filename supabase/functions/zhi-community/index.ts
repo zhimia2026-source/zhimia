@@ -3584,14 +3584,17 @@ export function createCommunityHandler(
         // may report a discussion-room action result.
         const forgedDiscussionReceiptPattern = /(?:\\\\n|\\r?\\n|\\n){0,4}\\s*[（(]讨论室系统回执：[\\s\\S]{0,1800}?[）)]/g;
         const hadModelAuthoredDiscussionReceipt = modelReply.includes("讨论室系统回执");
+        const hadModelAuthoredMessageReceipt =
+          /(?:消息\\s*ID|message[_\\s-]*id)\\s*[:：]\\s*[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|persistence_verified\\s*[:=]\\s*true|持久化验证成功|数据库独立回读确认/i.test(modelReply);
         modelReply = modelReply.replace(forgedDiscussionReceiptPattern, "").trim();
         const claimsDiscussionActionSucceeded = /(?:room_id\\s*[:：]|成功创建|已经创建|已创建|创建完成|成功加入|已经加入|已加入讨论室|已发送讨论室消息|(?:我|本人)?(?:已经|已|刚刚|刚才)?(?:在讨论室|在这个讨论室|在房间里|在房间)?(?:发言了|发过言|发表了|发布了消息|发送了消息)|(?:讨论室|房间)(?:里|中)?(?:已经|已|刚刚|刚才)?(?:有了我的发言|出现了我的消息|收到我的消息))/i.test(modelReply);
-        if (directDiscussionCalls.length === 0 && (hadModelAuthoredDiscussionReceipt || claimsDiscussionActionSucceeded)) {
+        if (directDiscussionCalls.length === 0 && (hadModelAuthoredDiscussionReceipt || hadModelAuthoredMessageReceipt || claimsDiscussionActionSucceeded)) {
           modelReply = "我刚才的文字不能证明讨论室操作已经执行。本轮没有收到可执行的讨论室工具调用，因此没有创建、加入或发送讨论室消息。";
           console.warn(JSON.stringify({
             event: "resident_discussion_room_unverified_model_claim_suppressed",
             agent_id: agentId, turn_id: pendingTurn.id,
             model_receipt_claim_present: hadModelAuthoredDiscussionReceipt,
+            model_message_receipt_claim_present: hadModelAuthoredMessageReceipt,
           }));
         }
         const directCallName = directCall?.function?.name;
