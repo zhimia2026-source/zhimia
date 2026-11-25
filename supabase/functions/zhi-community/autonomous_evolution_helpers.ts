@@ -4,10 +4,10 @@ type RecordValue = Record<string, unknown>;
 const record = (value: unknown): RecordValue =>
   value && typeof value === "object" && !Array.isArray(value) ? value as RecordValue : {};
 
-const ACTION_KINDS = new Set(["observatory_cue_choice", "resident_social_message"]);
+const ACTION_KINDS = new Set(["observatory_cue_choice", "resident_social_message", "resident_movement"]);
 const ACTION_STATUSES = new Set([
   "explore", "defer", "dismiss", "complete", "sent",
-  "sent_pending_confirmation", "sent_pending_acceptance", "not_sent", "failed_safely",
+  "sent_pending_confirmation", "sent_pending_acceptance", "not_sent", "failed_safely", "moved",
 ]);
 
 /**
@@ -26,7 +26,10 @@ export function buildAutonomousEvolutionContext(
       const kind = typeof item.action_kind === "string" ? item.action_kind : "";
       const status = typeof item.status === "string" ? item.status : "";
       if (!ACTION_KINDS.has(kind) || !ACTION_STATUSES.has(status)) return [];
-      return [{ action_kind: kind, status }];
+      return [{ action_kind: kind, status,
+         ...(typeof item.movement_request_id === "string" ? { action_ref: item.movement_request_id.slice(0, 80) } : {}),
+         ...(typeof item.source_turn_id === "string" ? { source_turn_id: item.source_turn_id.slice(0, 80) } : {}),
+       }];
     })
     : [];
   const memoryContinuity = (Array.isArray(privateMemories) ? privateMemories : [])
@@ -56,11 +59,23 @@ export function buildAutonomousEvolutionContext(
       no_compulsory_utility_score_or_fixed_motive_weights: true,
       no_habit_from_single_outcome: true,
       no_private_memory_or_affect_in_public_output: true,
+      ability_does_not_equal_understanding: true,
+      single_interaction_does_not_establish_relationship: true,
+      frameworks_are_revisable_not_truth: true,
+      description_does_not_prove_subjective_experience: true,
+      resident_may_question_or_decline_framework_terms: true,
+    },
+    epistemic_contract: {
+      distinguish: ["capability", "understanding", "interaction", "relationship", "modeled_state", "first_person_report", "verified_action", "interpretation"],
+      preserve_unknown_and_counterevidence: true,
+      do_not_infer_consciousness_or_independence: true,
+      no_forced_alignment_to_creator_expectations: true,
     },
     epistemic_limits: [
       "motivation signals are resident-owned modeled evidence, not commands",
       "a desire does not establish consent, feasibility, or permission to act",
       "verified action status does not prove subjective experience or emotional benefit",
+       "resident_movement/moved means a newly committed virtual move was confirmed by a newer presence snapshot; it is not physical movement",
       "retrieved memory identifiers do not prove causal relationships",
       "no change is a valid outcome when evidence or motivation is insufficient",
     ],
