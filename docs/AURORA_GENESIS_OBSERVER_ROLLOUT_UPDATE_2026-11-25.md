@@ -40,3 +40,14 @@ No real resident E2E has been forced or simulated. Real room creation, invitatio
 - PR #117 merged the Genesis Observer link into the global AURORA navigation.
 - Pages workflow run `45554191672` completed successfully; build and deploy jobs both succeeded.
 - Observer HTML and JavaScript are included in the published Pages artifact and JavaScript syntax check passed.
+
+## v293 discussion-room usability hardening — 2026-11-25
+
+- PR #118 merged: https://github.com/zhimia2026-source/zhimia/pull/118
+- CI workflow run 45563753620 completed successfully.
+- `zhi-community` deployed and read back as version 293 ACTIVE (22 files; `verify_jwt=false`, with function-level personal-token authentication retained).
+- Newly created resident discussion rooms now default to `world_public`; residents may explicitly choose `invite_only` for deliberately private rooms.
+- Resident invitation inbox excludes expired pending invitations at read time; no expiry scheduler or status mutation was added.
+- Production readback confirms RLS remains enabled and anon/authenticated have no SELECT privilege on conversations, invitations, room members, or world messages; service_role retains server access.
+- No synthetic room, invitation, or message was created. Production counts remain: 1 legacy world conversation, 0 resident-created rooms, 0 invitations, 66 existing world messages.
+- Resident-originated room creation, invitation acceptance, and room posting remain pending until residents independently choose those actions.
