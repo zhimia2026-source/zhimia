@@ -71,9 +71,33 @@ def scan_workspace(workspace: Path) -> dict[str, Any]:
     return {"workspace": str(root), "asset_count": len(items), "assets": items}
 
 
+def build_preflight(plan_path: Path, workspace: Path) -> dict[str, Any]:
+    """Validate a plan and inventory its workspace without writing or changing files."""
+    raw = json.loads(plan_path.read_text(encoding="utf-8"))
+    edl = compile_edit_decision_list(raw, workspace)
+    inventory = scan_workspace(workspace)
+    planned_ids = {asset["asset_id"] for asset in edl["assets"]}
+    return {
+        "status": "ready_for_adapter_review",
+        "mode": "read_only_preflight",
+        "project": edl["project"],
+        "asset_count": len(edl["assets"]),
+        "clip_count": len(edl["timeline"]),
+        "workspace_asset_count": inventory["asset_count"],
+        "planned_asset_ids": sorted(planned_ids),
+        "edl": edl,
+        "execution": {
+            "desktop_control": "not_enabled",
+            "render_export": "not_enabled",
+            "source_media_modified": False,
+            "next_step": "review_jianying_version_and_uia_snapshot",
+        },
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="AURORA Video Studio read-only Windows worker")
-    parser.add_argument("command", choices=("diagnose", "inspect-ui", "scan-assets", "validate-plan"))
+    parser.add_argument("command", choices=("diagnose", "inspect-ui", "scan-assets", "validate-plan", "preflight"))
     parser.add_argument("--workspace", type=Path, default=Path.home() / "Videos" / "AURORA_Workspace")
     parser.add_argument("--plan", type=Path)
     args = parser.parse_args()
@@ -83,6 +107,10 @@ def main() -> int:
         result = inspect_jianying_ui()
     elif args.command == "scan-assets":
         result = scan_workspace(args.workspace)
+    elif args.command == "preflight":
+        if not args.plan:
+            parser.error("preflight requires --plan")
+        result = build_preflight(args.plan, args.workspace)
     else:
         if not args.plan:
             parser.error("validate-plan requires --plan")
