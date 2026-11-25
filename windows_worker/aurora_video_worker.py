@@ -14,6 +14,11 @@ import subprocess
 import sys
 from typing import Any
 
+# Allow direct execution as: python windows_worker/aurora_video_worker.py ...
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from video_studio.planner import compile_edit_decision_list
 
 
