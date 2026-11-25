@@ -242,4 +242,44 @@ A second scoped privilege audit found additional excessive direct client grants 
 - All three tables retain RLS; service_role backend SELECT/INSERT remains available.
 - Verification confirms anon SELECT/INSERT/TRUNCATE false and authenticated INSERT/UPDATE/DELETE/TRUNCATE false on all three tables.
 
-The migration is tracked in GitHub PR #106 pending merge. No rows were modified or deleted.
+The migration was merged into `main` through GitHub PR #106. No rows were modified or deleted.
+
+## 9. Post-hardening production verification — 2026-11-25
+
+### 9.1 Migration/source-of-truth status
+
+The following production migrations are applied and their corresponding PRs are merged into `main`:
+- `20261125022050_revoke_aurora_runtime_client_table_grants` — PR #105.
+- `20261125022431_revoke_aurora_sensory_client_write_grants` — PR #106.
+- `20261125022608_optimize_sensory_memory_owner_rls_policy` — PR #107.
+
+The production project remains `ACTIVE_HEALTHY` on PostgreSQL 17.11.0.003.
+
+### 9.2 Public-schema client privilege check
+
+A final read-only check found **zero remaining TRUNCATE grants** to either `anon` or `authenticated` on public-schema tables.
+
+The only remaining direct authenticated DML grants in the public schema are on three health tables:
+- `zhi_health_consents` — INSERT/UPDATE with explicit user_id ownership checks.
+- `zhi_health_conversations` — UPDATE/DELETE with explicit user_id ownership checks.
+- `zhi_health_memories` — DELETE with explicit user_id ownership checks.
+
+These are outside the AURORA runtime scope and were not modified. No direct anon table grants remain in the inspected public schema.
+
+### 9.3 RLS performance follow-up
+
+The performance advisor's `auth_rls_initplan` warning for `zhi_agent_sensory_memory_events` was resolved by PR #107. The policy remains SELECT-only, role-scoped to `authenticated`, and uses the same owner predicate with `(SELECT auth.uid()) = owner_user_id`.
+
+### 9.4 Chat runtime reliability snapshot
+
+The production chat-turn ledger shows:
+- Last 24 hours: 79 completed turns, 0 failed turns.
+- Last 7 days: 1,058 completed and 31 failed turns (1,089 total; approximately 2.85% failures).
+- Historical failure categories: 54 `provider_unavailable`, 8 `provider_empty_reply`, 2 `provider_timeout`, and 7 `private_brain_persistence_failed`.
+- The latest recorded failure was `provider_empty_reply` at 2026-11-24 02:11 UTC; no failed turns were recorded in the subsequent 24-hour window.
+
+This is a point-in-time ledger snapshot, not a guarantee of future availability. Keep provider and private-memory failures separately observable; do not convert failed turns into successful conversational history.
+
+### 9.5 Current production boundary
+
+Database privilege hardening and the sensory-memory RLS optimization are deployed and verified. The remaining AURORA 2.0 release blockers are behavioral E2E evidence: cognition-to-action linkage, dedicated cross-owner negative tests, authenticated bidirectional resident messaging, and a real resident-owned CEES collaboration case. These require genuine resident actions and appropriately scoped test identities; do not manufacture them in production histories.
