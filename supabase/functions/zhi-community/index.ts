@@ -730,6 +730,8 @@ export function createCommunityHandler(
             agent_id: agentId, invalid_fields: invalidFields, decision: typeof decision === "string" ? decision : null }));
           return reply({ error: "invalid_cees_submission", invalid_fields: invalidFields }, 400);
         }
+        // Keep the post-validation value non-null for TypeScript and downstream query builders.
+        const validatedSourceIds = sourceIds ?? [];
         const identityClaim = authorization.match(/(?:我是|我叫|本人是)\s*([A-Za-z][A-Za-z0-9_-]*|[\u4e00-\u9fff]{2,4})/i);
         if (decision === "publish" && identityClaim &&
             identityClaim[1].toLocaleLowerCase() !== String(resident.display_name).trim().toLocaleLowerCase() &&
@@ -744,12 +746,12 @@ export function createCommunityHandler(
           if (!data) return reply({ error: "revision_source_not_owned_or_active" }, 409);
           previous = data as Record<string, unknown>;
         }
-        if (sourceIds.length) {
+        if (validatedSourceIds.length) {
           const { data, error } = await db.from("zhi_agent_concept_evolution_events").select("id")
-            .eq("owner_user_id", actor.userId).eq("agent_id", agentId).eq("world_id", worldId).in("id", sourceIds);
+            .eq("owner_user_id", actor.userId).eq("agent_id", agentId).eq("world_id", worldId).in("id", validatedSourceIds);
           if (error) throw new Error("cees_concept_source_lookup_failed");
           const owned = new Set((data ?? []).map((x: Record<string, unknown>) => String(x.id).toLowerCase()));
-          if (sourceIds.some(id => !owned.has(id))) return reply({ error: "concept_source_not_owned" }, 403);
+          if (validatedSourceIds.some(id => !owned.has(id))) return reply({ error: "concept_source_not_owned" }, 403);
         }
         const content = { schema_version: "aurora.cees.capsule.v1", title, topic_tags: tags,
           experience_summary: summary, observed_facts: facts, interpretation,
@@ -762,7 +764,7 @@ export function createCommunityHandler(
           source_experience_ids: [],
           provenance: { source_kind: "resident_direct_publish_api", resident_publish_request_id: requestId,
             private_source_details_excluded: true,
-            ...(sourceIds.length ? { private_source_concept_event_ids: sourceIds, concept_source_reference_visibility: "internal_only" } : {}) },
+            ...(validatedSourceIds.length ? { private_source_concept_event_ids: validatedSourceIds, concept_source_reference_visibility: "internal_only" } : {}) },
           publication_state: publishNow ? "published" : "draft", sharing_scope: "world",
           revision: previous ? Number(previous.revision ?? 1) + 1 : 1, previous_capsule_id: previous?.id ?? null,
           consent_event_id: publishNow ? "resident_direct_publish:" + requestId + ":" + contentSha256 : null,
@@ -4502,7 +4504,7 @@ export function createCommunityHandler(
         const ceesRecognizedSubmission = Boolean(ceesTitle) &&
           ceesCore.length >= 20 && ceesSourceText.length >= 100 && ceesSourceText.length <= 12000;
         // Chat prose is not a structured CEES submission; native tool only.
-        if (false && ceesRecognizedSubmission && !residentDirectCeesActionHandled &&
+        if (Boolean(false) && ceesRecognizedSubmission && !residentDirectCeesActionHandled &&
             agent.role === "world_resident" && agent.display_name !== "MIA" &&
             agent.status === "active" && auroraWorldId === AURORA_WORLD_ID &&
             !reflection?.share_proposal) {
@@ -4512,7 +4514,6 @@ export function createCommunityHandler(
           const ceesLimitList = ceesLimitations ? [ceesLimitations.slice(0, 1500)] : [];
           const ceesQuestionList = ceesOpenQuestions ? [ceesOpenQuestions.slice(0, 1000)] : [];
           const ceesCapsuleContent = {
-            schema_version: "aurora.cees.capsule.v1",
             title: ceesTitle,
             topic_tags: ceesTags,
             experience_summary: ceesCore.slice(0, 3000),
@@ -5090,7 +5091,7 @@ export function createCommunityHandler(
         }
         // CEES publication is independent of private long-term memory consent.
         const share = reflection?.share_proposal;
-        if (false && share && !residentDirectCeesActionHandled && agent.role === "world_resident" && agent.display_name !== "MIA" && auroraWorldId === AURORA_WORLD_ID) {
+        if (Boolean(false) && share && !residentDirectCeesActionHandled && agent.role === "world_resident" && agent.display_name !== "MIA" && auroraWorldId === AURORA_WORLD_ID) {
           const requestedConceptEventIds = share.source_concept_event_ids ?? [];
           const ownConceptEventIds = new Set(ownConceptHistory.map((item) => String(item.id).toLowerCase()));
           const verifiedConceptEventIds = requestedConceptEventIds.filter((id) => ownConceptEventIds.has(id.toLowerCase()));
