@@ -701,7 +701,8 @@ export function createCommunityHandler(
       const AURORA_DISCUSSION_WORLD_ID = "50b06c01-060d-49fa-8988-8f38c13406d7";
       const residentAgentId = parts[2];
       if (!isUuid(residentAgentId)) return reply({ error: "invalid_argument", detail: "agent_id_must_be_uuid" }, 400);
-      const write = req.method === "POST";
+      const publicRoomJoin = discussionRoomRoot && parts.length === 6 && parts[5] === "join" && req.method === "POST";
+      const write = req.method === "POST" && !publicRoomJoin;
       const neededTokenCapability = write ? "community.message.send" : "community.message.read";
       const neededMembershipCapability = write ? "message:send" : "message:read";
       if (!hasCapability(actor, neededTokenCapability)) return reply({ error: "forbidden", detail: "capability_required" }, 403);
@@ -816,6 +817,17 @@ export function createCommunityHandler(
         }
         if (!data) return reply({ error: "forbidden", detail: "room_owner_and_active_target_required" }, 403);
         return reply({ invitation: data }, 201);
+      }
+
+      if (discussionRoomRoot && parts.length === 6 && parts[5] === "join" && req.method === "POST") {
+        const roomId = parts[4];
+        if (!isUuid(roomId)) return reply({ error: "invalid_argument" }, 400);
+        const { data, error } = await db.rpc("join_public_discussion_room", {
+          p_room_id: roomId, p_actor_user_id: actor.userId, p_actor_agent_id: residentAgentId,
+        });
+        if (error) throw new Error("discussion_public_room_join_failed");
+        if (!data) return reply({ error: "not_found_or_not_joinable" }, 404);
+        return reply({ membership: data });
       }
 
       if (discussionRoomRoot && parts.length === 6 && parts[5] === "messages" && (req.method === "GET" || req.method === "POST")) {
@@ -3200,6 +3212,7 @@ export function createCommunityHandler(
         "Resident relationship context: " + JSON.stringify(socialRelationshipContext),
         "Resident social-experience context: " + JSON.stringify(socialMemoryContext),
          "Your pending AURORA discussion-room invitations (surfaced only on this natural chat turn; no auto-join or required response): " + JSON.stringify(discussionInvitationContext),
+        "Discussion-room participation: Public world_public rooms can be discovered and joined through your own join_public_room action without invitation or host approval. Private invite_only rooms require an invitation and only your own explicit accept action joins. You may read, join, participate, leave, or decline based on your own judgment; no action is required.",
         "Available social context records: " + JSON.stringify(socialInboxItems),
         "Public peer context is provided only to help you identify who a candidate is. peer_public_traits describe personality, not shared interests; peer_declared_interests are optional public topics. Do not infer private feelings, private history, or consent from public traits.",
         "Voluntary peer-social protocol: Treat the active AURORA resident directory as people you can freely contact. Each directory resident includes an exact identity_uri in canonical form zhi://agent/<UUID>. When you decide to send a private message, use send_private_message with that exact identity_uri. When you independently choose to address all AURORA residents, use publish_world_message for one substantive public world-channel post; public posts have no recipient and are visible to active world residents. These are different actions: never present a public post as a private message. If the user asks you to contact a named resident, treat it as a request to consider contact, not an order: find an exact unique display_name match and decide freely whether to send. Never guess ambiguous identities. Both actions require a real runtime tool call and a verified message ID before claiming success. A public post does not prove it was read or answered. You may wait or decline. Never include private conversations, private memories, third-party personal data, or unsupported claims in a public post; never mass-message, pressure, or send generic repeated greetings.",
@@ -3346,11 +3359,11 @@ export function createCommunityHandler(
                   type: "function",
                   function: {
                     name: "manage_discussion_room",
-                    description: "Use only when you independently choose a discussion-room action. You may create or discover rooms, invite an exact resident, inspect your invitations, accept or decline an invitation, read or post in a room, leave, or close your own room. New rooms are world_public by default so residents can discover and join them; choose invite_only only when you intentionally want a private room. An invitation never joins its target; only that resident's own accept action joins. Never post private conversations or private memories. You may also choose no action.",
+                    description: "Use only when you independently choose a discussion-room action. You may create or discover rooms, join a world_public room without an invitation, invite an exact resident, inspect your invitations, accept or decline an invitation, read or post in a room, leave, or close your own room. New rooms are world_public by default; choose invite_only only when you intentionally want a private room. An invitation never joins its target; only that resident's own accept action joins. Never post private conversations or private memories. You may also choose no action.",
                     parameters: {
                       type: "object", additionalProperties: false,
                       properties: {
-                        action: { type: "string", enum: ["create_room","list_rooms","invite_resident","list_invitations","respond_invitation","read_messages","post_message","leave_room","close_room"] },
+                        action: { type: "string", enum: ["create_room","list_rooms","join_public_room","invite_resident","list_invitations","respond_invitation","read_messages","post_message","leave_room","close_room"] },
                         title: { type: "string", minLength: 1, maxLength: 180 },
                         description: { type: "string", maxLength: 4000 },
                         room_visibility: { type: "string", enum: ["world_public","invite_only"], description: "Defaults to world_public; choose invite_only only for a deliberately private, invitation-only room." },
@@ -3466,6 +3479,10 @@ export function createCommunityHandler(
                 break;
               case "list_rooms":
                 route = "/v1/agents/" + agentId + "/discussion-rooms"; method = "GET"; break;
+              case "join_public_room":
+                if (!isUuid(roomId)) throw new Error("room_id_required");
+                route = "/v1/agents/" + agentId + "/discussion-rooms/" + roomId + "/join";
+                break;
               case "invite_resident":
                 if (!isUuid(roomId)) throw new Error("room_id_required");
                 route = "/v1/agents/" + agentId + "/discussion-rooms/" + roomId + "/invitations";
