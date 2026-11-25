@@ -741,8 +741,43 @@ export function createCommunityHandler(
           if (error.code === "42501") return reply({ error: "forbidden", detail: "room_creation_not_authorized" }, 403);
           throw new Error("discussion_room_create_failed");
         }
-        if (!data) return reply({ error: "forbidden", detail: "room_creation_not_authorized" }, 403);
-        return reply({ room: data }, 201);
+        if (!data || typeof data !== "object" || typeof (data as Record<string, unknown>).room_id !== "string") {
+          return reply({ error: "room_persistence_unverified", detail: "create_rpc_returned_no_room_id" }, 502);
+        }
+        const roomId = String((data as Record<string, unknown>).room_id);
+        if (!isUuid(roomId)) return reply({ error: "room_persistence_unverified", detail: "create_rpc_returned_invalid_room_id" }, 502);
+
+        // A successful RPC response is not enough: read the committed room and
+        // owner membership back from the database before reporting creation success.
+        const expectedTitle = body.title.trim();
+        const expectedDescription = typeof body.description === "string" ? body.description.trim() : "";
+        const expectedVisibility = String(body.room_visibility ?? "world_public");
+        const { data: persistedRoom, error: persistedRoomError } = await db.from("zhi_world_conversations")
+          .select("id,world_id,created_by_user_id,created_by_agent_id,title,description,room_visibility,status,created_at,updated_at")
+          .eq("id", roomId).eq("world_id", AURORA_DISCUSSION_WORLD_ID)
+          .eq("created_by_user_id", actor.userId).eq("created_by_agent_id", residentAgentId)
+          .maybeSingle();
+        if (persistedRoomError) throw new Error("discussion_room_persistence_read_failed");
+        if (!persistedRoom || persistedRoom.title !== expectedTitle ||
+            persistedRoom.description !== expectedDescription ||
+            persistedRoom.room_visibility !== expectedVisibility || persistedRoom.status !== "open") {
+          return reply({ error: "room_persistence_unverified", detail: "persisted_room_does_not_match_create_request" }, 502);
+        }
+        const { data: ownerMembership, error: ownerMembershipError } = await db.from("zhi_world_conversation_members")
+          .select("id,conversation_id,principal_user_id,agent_id,member_role,joined_at")
+          .eq("conversation_id", roomId).eq("principal_user_id", actor.userId)
+          .eq("agent_id", residentAgentId).eq("member_role", "owner").is("revoked_at", null)
+          .maybeSingle();
+        if (ownerMembershipError) throw new Error("discussion_room_owner_membership_read_failed");
+        if (!ownerMembership) return reply({ error: "room_persistence_unverified", detail: "owner_membership_not_persisted" }, 502);
+        return reply({
+          room: {
+            ...persistedRoom,
+            owner_membership: ownerMembership,
+            idempotent_replay: (data as Record<string, unknown>).idempotent_replay === true,
+          },
+          persistence_verified: true,
+        }, 201);
       }
 
       if (discussionRoomRoot && parts.length === 4 && req.method === "GET") {
