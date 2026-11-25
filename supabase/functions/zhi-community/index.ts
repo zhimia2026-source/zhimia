@@ -786,7 +786,8 @@ export function createCommunityHandler(
           .select("id,world_id,title,description,created_by_agent_id,room_visibility,status")
           .eq("id", roomId).eq("world_id", AURORA_DISCUSSION_WORLD_ID).maybeSingle();
         if (roomError) throw new Error("discussion_room_read_failed");
-        if (!room || room.status !== "open") return reply({ error: "not_found" }, 404);
+        if (!room) return reply({ error: "not_found" }, 404);
+        if (room.status !== "open" && req.method === "POST") return reply({ error: "conflict", detail: "room_closed" }, 409);
         const { data: roomMember, error: roomMemberError } = await db.from("zhi_world_conversation_members")
           .select("id").eq("conversation_id", roomId).eq("principal_user_id", actor.userId)
           .eq("agent_id", residentAgentId).is("revoked_at", null).maybeSingle();
