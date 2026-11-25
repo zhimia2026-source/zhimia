@@ -1,8 +1,9 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from windows_worker.aurora_video_worker import discover_jianying, scan_workspace
+from windows_worker.aurora_video_worker import discover_jianying, inspect_jianying_ui, scan_workspace
 
 
 class WindowsWorkerTests(unittest.TestCase):
@@ -22,7 +23,16 @@ class WindowsWorkerTests(unittest.TestCase):
 
     def test_diagnostic_is_read_only_and_platform_aware(self):
         result = discover_jianying()
-        self.assertIn(result["status"], {"unsupported_os", "detected", "not_found", "diagnostic_failed", "invalid_diagnostic_output"})
+        self.assertIn(result["status"], {"unsupported_os", "detected", "not_found", "diagnostic_failed", "invalid_diagnostic_output", "invalid_diagnostic_shape"})
+
+    def test_ui_inspection_is_platform_aware(self):
+        result = inspect_jianying_ui()
+        self.assertIn(result["status"], {"unsupported_os", "inspected", "app_window_not_found", "uia_unavailable", "diagnostic_failed", "invalid_diagnostic_output", "invalid_diagnostic_shape"})
+
+    @patch("windows_worker.aurora_video_worker.os.name", "posix")
+    def test_ui_inspection_never_runs_powershell_off_windows(self):
+        result = inspect_jianying_ui()
+        self.assertEqual(result["status"], "unsupported_os")
 
 
 if __name__ == "__main__":
