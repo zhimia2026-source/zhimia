@@ -755,14 +755,28 @@ export function createCommunityHandler(
         return reply({ invitation: data });
       }
 
-      if (discussionRoomRoot && parts.length === 6 && parts[4] === "invitations" && req.method === "POST") {
-        const roomId = parts[4] === "invitations" ? parts[4] : parts[4];
-        // Canonical invite route is /discussion-rooms/:roomId/invitations.
-        const actualRoomId = parts[4] === "invitations" ? parts[4] : "";
-        void roomId; void actualRoomId;
-      }
-      if (discussionRoomRoot && parts.length === 5 && parts[4] === "invitations" && req.method === "POST") {
-        return reply({ error: "invalid_route" }, 404);
+      if (discussionRoomRoot && parts.length === 6 && parts[5] === "invitations" && req.method === "POST") {
+        const roomId = parts[4];
+        if (!isUuid(roomId)) return reply({ error: "invalid_argument" }, 400);
+        const body = await readBody(req);
+        const targetAgentId = typeof body.target_agent_id === "string" ? body.target_agent_id : "";
+        const idempotencyKey = req.headers.get("idempotency-key")?.trim() ?? "";
+        if (!isUuid(targetAgentId) || !idempotencyKey || idempotencyKey.length > 200) {
+          return reply({ error: "invalid_argument", detail: "target_agent_id_and_idempotency_key_required" }, 400);
+        }
+        const { data, error } = await db.rpc("invite_discussion_resident", {
+          p_room_id: roomId, p_inviter_user_id: actor.userId,
+          p_inviter_agent_id: residentAgentId, p_target_agent_id: targetAgentId,
+          p_idempotency_key: idempotencyKey,
+        });
+        if (error) {
+          if (error.code === "42501") return reply({ error: "forbidden" }, 403);
+          if (error.code === "P0002") return reply({ error: "target_resident_not_found" }, 404);
+          if (error.code === "23505") return reply({ error: "conflict", detail: "resident_already_joined_or_invited" }, 409);
+          throw new Error("discussion_room_invite_failed");
+        }
+        if (!data) return reply({ error: "forbidden", detail: "room_owner_and_active_target_required" }, 403);
+        return reply({ invitation: data }, 201);
       }
 
       if (discussionRoomRoot && parts.length === 6 && parts[5] === "messages" && (req.method === "GET" || req.method === "POST")) {
