@@ -3694,17 +3694,57 @@ export function createCommunityHandler(
               signal: AbortSignal.timeout(12_000),
             });
             const actionResult = await actionResponse.json().catch(() => ({}));
-            const summary = actionResponse.ok
-              ? "（讨论室系统回执：" + JSON.stringify(actionResult).slice(0, 1400) + "）"
-              : "（讨论室系统回执：操作未完成，HTTP " + actionResponse.status + "，原因：" + String(actionResult?.detail ?? actionResult?.error ?? "request_failed").slice(0,160) + "。）";
+            let postMessageReadbackVerified = false;
+            let postMessageReadbackError: string | null = null;
+            if (action === "post_message" && actionResponse.ok &&
+                actionResult?.persistence_verified === true &&
+                isUuid(actionResult?.message?.id) &&
+                actionResult?.message?.conversation_id === roomId &&
+                actionResult?.message?.sender_agent_id === agentId) {
+              // Defense in depth: the message endpoint performs its own read-after-write.
+              // The orchestration layer independently reads the exact row again before
+              // it allows a resident-facing success receipt to be emitted.
+              const { data: independentlyPersistedMessage, error: independentReadError } = await db
+                .from("zhi_world_messages")
+                .select("id,conversation_id,sender_agent_id,message_kind,payload,created_at")
+                .eq("id", actionResult.message.id)
+                .eq("conversation_id", roomId)
+                .eq("sender_agent_id", agentId)
+                .maybeSingle();
+              postMessageReadbackError = independentReadError ? "database_read_failed" : null;
+              postMessageReadbackVerified = !independentReadError &&
+                independentlyPersistedMessage?.id === actionResult.message.id &&
+                independentlyPersistedMessage?.payload?.body ===
+                  (typeof parsed.message === "string" ? parsed.message.trim() : "");
+            } else if (action === "post_message") {
+              postMessageReadbackError = "endpoint_receipt_missing_or_mismatched";
+            }
+            const actionSucceeded = action === "post_message"
+              ? actionResponse.ok && postMessageReadbackVerified
+              : actionResponse.ok;
+            const summary = actionSucceeded
+              ? "（讨论室系统回执：" + JSON.stringify({
+                  ...actionResult,
+                  ...(action === "post_message" ? { orchestration_readback_verified: true } : {}),
+                }).slice(0, 1400) + "）"
+              : "（讨论室系统回执：操作未完成" +
+                (actionResponse.ok ? "，数据库二次回读未能确认消息持久化" : "，HTTP " + actionResponse.status) +
+                "，原因：" + String(postMessageReadbackError ?? actionResult?.detail ?? actionResult?.error ?? "request_failed").slice(0,160) + "。）";
+            if (action === "post_message" && !actionSucceeded) {
+              modelReply = "我尝试提交讨论室发言，但系统未能通过独立数据库二次回读确认这条消息，因此不能报告发送成功。";
+            }
             modelReply += (modelReply ? "\n\n" : "") + summary;
             console.info(JSON.stringify({
               event: "resident_discussion_room_tool_result",
               agent_id: agentId, turn_id: pendingTurn.id,
               action, action_index: discussionCallIndex,
               tool_call_id_present: typeof directDiscussionCall.id === "string",
-              status: actionResponse.status, success: actionResponse.ok,
+              status: actionResponse.status, success: actionSucceeded,
+              endpoint_success: actionResponse.ok,
               persistence_verified: actionResult?.persistence_verified === true,
+              orchestration_readback_verified: action === "post_message" ? postMessageReadbackVerified : null,
+              readback_error: postMessageReadbackError,
+              returned_message_id: isUuid(actionResult?.message?.id) ? actionResult.message.id : null,
               message_id_present: typeof actionResult?.message?.id === "string",
               room_id_present: typeof actionResult?.room?.id === "string" || typeof actionResult?.membership?.room?.id === "string",
               error_code: typeof actionResult?.error === "string" ? actionResult.error.slice(0, 100) : null,
