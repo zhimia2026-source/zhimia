@@ -44,7 +44,7 @@ create or replace function public.zhi_invite_resident_to_discussion_room(
 language plpgsql security definer set search_path = public, auth
 as $$
 declare v_room public.zhi_world_conversations%rowtype;
-declare v_target public.zhi_agents%rowtype;
+ v_target public.zhi_agents%rowtype;
  v_invitation public.zhi_world_conversation_invitations%rowtype;
 begin
   select * into v_room from public.zhi_world_conversations
@@ -118,7 +118,7 @@ begin
         and m.world_id=v_inv.world_id and m.principal_user_id=p_target_user_id
         and m.status='active' and m.revoked_at is null
         and (m.expires_at is null or m.expires_at>now())
-        and m.capabilities @> '["message:read"]'::jsonb) then
+        and m.capabilities @> ARRAY['message:read']::text[]) then
       raise exception using errcode='42501',message='active_resident_membership_required';
     end if;
     insert into public.zhi_world_conversation_members(conversation_id,principal_user_id,agent_id,member_role)
