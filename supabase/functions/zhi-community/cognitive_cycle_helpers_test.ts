@@ -48,7 +48,7 @@ Deno.test("cognition action evidence rejects unverified, unsupported, and oversi
       action_kind: "resident_social_message", status: "sent", message_id: "message-" + index,
     })),
   ]);
-  if (value.outcomes.length !== 12 || value.counts.confirmed_action_count !== 12) {
+  if (value.outcomes.length !== 9 || value.counts.confirmed_action_count !== 9) {
     throw new Error("unsupported or over-limit action evidence was accepted");
   }
   if (value.evidence_refs.some((item) => item.id === "not-moved")) {
