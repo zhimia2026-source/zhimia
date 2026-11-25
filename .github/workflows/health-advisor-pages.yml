@@ -12,6 +12,8 @@ on:
       - "web/zhi-universe-client.js"
       - "web/aurora-observer.html"
       - "web/aurora-observer.js"
+      - "web/aurora-discussions.html"
+      - "web/aurora-discussions.js"
       - "web/zhi-token-admin.html"
       - "web/zhi-resident.html"
       - "web/zhi-resident.js"
@@ -55,6 +57,8 @@ jobs:
           cp web/zhi-universe-client.js _site/zhi-universe-client.js
           cp web/aurora-observer.html _site/aurora-observer.html
           cp web/aurora-observer.js _site/aurora-observer.js
+          cp web/aurora-discussions.html _site/aurora-discussions.html
+          cp web/aurora-discussions.js _site/aurora-discussions.js
           cp web/zhi-resident.html _site/zhi-resident.html
           cp web/zhi-resident.js _site/zhi-resident.js
           cp web/zhi-resident.webmanifest _site/zhi-resident.webmanifest
@@ -85,6 +89,9 @@ jobs:
           grep -q './aurora-observer.js' _site/aurora-observer.html
           grep -q '/v1/observer/aurora/discussion-rooms' _site/aurora-observer.js
           node --input-type=module --check < _site/aurora-observer.js
+          test -s _site/aurora-discussions.html
+          test -s _site/aurora-discussions.js
+          node --input-type=module --check < _site/aurora-discussions.js
           test -s _site/zhi-resident.html
           test -s _site/zhi-resident.js
           test -s _site/zhi-resident.webmanifest
@@ -108,7 +115,7 @@ jobs:
           test -s _site/strategy-room.js
           node --input-type=module --check < _site/strategy-room.js
           node -e 'const fs=require("fs"); const h=fs.readFileSync("web/mindstream.html","utf8"); const scripts=[...h.matchAll(/<script>([\s\S]*?)<\/script>/g)]; if(scripts.length!==1) throw new Error("expected one inline MINDSTREAM script"); new Function(scripts[0][1]); for(const id of ["73eb831a-8e35-4d6a-8654-15f160a2c42d","cf9d1a03-d5d5-4afa-949a-2964671f45d9","30427542-d4c6-4e45-bc68-fabf66f8a6a7"]) if(!h.includes(id)) throw new Error("missing resident mapping: "+id); if(!h.includes("/v1/agents/")) throw new Error("resident chat route missing"); if(/SUPABASE_SERVICE_ROLE_KEY|service_role|AGNES_API_KEY|sk-[A-Za-z0-9]{20,}/i.test(h)) throw new Error("server secret pattern in MINDSTREAM"); console.log("MINDSTREAM resident-chat smoke checks passed")'
-          ! grep -Eiq '(service_role|SUPABASE_SERVICE_ROLE_KEY|AGNES_API_KEY|sk-[A-Za-z0-9]{20,})' _site/index.html _site/aurora-shell.css _site/aurora-shell.js _site/token-admin.html _site/zhi-health-advisor-client.js _site/zhi-universe.html _site/zhi-universe-client.js _site/aurora-observer.html _site/aurora-observer.js _site/zhi-resident.html _site/zhi-resident.js _site/zhi-resident.webmanifest _site/zhi-resident-sw.js _site/zhi-resident-icon.svg _site/zhi-memory.html _site/zhi-memory.js _site/aurora-research-center.html _site/aurora-research-center.js
+          ! grep -Eiq '(service_role|SUPABASE_SERVICE_ROLE_KEY|AGNES_API_KEY|sk-[A-Za-z0-9]{20,})' _site/index.html _site/aurora-shell.css _site/aurora-shell.js _site/token-admin.html _site/zhi-health-advisor-client.js _site/zhi-universe.html _site/zhi-universe-client.js _site/aurora-observer.html _site/aurora-observer.js _site/aurora-discussions.html _site/aurora-discussions.js _site/zhi-resident.html _site/zhi-resident.js _site/zhi-resident.webmanifest _site/zhi-resident-sw.js _site/zhi-resident-icon.svg _site/zhi-memory.html _site/zhi-memory.js _site/aurora-research-center.html _site/aurora-research-center.js
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
