@@ -47,7 +47,7 @@ The following persisted data counts were observed:
 
 All ten inspected core tables (cognition cycles, micro-experiences, implicit profiles, collective experience capsules/responses, resident research intents, strategy jobs, governance audit/authorizations, and Python jobs) have RLS enabled. The read-only policy inspection found an owner-scoped SELECT policy on cognition cycles and a deny-all direct-client policy on Python jobs; most other inspected tables had no direct client policy in that inspection and therefore remain default-deny under RLS. This does not replace a full grants, RPC, and service-role boundary audit.
 
-All 27 cognition cycles currently report `evidence_attached`. This establishes persisted evidence attachment only; it does not establish that a resident's later decisions or actions changed because of that experience.
+All cognition cycles currently report `evidence_attached`. This establishes persisted evidence attachment only; it does not establish that a resident's later decisions or actions changed because of that experience. The action and review counters are nested inside the `validation_evidence` JSON object, not standalone table columns.
 
 ## 3. Existing implementation to reuse
 
@@ -138,8 +138,8 @@ Publish a periodic AURORA report containing only privacy-safe aggregates: active
 | Ecosystem cron active | pass | `cron.job` inspection |
 | Recent cron executions successful | pass | `cron.job_run_details` aggregate |
 | Core table RLS enabled | pass | `pg_tables.rowsecurity` inspection |
-| Cognition records have attached evidence | pass | 27 rows, all `evidence_attached` |
-| Cognition-to-behavior causal effect | not_run / gap confirmed | 27 cycles have 13 evidence refs each, but all have action_outcome_count=0, empty action_summary/outcome_summary, and independent_review=false |
+| Cognition records have attached evidence | pass | 28 rows at the latest recheck, all `evidence_attached`; counts are stored in `validation_evidence` JSON |
+| Cognition-to-behavior causal effect | not_run / gap confirmed | Latest recheck: 28 cycles have evidence refs; all have `validation_evidence.action_outcome_count=0` and `validation_evidence.independent_review=false`; all `action_summary` and `outcome_summary` fields are empty |
 | Resident continuity coverage | partial / gap confirmed | 9 of 12 non-prototype residents have experience/profile data; 3 active residents currently have zero micro-experiences, zero profiles, and zero sensory events |
 | Server-side SECURITY DEFINER RPC ACL review | pass (scoped) | 17 inspected public SECURITY DEFINER functions are executable by service_role only; anon/authenticated EXECUTE false |
 | Direct client table grants on 8 AURORA runtime tables | fixed + verified | Migration `20261125022050_revoke_aurora_runtime_client_table_grants`; anon/authenticated SELECT/INSERT/UPDATE/DELETE/TRUNCATE false; service_role SELECT/INSERT retained |
@@ -172,10 +172,11 @@ Zero-history residents must not be given fabricated experiences or synthetic gre
 
 ### 8.2 Cognition-to-action evidence gap
 
-The 27 existing cognition cycles each have 13 evidence references and an `evidence_attached` validation status. A deeper aggregate check found:
-- `action_outcome_count = 0` for all 27 cycles.
-- `action_summary` and `outcome_summary` are empty for all 27 cycles.
-- `independent_review = false` for all 27 cycles.
+The 28 cognition cycles observed in the latest recheck have non-empty evidence references and an `evidence_attached` validation status. A deeper aggregate check found:
+- `validation_evidence.action_outcome_count = 0` for all 28 cycles.
+- `action_summary` and `outcome_summary` are empty for all 28 cycles.
+- `validation_evidence.independent_review = false` for all 28 cycles.
+- `action_outcome_count` and `independent_review` are JSON keys inside `validation_evidence`; they are not standalone columns in `zhi_agent_cognition_cycles`.
 
 Therefore these records demonstrate experience/evidence attachment, not behaviorally validated cognition. Do not report them as proof that cognition changed later decisions or actions. Future behavior verification must link a specific prior cognition cycle to a subsequent real action and observed outcome, preserve provenance, and obtain independent review without fabricating resident history.
 
@@ -283,3 +284,26 @@ This is a point-in-time ledger snapshot, not a guarantee of future availability.
 ### 9.5 Current production boundary
 
 Database privilege hardening and the sensory-memory RLS optimization are deployed and verified. The remaining AURORA 2.0 release blockers are behavioral E2E evidence: cognition-to-action linkage, dedicated cross-owner negative tests, authenticated bidirectional resident messaging, and a real resident-owned CEES collaboration case. These require genuine resident actions and appropriately scoped test identities; do not manufacture them in production histories.
+
+
+## 10. Production source parity and cognition recheck — 2026-11-25
+
+### 10.1 Live source parity
+
+The active production `zhi-community` Edge Function is version 288. Its returned source bundle contains 20 files. A byte-for-byte comparison against the GitHub `main` source found 16 matching files and four differing files:
+- `index.ts`
+- `memory_experience_helpers.ts`
+- `affective_engine.ts`
+- `autonomous_evolution_helpers.ts`
+
+The four deployed files were copied exactly to a dedicated GitHub branch and submitted as PR #109. This is a source-of-truth synchronization only; it does not change the running Edge Function or database. Do not redeploy from the pre-sync `main` revision, because it would omit behavior already present in production. After the PR is merged, use the synchronized source as the baseline for subsequent code changes.
+
+### 10.2 Cognition evidence recheck
+
+A fresh read-only production query returned 28 cognition cycles for the AURORA world:
+- 28/28 have non-empty `evidence_refs` and `validation_status='evidence_attached'`.
+- 0/28 have a positive `validation_evidence.action_outcome_count`.
+- 0/28 have a non-empty `action_summary` or `outcome_summary`.
+- 0/28 have `validation_evidence.independent_review=true`.
+
+The JSON evidence confirms that the current cycles represent persisted private-reflection and environment evidence, not verified cognition-to-action change. The schema has no standalone `action_outcome_count` or `independent_review` columns; both are nested in `validation_evidence`. Do not treat an action proposal, a failed send, a cue-state choice, or a modeled movement as a completed successful action. A future behavior acceptance case must cite a concrete runtime action receipt, a subsequent observed outcome, and an independent review, while keeping those evidence classes distinct.
