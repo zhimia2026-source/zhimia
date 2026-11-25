@@ -727,11 +727,14 @@ export function createCommunityHandler(
             !["world_public","invite_only"].includes(String(body.room_visibility ?? "invite_only"))) {
           return reply({ error: "invalid_argument", detail: "invalid_room_fields" }, 400);
         }
+        const idempotencyKey = req.headers.get("idempotency-key")?.trim() ?? "";
+        if (!idempotencyKey || idempotencyKey.length > 200) return reply({ error: "invalid_argument", detail: "idempotency_key_required" }, 400);
         const { data, error } = await db.rpc("create_discussion_room", {
           p_world_id: AURORA_DISCUSSION_WORLD_ID, p_owner_user_id: actor.userId,
           p_owner_agent_id: residentAgentId, p_title: body.title.trim(),
           p_description: typeof body.description === "string" ? body.description.trim() : "",
           p_room_visibility: String(body.room_visibility ?? "invite_only"),
+          p_idempotency_key: idempotencyKey,
         });
         if (error) {
           if (error.code === "42501") return reply({ error: "forbidden", detail: "room_creation_not_authorized" }, 403);
@@ -855,6 +858,13 @@ export function createCommunityHandler(
           conversation_id: roomId, sender_user_id: null, sender_agent_id: residentAgentId,
           request_id: requestUuid, message_kind: "text", payload: { body: body.body.trim() },
         }).select("id,conversation_id,sender_agent_id,message_kind,payload,created_at").single();
+        if (messageError?.code === "23505") {
+          const { data: replay, error: replayError } = await db.from("zhi_world_messages")
+            .select("id,conversation_id,sender_agent_id,message_kind,payload,created_at")
+            .eq("conversation_id", roomId).eq("sender_agent_id", residentAgentId).eq("request_id", requestUuid).maybeSingle();
+          if (replayError || !replay || replay.payload?.body !== body.body.trim()) return reply({ error: "conflict", detail: "idempotency_payload_mismatch" }, 409);
+          return reply({ message: replay, idempotent_replay: true });
+        }
         if (messageError || !message) throw new Error("discussion_room_message_write_failed");
         return reply({ message, idempotent_replay: false }, 201);
       }
