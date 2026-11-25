@@ -2,6 +2,7 @@
   if (document.querySelector(".aurora-globalbar")) return;
   const links = [
     ["zhi-universe.html","世界"],
+    ["aurora-observer.html","创世观察者"],
     ["zhi-resident.html","居民聊天"],
     ["strategy-room.html","战略作战室"],
     ["aurora-research-center.html","研究中心"],
