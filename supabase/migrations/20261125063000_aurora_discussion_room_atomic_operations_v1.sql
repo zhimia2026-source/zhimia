@@ -17,7 +17,7 @@ create or replace function public.create_discussion_room(
   p_title text, p_description text, p_room_visibility text, p_idempotency_key text
 ) returns jsonb
 language sql security invoker set search_path = pg_catalog, public
-as $
+as $fn1$
   with eligible as (
     select a.id, a.owner_user_id
     from public.zhi_agents a
@@ -66,7 +66,7 @@ as $
      or exists(select 1 from public.zhi_world_conversation_members m
        where m.conversation_id=room.id and m.principal_user_id=p_owner_user_id
          and m.agent_id=p_owner_agent_id and m.revoked_at is null)
-$;
+$fn1$;
 
 create or replace function public.invite_discussion_resident(
   p_room_id uuid, p_inviter_user_id uuid, p_inviter_agent_id uuid,
