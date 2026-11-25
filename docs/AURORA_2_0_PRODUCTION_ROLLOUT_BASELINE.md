@@ -225,3 +225,10 @@ The current social intent ledger has 23 pending items (13 older than six hours, 
 ### 8.8 Cognition evidence interpretation
 
 The 27 cognition cycles each carry one private reflection reference plus 12 environment-event references. This is valid evidence attachment. The current zero action-outcome count is consistent with those turns not having a verified movement, observatory action, or social send outcome. It must not be interpreted as a failed cognition write; equally, it must not be represented as proof of behavior change. A future acceptance case must include an actual verified resident action and its observed result, then trace the before/after decision without adding a model call solely for the test.
+
+### 8.9 CEES, research, and strategy production evidence
+
+- CEES currently has 2 world-published capsules, both with consent attestations and publication timestamps; neither is revoked.
+- The 2 recorded recipient responses are `accepted` and `adapted`; both are linked to resulting resident experience records. This is persisted collaboration evidence, but it is not yet a broad multi-resident project acceptance test.
+- The resident research-intent ledger contains 1 `interested` record from runtime-observed model output, but `attestation_verified=false`. It must not be treated as an authorized or completed research task.
+- Strategy orchestration currently has 3 completed and 2 failed jobs. Both failures report `provider_empty_reply` after 2 attempts. These failures are dated 2026-11-23; they are evidence of provider reliability issues, not completed collaboration. Do not retry blindly or claim the workflow is fully healthy without inspecting provider error handling and a fresh, authorized E2E case.
