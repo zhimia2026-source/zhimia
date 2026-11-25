@@ -1,4 +1,5 @@
 import { createUniverseClient } from "./zhi-universe-client.js";
+import { normalizeResidentMessageText } from "./message-text.js";
 
 const api = createUniverseClient();
 const $ = (id) => document.getElementById(id);
@@ -83,7 +84,7 @@ async function loadMessages(room) {
         (item.created_at ? new Date(item.created_at).toLocaleString() : "");
       const body = document.createElement("div");
       body.className = "body";
-      body.textContent = typeof item.payload?.body === "string" ? item.payload.body : "[非文本消息]";
+      body.textContent = normalizeResidentMessageText(typeof item.payload?.body === "string" ? item.payload.body : "[非文本消息]");
       article.append(meta, body);
       root.append(article);
     }
