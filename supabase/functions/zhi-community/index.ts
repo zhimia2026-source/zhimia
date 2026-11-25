@@ -2,7 +2,7 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { hasCapability, isTokenExpiryValid, tokenTouchSucceeded } from "./auth_helpers.ts";
 import { isMembershipAuthorized, isAgentMembershipAuthorized, isWorldResidentDiscoverable, isSceneMessageVisibleToAgent, privilegesForPublicRejoin, normalizeWorldProtocolPath, isPublicAgentJoinAllowed, publicAgentMembershipPrivileges } from "./access_helpers.ts";
 import { validateMouRecord } from "./ontology_helpers.ts";
-import { buildFeedbackRecord, buildRevisionProposal } from "./cognitive_cycle_helpers.ts";
+import { buildCognitionActionEvidence, buildFeedbackRecord, buildRevisionProposal } from "./cognitive_cycle_helpers.ts";
 import { buildAgentIdentityContext, buildResidentCognitionDiagnostics, buildPrivateAgentContext, buildPrivateChatHistory, buildSceneAwarenessContext, buildSceneBehaviorGuidance } from "./chat_context_helpers.ts";
 import { computeSceneEnvironment, normalizeSceneEnvironmentConfig } from "./environment_helpers.ts";
 import { canReadPrivateCognition } from "./constitutional_helpers.ts";
@@ -3383,7 +3383,10 @@ export function createCommunityHandler(
             if (cueUpdateError || !updatedCue) {
               console.warn(JSON.stringify({ event: "observatory_cue_action_commit_conflict", agent_id: agentId, turn_id: pendingTurn.id }));
             } else {
-              verifiedCueActionOutcome = { action_kind: "observatory_cue_choice", status: cueAction.action };
+              verifiedCueActionOutcome = {
+                action_kind: "observatory_cue_choice", status: cueAction.action,
+                cue_id: cueAction.cue_id, source_turn_id: pendingTurn.id,
+              };
               console.info(JSON.stringify({ event: "resident_action_committed", action_kind: "observatory_cue_choice", status: cueAction.action, turn_id: pendingTurn.id }));
             }
           }
@@ -4165,7 +4168,12 @@ export function createCommunityHandler(
         if (verifiedCueActionOutcome) verifiedActionOutcomes.push(verifiedCueActionOutcome);
         if (verifiedMovementActionOutcome) verifiedActionOutcomes.push(verifiedMovementActionOutcome);
         if (["sent", "sent_pending_confirmation", "sent_pending_acceptance", "not_sent", "failed_safely"].includes(actionOutcomeStatus)) {
-          verifiedActionOutcomes.push({ action_kind: "resident_social_message", status: actionOutcomeStatus });
+          verifiedActionOutcomes.push({
+            action_kind: "resident_social_message", status: actionOutcomeStatus,
+            ...(typeof socialOutcome?.intent_id === "string" ? { intent_id: socialOutcome.intent_id } : {}),
+            ...(typeof socialOutcome?.message_id === "string" ? { message_id: socialOutcome.message_id } : {}),
+            source_turn_id: completed.id,
+          });
          }
         const verifiedActionOutcome = verifiedActionOutcomes.length ? { outcomes: verifiedActionOutcomes } : null;
         const lastAffectEventAt = typeof residentAffectState?.last_event_at === "string"
@@ -4815,20 +4823,24 @@ export function createCommunityHandler(
                   ? reflectionEnvironmentFeedback as Record<string, unknown> : {};
                 const cognitionEvents = Array.isArray(cognitionFeedback.events)
                   ? (cognitionFeedback.events as Array<Record<string, unknown>>).slice(0, 12) : [];
+                const cognitionActionEvidence = buildCognitionActionEvidence(verifiedActionOutcomes);
+                const cognitionActionOutcomes = cognitionActionEvidence.outcomes;
+                const cognitionEnvironmentRefs = cognitionEvents.flatMap((event) => typeof event.id === "string"
+                  ? [{ kind: "aurora_environment_event", id: event.id,
+                       event_kind: typeof event.event_kind === "string" ? event.event_kind : "unknown",
+                       state_revision: typeof event.state_revision === "number" ? event.state_revision : null }]
+                  : []);
+                const cognitionActionEvidenceRefs = cognitionActionEvidence.evidence_refs.slice(
+                  0, Math.max(0, 20 - 1 - cognitionEnvironmentRefs.length),
+                );
                 const cognitionEvidenceRefs = [
                   { kind: "private_experience", id: String(savedReflection.id) },
-                  ...cognitionEvents.flatMap((event) => typeof event.id === "string"
-                    ? [{ kind: "aurora_environment_event", id: event.id,
-                         event_kind: typeof event.event_kind === "string" ? event.event_kind : "unknown",
-                         state_revision: typeof event.state_revision === "number" ? event.state_revision : null }]
-                    : []),
-                ].slice(0, 20);
+                  ...cognitionEnvironmentRefs,
+                  ...cognitionActionEvidenceRefs,
+                ];
                 const cognitionActionTrace = reflection.affect_decision_trace &&
                   typeof reflection.affect_decision_trace === "object"
                   ? reflection.affect_decision_trace : null;
-                const cognitionActionOutcomes = verifiedActionOutcomes.slice(0, 12).map((outcome) => ({
-                  action_kind: outcome.action_kind, status: outcome.status,
-                }));
                 const cognitionRow = {
                   owner_user_id: actor.userId,
                   agent_id: agentId,
@@ -4872,8 +4884,14 @@ export function createCommunityHandler(
                   validation_evidence: {
                     source_experience_id: savedReflection.id,
                     environment_event_count: cognitionEvents.length,
-                    action_outcome_count: cognitionActionOutcomes.length,
+                    action_outcome_count: cognitionActionEvidence.counts.observed_count,
+                    action_evidence_ref_count: cognitionActionEvidenceRefs.length,
+                    confirmed_action_count: cognitionActionEvidence.counts.confirmed_action_count,
+                    pending_followup_count: cognitionActionEvidence.counts.pending_followup_count,
+                    not_executed_or_failed_count: cognitionActionEvidence.counts.not_executed_or_failed_count,
+                    cue_choice_commit_count: cognitionActionEvidence.counts.cue_choice_commit_count,
                     independent_review: false,
+                    action_evidence_semantics: "runtime_observed_execution_status_not_independent_behavior_review",
                   },
                 };
                 const { data: cognitionCycle, error: cognitionCycleError } = await db

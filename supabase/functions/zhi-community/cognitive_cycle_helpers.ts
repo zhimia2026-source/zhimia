@@ -122,3 +122,107 @@ export function buildRevisionProposal(
     created_at: proposal.created_at,
   };
 }
+
+
+export type CognitionActionEvidence = {
+  outcomes: Array<{
+    action_kind: "observatory_cue_choice" | "resident_movement" | "resident_social_message";
+    status: string;
+    execution_evidence: string;
+    action_ref?: string;
+    source_turn_id?: string;
+  }>;
+  evidence_refs: Array<{
+    kind: "runtime_action_observation";
+    id: string;
+    action_kind: string;
+    status: string;
+    source_turn_id?: string;
+  }>;
+  counts: {
+    observed_count: number;
+    confirmed_action_count: number;
+    pending_followup_count: number;
+    not_executed_or_failed_count: number;
+    cue_choice_commit_count: number;
+  };
+};
+
+/**
+ * Normalize only runtime-observed action results for a resident's private cognition cycle.
+ * A committed cue choice is not a completed exploration; a virtual move is not physical
+ * movement; a sent message is not proof of reading, acceptance, or reciprocity.
+ */
+export function buildCognitionActionEvidence(raw: unknown): CognitionActionEvidence {
+  const allowedStatuses: Record<string, Set<string>> = {
+    observatory_cue_choice: new Set(["explore", "defer", "dismiss", "complete"]),
+    resident_movement: new Set(["moved"]),
+    resident_social_message: new Set([
+      "sent", "sent_pending_confirmation", "sent_pending_acceptance", "not_sent", "failed_safely",
+    ]),
+  };
+  const source = Array.isArray(raw) ? raw.slice(0, 12) : [];
+  const outcomes: CognitionActionEvidence["outcomes"] = [];
+  const evidence_refs: CognitionActionEvidence["evidence_refs"] = [];
+  const counts = {
+    observed_count: 0,
+    confirmed_action_count: 0,
+    pending_followup_count: 0,
+    not_executed_or_failed_count: 0,
+    cue_choice_commit_count: 0,
+  };
+
+  for (const value of source) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+    const item = value as Record<string, unknown>;
+    const kind = typeof item.action_kind === "string" ? item.action_kind : "";
+    const status = typeof item.status === "string" ? item.status : "";
+    if (!allowedStatuses[kind]?.has(status)) continue;
+
+    let executionEvidence = "unclassified";
+    if (kind === "resident_movement" && status === "moved") {
+      executionEvidence = "virtual_move_committed";
+      counts.confirmed_action_count++;
+    } else if (kind === "observatory_cue_choice") {
+      executionEvidence = "cue_choice_committed_only";
+      counts.cue_choice_commit_count++;
+    } else if (kind === "resident_social_message" && status === "sent") {
+      executionEvidence = "message_send_confirmed_read_and_response_unknown";
+      counts.confirmed_action_count++;
+    } else if (kind === "resident_social_message" &&
+      ["sent_pending_confirmation", "sent_pending_acceptance"].includes(status)) {
+      executionEvidence = "message_sent_followup_pending";
+      counts.pending_followup_count++;
+    } else if (kind === "resident_social_message" && ["not_sent", "failed_safely"].includes(status)) {
+      executionEvidence = "message_not_sent_or_failed";
+      counts.not_executed_or_failed_count++;
+    }
+
+    const actionRef = [
+      item.movement_request_id, item.message_id, item.intent_id, item.cue_id,
+    ].find((candidate): candidate is string =>
+      typeof candidate === "string" && candidate.trim().length > 0 && candidate.length <= 160
+    );
+    const sourceTurnId = typeof item.source_turn_id === "string" &&
+      item.source_turn_id.trim().length > 0 && item.source_turn_id.length <= 160
+      ? item.source_turn_id : undefined;
+    const outcome = {
+      action_kind: kind as CognitionActionEvidence["outcomes"][number]["action_kind"],
+      status,
+      execution_evidence: executionEvidence,
+      ...(actionRef ? { action_ref: actionRef } : {}),
+      ...(sourceTurnId ? { source_turn_id: sourceTurnId } : {}),
+    };
+    outcomes.push(outcome);
+    counts.observed_count++;
+    if (actionRef) evidence_refs.push({
+      kind: "runtime_action_observation",
+      id: actionRef,
+      action_kind: kind,
+      status,
+      ...(sourceTurnId ? { source_turn_id: sourceTurnId } : {}),
+    });
+  }
+
+  return { outcomes, evidence_refs, counts };
+}
