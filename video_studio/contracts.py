@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import math
 import re
 from typing import Any
 
@@ -65,13 +66,13 @@ class VideoPlan:
             raise VideoPlanError("invalid_title")
 
         aspect = raw.get("aspect_ratio", "9:16")
-        if aspect not in {"9:16", "16:9", "1:1", "4:5"}:
+        if not isinstance(aspect, str) or aspect not in {"9:16", "16:9", "1:1", "4:5"}:
             raise VideoPlanError("unsupported_aspect_ratio")
         fps = raw.get("fps", 30)
         if isinstance(fps, bool) or fps not in {24, 25, 30, 50, 60}:
             raise VideoPlanError("unsupported_fps")
         resolution = raw.get("resolution", "1080x1920" if aspect == "9:16" else "1920x1080")
-        if resolution not in {"720x1280", "1080x1920", "1280x720", "1920x1080", "1080x1080"}:
+        if not isinstance(resolution, str) or resolution not in {"720x1280", "1080x1920", "1280x720", "1920x1080", "1080x1080"}:
             raise VideoPlanError("unsupported_resolution")
 
         raw_assets = raw.get("assets")
@@ -94,7 +95,7 @@ class VideoPlan:
             if suffix not in _ALLOWED_MEDIA:
                 raise VideoPlanError("asset_extension_not_allowlisted")
             media_type = item.get("media_type", "audio" if suffix in {".mp3", ".wav", ".m4a", ".aac"} else "visual")
-            if media_type not in {"visual", "audio"}:
+            if not isinstance(media_type, str) or media_type not in {"visual", "audio"}:
                 raise VideoPlanError("invalid_media_type")
             assets.append(Asset(asset_id, path, media_type))
             seen.add(asset_id)
@@ -107,19 +108,21 @@ class VideoPlan:
             if not isinstance(item, dict):
                 raise VideoPlanError("clip_must_be_object")
             asset_id = item.get("asset_id")
-            if asset_id not in seen:
+            if not isinstance(asset_id, str) or asset_id not in seen:
                 raise VideoPlanError("clip_references_unknown_asset")
             start, source_start, source_end = (item.get(k) for k in ("timeline_start", "source_start", "source_end"))
             values = (start, source_start, source_end)
             if any(isinstance(v, bool) or not isinstance(v, (int, float)) for v in values):
                 raise VideoPlanError("clip_times_must_be_numbers")
+            if any(not math.isfinite(v) for v in values):
+                raise VideoPlanError("clip_times_must_be_finite")
             if start < 0 or source_start < 0 or source_end <= source_start or source_end > MAX_SECONDS or start > MAX_SECONDS:
                 raise VideoPlanError("clip_times_out_of_range")
             track = item.get("track", 1)
             if isinstance(track, bool) or not isinstance(track, int) or not 1 <= track <= 8:
                 raise VideoPlanError("invalid_track")
             role = item.get("role", "main")
-            if role not in {"main", "broll", "voiceover", "music", "subtitle"}:
+            if not isinstance(role, str) or role not in {"main", "broll", "voiceover", "music", "subtitle"}:
                 raise VideoPlanError("invalid_clip_role")
             clips.append(Clip(asset_id, float(start), float(source_start), float(source_end), track, role))
 
