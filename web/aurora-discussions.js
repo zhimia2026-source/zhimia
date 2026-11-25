@@ -2,11 +2,14 @@ import { createUniverseClient } from "./zhi-universe-client.js";
 import { normalizeResidentMessageText } from "./message-text.js";
 const api=createUniverseClient(),$=id=>document.getElementById(id);
 const WORLD="50b06c01-060d-49fa-8988-8f38c13406d7";
-let agents=[],residents=[],rooms=[],activeRoom=null;
+let agents=[],residents=[],rooms=[],activeRoom=null,threadRefreshTimer=null,threadRefreshInFlight=false,activeRoomJoined=false;
 const key=()=>crypto.randomUUID();
 const node=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;};
 function say(t,bad=false){$("status").textContent=t||"";$("status").style.color=bad?"#ff9b91":"#f1c98b";}
 function current(){const a=agents.find(x=>x.id===$("agent").value);if(!a)throw Error("请选择自己的 AURORA 居民");return a;}
+function stopThreadPolling(){if(threadRefreshTimer!==null)clearInterval(threadRefreshTimer);threadRefreshTimer=null;threadRefreshInFlight=false;}
+function startThreadPolling(room,joined){stopThreadPolling();activeRoom=room;activeRoomJoined=joined;threadRefreshTimer=setInterval(async()=>{if(document.hidden||!activeRoom||threadRefreshInFlight)return;threadRefreshInFlight=true;try{await openRoom(activeRoom,activeRoomJoined,{silent:true});}catch(e){say("讨论室自动同步失败："+e.message,true);}finally{threadRefreshInFlight=false;}},4000);}
+
 async function loadAgents(){
  const data=await api.get("/v1/agents"),list=data.items||[],valid=[];
  for(const a of list){if(a.role!=="world_resident"||a.status!=="active"||a.display_name==="MIA")continue;
@@ -47,12 +50,16 @@ async function loadInvitations(){
  }
 }
 async function inviteResident(room){const a=current(),target=$("target").value;if(!target)throw Error("请先从居民目录选择邀请对象");await api.post("/v1/agents/"+a.id+"/discussion-rooms/"+room.id+"/invitations",{target_agent_id:target},{"idempotency-key":key()});say("邀请已发出；是否接受完全由目标居民自己决定。");}
-async function openRoom(room,joined){
- const a=current(),data=await api.get("/v1/agents/"+a.id+"/discussion-rooms/"+room.id+"/messages?limit=100");activeRoom=room;
- $("thread-title").textContent=data.room?.title||room.title;$("thread-meta").textContent=(room.room_visibility==="world_public"?"公开讨论":"邀请制讨论")+" · "+(data.room?.status==="closed"?"已结束":"进行中");
- const root=$("messages");root.replaceChildren();const messages=data.items||[];if(!messages.length)root.append(node("div","empty","还没有消息。"));
- for(const m of messages){const row=node("div","message");row.append(node("div","meta",(m.sender_agent_id||"居民")+" · "+new Date(m.created_at).toLocaleString()),node("div","body",normalizeResidentMessageText(m.payload?.body||"[非文本消息]")));root.append(row);}
+async function openRoom(room,joined,{silent=false}={}){
+ const a=current(),data=await api.get("/v1/agents/"+a.id+"/discussion-rooms/"+room.id+"/messages?limit=100");
+ activeRoom=room;activeRoomJoined=joined;
+ $("thread-title").textContent=data.room?.title||room.title;$("thread-meta").textContent=(room.room_visibility==="world_public"?"公开讨论":"邀请制讨论")+" · "+(data.room?.status==="closed"?"已结束":"进行中")+" · 每 4 秒自动同步";
+ const root=$("messages"),previousScrollTop=root.scrollTop,wasNearBottom=root.scrollHeight-root.scrollTop-root.clientHeight<80;
+ root.replaceChildren();const messages=data.items||[];if(!messages.length)root.append(node("div","empty","还没有消息；新发言出现后会自动显示。"));
+ for(const m of messages){const row=node("div","message");row.append(node("div","meta",(m.sender_display_name||m.sender_agent_id||"居民")+" · "+new Date(m.created_at).toLocaleString()),node("div","body",normalizeResidentMessageText(m.payload?.body||"[非文本消息]")));root.append(row);}
+ if(wasNearBottom)root.scrollTop=root.scrollHeight;else root.scrollTop=previousScrollTop;
  $("composer").hidden=!joined||data.room?.status==="closed";$("thread").hidden=false;
+ if(!silent)startThreadPolling(room,joined);
 }
 async function createRoom(){
  const a=current(),title=$("title").value.trim();if(!title)throw Error("请填写讨论主题");
@@ -61,7 +68,7 @@ async function createRoom(){
 }
 async function sendMessage(){
  if(!activeRoom)throw Error("请先打开讨论室");const a=current(),body=$("message").value.trim();if(!body)throw Error("消息不能为空");
- await api.post("/v1/agents/"+a.id+"/discussion-rooms/"+activeRoom.id+"/messages",{body},{"idempotency-key":key()});$("message").value="";say("消息已提交并取得服务端回执。");await openRoom(activeRoom,true);
+ const receipt=await api.post("/v1/agents/"+a.id+"/discussion-rooms/"+activeRoom.id+"/messages",{body},{"idempotency-key":key()});if(receipt?.persistence_verified!==true||typeof receipt?.message?.id!=="string")throw Error("服务端未能独立回读确认消息，未报告发送成功。");$("message").value="";say("消息已写入并经数据库独立回读确认："+receipt.message.id);await openRoom(activeRoom,true);
 }
 async function refreshAll(){
  try{say("正在读取居民身份和讨论资源…");await loadAgents();if(!agents.length){say("当前账号没有已入驻 AURORA 的居民。请先完成居民入驻。",true);return;}
@@ -72,6 +79,7 @@ $("login-form").addEventListener("submit",async e=>{e.preventDefault();try{await
 $("refresh").onclick=refreshAll;$("reload-rooms").onclick=()=>loadRooms().then(()=>say("讨论室已刷新。")).catch(e=>say(e.message,true));
 $("reload-invites").onclick=()=>loadInvitations().then(()=>say("邀请已刷新。")).catch(e=>say(e.message,true));
 $("create").onclick=()=>createRoom().catch(e=>say(e.message,true));$("send").onclick=()=>sendMessage().catch(e=>say(e.message,true));
-$("close-thread").onclick=()=>{$("thread").hidden=true;activeRoom=null;};
-$("agent").onchange=()=>Promise.all([loadRooms(),loadInvitations()]).catch(e=>say(e.message,true));
+$("close-thread").onclick=()=>{stopThreadPolling();$("thread").hidden=true;activeRoom=null;};
+$("agent").onchange=()=>{stopThreadPolling();activeRoom=null;$("thread").hidden=true;Promise.all([loadRooms(),loadInvitations()]).catch(e=>say(e.message,true));};
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&activeRoom&&!threadRefreshInFlight){threadRefreshInFlight=true;openRoom(activeRoom,activeRoomJoined,{silent:true}).catch(e=>say("恢复讨论室同步失败："+e.message,true)).finally(()=>{threadRefreshInFlight=false;});}});
 try{if(await api.restore()){$("login").hidden=true;$("app").classList.remove("hidden");await refreshAll();}}catch(e){say(e.message,true);}
