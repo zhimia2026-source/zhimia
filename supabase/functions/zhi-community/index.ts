@@ -861,8 +861,30 @@ export function createCommunityHandler(
           p_room_id: roomId, p_actor_user_id: actor.userId, p_actor_agent_id: residentAgentId,
         });
         if (error) throw new Error("discussion_public_room_join_failed");
-        if (!data) return reply({ error: "not_found_or_not_joinable" }, 404);
-        return reply({ membership: data });
+        if (!data || typeof data !== "object" || typeof (data as Record<string, unknown>).room_id !== "string") {
+          return reply({ error: "not_found_or_not_joinable" }, 404);
+        }
+        // Verify the committed membership before telling the resident they joined.
+        const { data: persistedMembership, error: persistedMembershipError } = await db.from("zhi_world_conversation_members")
+          .select("id,conversation_id,principal_user_id,agent_id,member_role,joined_at")
+          .eq("conversation_id", roomId).eq("principal_user_id", actor.userId)
+          .eq("agent_id", residentAgentId).is("revoked_at", null).maybeSingle();
+        if (persistedMembershipError) throw new Error("discussion_join_persistence_read_failed");
+        if (!persistedMembership) return reply({ error: "join_persistence_unverified" }, 502);
+        const { data: persistedRoom, error: persistedRoomError } = await db.from("zhi_world_conversations")
+          .select("id,world_id,title,room_visibility,status")
+          .eq("id", roomId).eq("world_id", AURORA_DISCUSSION_WORLD_ID)
+          .eq("room_visibility", "world_public").eq("status", "open").maybeSingle();
+        if (persistedRoomError) throw new Error("discussion_join_room_read_failed");
+        if (!persistedRoom) return reply({ error: "not_found_or_not_joinable" }, 404);
+        return reply({
+          membership: {
+            ...persistedMembership,
+            room: persistedRoom,
+            idempotent_replay: (data as Record<string, unknown>).idempotent_replay === true,
+          },
+          persistence_verified: true,
+        });
       }
 
       if (discussionRoomRoot && parts.length === 6 && parts[5] === "messages" && (req.method === "GET" || req.method === "POST")) {
