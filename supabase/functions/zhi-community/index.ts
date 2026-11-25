@@ -942,9 +942,27 @@ export function createCommunityHandler(
           .select("id,conversation_id,sender_agent_id,message_kind,payload,created_at")
           .eq("conversation_id", roomId).eq("sender_agent_id", residentAgentId).eq("request_id", requestUuid).maybeSingle();
         if (existingError) throw new Error("discussion_room_message_idempotency_read_failed");
+        const confirmPersistedMessage = async (expectedMessageId: string, idempotentReplay: boolean) => {
+          // The write/unique-key response is not itself proof of durable delivery.
+          // Independently read the exact message back under the authenticated room,
+          // sender, and idempotency key before returning a success receipt.
+          const { data: persistedMessage, error: persistedMessageError } = await db.from("zhi_world_messages")
+            .select("id,conversation_id,sender_agent_id,message_kind,payload,created_at")
+            .eq("id", expectedMessageId).eq("conversation_id", roomId)
+            .eq("sender_agent_id", residentAgentId).eq("request_id", requestUuid).maybeSingle();
+          if (persistedMessageError) throw new Error("discussion_room_message_persistence_read_failed");
+          if (!persistedMessage || persistedMessage.payload?.body !== body.body.trim()) {
+            return reply({ error: "message_persistence_unverified" }, 502);
+          }
+          return reply({
+            message: persistedMessage,
+            idempotent_replay: idempotentReplay,
+            persistence_verified: true,
+          }, idempotentReplay ? 200 : 201);
+        };
         if (existing) {
           if (existing.payload?.body !== body.body.trim()) return reply({ error: "conflict", detail: "idempotency_payload_mismatch" }, 409);
-          return reply({ message: existing, idempotent_replay: true });
+          return await confirmPersistedMessage(existing.id, true);
         }
         const { data: message, error: messageError } = await db.from("zhi_world_messages").insert({
           conversation_id: roomId, sender_user_id: null, sender_agent_id: residentAgentId,
@@ -955,10 +973,10 @@ export function createCommunityHandler(
             .select("id,conversation_id,sender_agent_id,message_kind,payload,created_at")
             .eq("conversation_id", roomId).eq("sender_agent_id", residentAgentId).eq("request_id", requestUuid).maybeSingle();
           if (replayError || !replay || replay.payload?.body !== body.body.trim()) return reply({ error: "conflict", detail: "idempotency_payload_mismatch" }, 409);
-          return reply({ message: replay, idempotent_replay: true });
+          return await confirmPersistedMessage(replay.id, true);
         }
         if (messageError || !message) throw new Error("discussion_room_message_write_failed");
-        return reply({ message, idempotent_replay: false }, 201);
+        return await confirmPersistedMessage(message.id, false);
       }
 
       if (discussionRoomRoot && parts.length === 6 && parts[5] === "leave" && req.method === "POST") {
