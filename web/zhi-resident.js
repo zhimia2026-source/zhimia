@@ -1,4 +1,5 @@
 import { createUniverseClient } from "./zhi-universe-client.js";
+import { normalizeResidentMessageText } from "./message-text.js";
 
 const api = createUniverseClient();
 const $ = (id) => document.getElementById(id);
@@ -99,7 +100,7 @@ function appendMessage(role, content) {
   label.className = "role";
   label.textContent = role === "user" ? "你" : activeAgentName || "智能人";
   const body = document.createElement("div");
-  body.textContent = String(content || "");
+  body.textContent = normalizeResidentMessageText(String(content || ""));
   item.append(label, body);
   $("messages").append(item);
 }
