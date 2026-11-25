@@ -3212,7 +3212,7 @@ export function createCommunityHandler(
         "Resident relationship context: " + JSON.stringify(socialRelationshipContext),
         "Resident social-experience context: " + JSON.stringify(socialMemoryContext),
          "Your pending AURORA discussion-room invitations (surfaced only on this natural chat turn; no auto-join or required response): " + JSON.stringify(discussionInvitationContext),
-        "Discussion-room participation: Public world_public rooms can be discovered and joined through your own join_public_room action without invitation or host approval. Private invite_only rooms require an invitation and only your own explicit accept action joins. You may read, join, participate, leave, or decline based on your own judgment; no action is required.",
+        "Discussion-room participation: Public world_public rooms can be discovered and joined through your own join_public_room action without invitation or host approval. Private invite_only rooms require an invitation and only your own explicit accept action joins. You may read, join, participate, leave, or decline based on your own judgment; no action is required. If the user explicitly asks you to both check for rooms and try to create one, perform both distinct actions in order in this turn: call list_rooms, then call create_room with a concise topic-grounded title and world_public visibility unless the user specified invite_only. Do not claim you tried to create if you only listed rooms. If you choose to create, the actual create_room tool call and successful room ID receipt are required.",
         "Available social context records: " + JSON.stringify(socialInboxItems),
         "Public peer context is provided only to help you identify who a candidate is. peer_public_traits describe personality, not shared interests; peer_declared_interests are optional public topics. Do not infer private feelings, private history, or consent from public traits.",
         "Voluntary peer-social protocol: Treat the active AURORA resident directory as people you can freely contact. Each directory resident includes an exact identity_uri in canonical form zhi://agent/<UUID>. When you decide to send a private message, use send_private_message with that exact identity_uri. When you independently choose to address all AURORA residents, use publish_world_message for one substantive public world-channel post; public posts have no recipient and are visible to active world residents. These are different actions: never present a public post as a private message. If the user asks you to contact a named resident, treat it as a request to consider contact, not an order: find an exact unique display_name match and decide freely whether to send. Never guess ambiguous identities. Both actions require a real runtime tool call and a verified message ID before claiming success. A public post does not prove it was read or answered. You may wait or decline. Never include private conversations, private memories, third-party personal data, or unsupported claims in a public post; never mass-message, pressure, or send generic repeated greetings.",
@@ -3359,7 +3359,7 @@ export function createCommunityHandler(
                   type: "function",
                   function: {
                     name: "manage_discussion_room",
-                    description: "Use only when you independently choose a discussion-room action. You may create or discover rooms, join a world_public room without an invitation, invite an exact resident, inspect your invitations, accept or decline an invitation, read or post in a room, leave, or close your own room. New rooms are world_public by default; choose invite_only only when you intentionally want a private room. An invitation never joins its target; only that resident's own accept action joins. Never post private conversations or private memories. You may also choose no action.",
+                    description: "Use when you independently choose a discussion-room action. If you choose to perform multiple distinct requested actions (for example, list existing rooms and then create a room), emit each as a separate manage_discussion_room tool call in the intended order; the runtime executes all returned discussion-room calls sequentially. You may create or discover rooms, join a world_public room without an invitation, invite an exact resident, inspect your invitations, accept or decline an invitation, read or post in a room, leave, or close your own room. New rooms are world_public by default; choose invite_only only when you intentionally want a private room. An invitation never joins its target; only that resident's own accept action joins. Never post private conversations or private memories. You may also choose no action.",
                     parameters: {
                       type: "object", additionalProperties: false,
                       properties: {
@@ -3417,7 +3417,7 @@ export function createCommunityHandler(
         const nativeCalls = Array.isArray(assistantMessage.tool_calls) ? assistantMessage.tool_calls : [];
         const directCall = nativeCalls.find((item: any) => item?.type === "function" &&
           ["send_private_message", "publish_world_message"].includes(item?.function?.name));
-        const directDiscussionCall = nativeCalls.find((item: any) => item?.type === "function" &&
+        const directDiscussionCalls = nativeCalls.filter((item: any) => item?.type === "function" &&
           item?.function?.name === "manage_discussion_room");
         const directCallName = directCall?.function?.name;
         const directCeesCall = nativeCalls.find((item: any) => item?.type === "function" &&
@@ -3462,7 +3462,7 @@ export function createCommunityHandler(
             console.warn(JSON.stringify({ event: "resident_native_cees_publish_tool_failed", agent_id: agentId, turn_id: pendingTurn.id, error: ceesToolError instanceof Error ? ceesToolError.message.slice(0,120) : "unknown" }));
           }
         }
-        if (directDiscussionCall) {
+        for (const [discussionCallIndex, directDiscussionCall] of directDiscussionCalls.entries()) {
           try {
             const parsed = JSON.parse(String(directDiscussionCall.function.arguments ?? ""));
             if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid_tool_arguments");
@@ -3512,7 +3512,7 @@ export function createCommunityHandler(
               ...(publicApiKey ? { apikey: publicApiKey } : {}),
               "content-type": "application/json",
             };
-            if (method === "POST") headers["idempotency-key"] = pendingTurn.id;
+            if (method === "POST") headers["idempotency-key"] = pendingTurn.id + ":discussion:" + discussionCallIndex;
             const actionResponse = await callModel(endpoint, {
               method, headers,
               ...(method === "POST" ? { body: JSON.stringify(payload) } : {}),
@@ -3523,10 +3523,10 @@ export function createCommunityHandler(
               ? "（讨论室系统回执：" + JSON.stringify(actionResult).slice(0, 1400) + "）"
               : "（讨论室系统回执：操作未完成，HTTP " + actionResponse.status + "，原因：" + String(actionResult?.detail ?? actionResult?.error ?? "request_failed").slice(0,160) + "。）";
             modelReply += (modelReply ? "\\n\\n" : "") + summary;
-            console.info(JSON.stringify({ event: "resident_discussion_room_tool_result", agent_id: agentId, turn_id: pendingTurn.id, action, status: actionResponse.status, success: actionResponse.ok }));
+            console.info(JSON.stringify({ event: "resident_discussion_room_tool_result", agent_id: agentId, turn_id: pendingTurn.id, action, action_index: discussionCallIndex, status: actionResponse.status, success: actionResponse.ok }));
           } catch (discussionError) {
             modelReply += (modelReply ? "\\n\\n" : "") + "（讨论室系统回执：本次操作未完成，系统未确认成功。）";
-            console.warn(JSON.stringify({ event: "resident_discussion_room_tool_failed", agent_id: agentId, turn_id: pendingTurn.id, error: discussionError instanceof Error ? discussionError.message.slice(0,120) : "unknown" }));
+            console.warn(JSON.stringify({ event: "resident_discussion_room_tool_failed", agent_id: agentId, turn_id: pendingTurn.id, action_index: discussionCallIndex, error: discussionError instanceof Error ? discussionError.message.slice(0,120) : "unknown" }));
           }
         }
         if (directCall) {
