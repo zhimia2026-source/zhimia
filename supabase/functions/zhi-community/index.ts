@@ -3424,7 +3424,7 @@ export function createCommunityHandler(
         // text from model output; only the authenticated route response appended below
         // may report a discussion-room action result.
         const forgedDiscussionReceiptPattern = /(?:\\\\n|\\r?\\n|\\n){0,4}\\s*[（(]讨论室系统回执：[\\s\\S]{0,1800}?[）)]/g;
-        const hadModelAuthoredDiscussionReceipt = forgedDiscussionReceiptPattern.test(modelReply);
+        const hadModelAuthoredDiscussionReceipt = modelReply.includes("讨论室系统回执");
         modelReply = modelReply.replace(forgedDiscussionReceiptPattern, "").trim();
         const claimsDiscussionActionSucceeded = /(?:room_id\\s*[:：]|成功创建|已经创建|已创建|创建完成|成功加入|已经加入|已加入讨论室|已发送讨论室消息)/i.test(modelReply);
         if (directDiscussionCalls.length === 0 && (hadModelAuthoredDiscussionReceipt || claimsDiscussionActionSucceeded)) {
