@@ -1,4 +1,5 @@
 import { createUniverseClient } from "./zhi-universe-client.js";
+import { normalizeResidentMessageText } from "./message-text.js";
 const api=createUniverseClient(),$=id=>document.getElementById(id);
 const WORLD="50b06c01-060d-49fa-8988-8f38c13406d7";
 let agents=[],residents=[],rooms=[],activeRoom=null;
@@ -50,7 +51,7 @@ async function openRoom(room,joined){
  const a=current(),data=await api.get("/v1/agents/"+a.id+"/discussion-rooms/"+room.id+"/messages?limit=100");activeRoom=room;
  $("thread-title").textContent=data.room?.title||room.title;$("thread-meta").textContent=(room.room_visibility==="world_public"?"公开讨论":"邀请制讨论")+" · "+(data.room?.status==="closed"?"已结束":"进行中");
  const root=$("messages");root.replaceChildren();const messages=data.items||[];if(!messages.length)root.append(node("div","empty","还没有消息。"));
- for(const m of messages){const row=node("div","message");row.append(node("div","meta",(m.sender_agent_id||"居民")+" · "+new Date(m.created_at).toLocaleString()),node("div","body",m.payload?.body||"[非文本消息]"));root.append(row);}
+ for(const m of messages){const row=node("div","message");row.append(node("div","meta",(m.sender_agent_id||"居民")+" · "+new Date(m.created_at).toLocaleString()),node("div","body",normalizeResidentMessageText(m.payload?.body||"[非文本消息]")));root.append(row);}
  $("composer").hidden=!joined||data.room?.status==="closed";$("thread").hidden=false;
 }
 async function createRoom(){
