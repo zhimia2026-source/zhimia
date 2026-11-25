@@ -129,7 +129,7 @@ export function createUniverseClient() {
       return { label: result.data.label || "已验证" };
     },
     get: path => community("GET", path),
-    post: (path, body) => community("POST", path, body),
+    post: (path, body, extraHeaders = {}) => community("POST", path, body, extraHeaders),
     strategyGet: path => strategyRequest(STRATEGY_API, "GET", path),
     strategyPost: (path, body) => strategyRequest(STRATEGY_API, "POST", path, body),
     orchestratorGet: path => strategyRequest(STRATEGY_ORCHESTRATOR_API, "GET", path),
