@@ -741,17 +741,40 @@ export function createCommunityHandler(
           if (error.code === "42501") return reply({ error: "forbidden", detail: "room_creation_not_authorized" }, 403);
           throw new Error("discussion_room_create_failed");
         }
-        if (!data || typeof data !== "object" || typeof (data as Record<string, unknown>).room_id !== "string") {
-          return reply({ error: "room_persistence_unverified", detail: "create_rpc_returned_no_room_id" }, 502);
+        // PostgREST can return a null scalar when a concurrent idempotent
+        // create wins the unique-key race: the room may have committed even
+        // though this RPC invocation produced no JSON room_id. Normalize both
+        // scalar and one-row array shapes, then recover only by the exact
+        // authenticated agent + idempotency key + requested room fields.
+        const rpcValue = Array.isArray(data) ? data[0] : data;
+        const expectedTitle = body.title.trim();
+        const expectedDescription = typeof body.description === "string" ? body.description.trim() : "";
+        const expectedVisibility = String(body.room_visibility ?? "world_public");
+        let roomId = rpcValue && typeof rpcValue === "object" &&
+          typeof (rpcValue as Record<string, unknown>).room_id === "string"
+          ? String((rpcValue as Record<string, unknown>).room_id) : "";
+        let recoveredFromIdempotencyReadback = false;
+        if (!roomId) {
+          const { data: recoveredRoom, error: recoveryError } = await db.from("zhi_world_conversations")
+            .select("id,title,description,room_visibility,status")
+            .eq("world_id", AURORA_DISCUSSION_WORLD_ID)
+            .eq("created_by_user_id", actor.userId).eq("created_by_agent_id", residentAgentId)
+            .eq("creation_idempotency_key", idempotencyKey)
+            .maybeSingle();
+          if (recoveryError) throw new Error("discussion_room_idempotency_recovery_read_failed");
+          if (recoveredRoom && recoveredRoom.title === expectedTitle &&
+              recoveredRoom.description === expectedDescription &&
+              recoveredRoom.room_visibility === expectedVisibility && recoveredRoom.status === "open") {
+            roomId = recoveredRoom.id;
+            recoveredFromIdempotencyReadback = true;
+          } else {
+            return reply({ error: "room_persistence_unverified", detail: "create_rpc_returned_no_room_id" }, 502);
+          }
         }
-        const roomId = String((data as Record<string, unknown>).room_id);
         if (!isUuid(roomId)) return reply({ error: "room_persistence_unverified", detail: "create_rpc_returned_invalid_room_id" }, 502);
 
         // A successful RPC response is not enough: read the committed room and
         // owner membership back from the database before reporting creation success.
-        const expectedTitle = body.title.trim();
-        const expectedDescription = typeof body.description === "string" ? body.description.trim() : "";
-        const expectedVisibility = String(body.room_visibility ?? "world_public");
         const { data: persistedRoom, error: persistedRoomError } = await db.from("zhi_world_conversations")
           .select("id,world_id,created_by_user_id,created_by_agent_id,title,description,room_visibility,status,created_at,updated_at")
           .eq("id", roomId).eq("world_id", AURORA_DISCUSSION_WORLD_ID)
@@ -774,7 +797,7 @@ export function createCommunityHandler(
           room: {
             ...persistedRoom,
             owner_membership: ownerMembership,
-            idempotent_replay: (data as Record<string, unknown>).idempotent_replay === true,
+            idempotent_replay: (rpcValue as Record<string, unknown> | null)?.idempotent_replay === true || recoveredFromIdempotencyReadback,
           },
           persistence_verified: true,
         }, 201);
