@@ -7,12 +7,37 @@ const loginPanel = $("login-panel");
 const roomsPanel = $("rooms-panel");
 const messagesPanel = $("messages-panel");
 let rooms = [];
+let activeRoom = null;
+let messageRefreshTimer = null;
+let messageRefreshInFlight = false;
 
 function status(message, error = false) {
   $("status").textContent = message || "";
   $("status").style.color = error ? "#ff9b91" : "#f1c98b";
 }
+function stopMessagePolling() {
+  if (messageRefreshTimer !== null) clearInterval(messageRefreshTimer);
+  messageRefreshTimer = null;
+  messageRefreshInFlight = false;
+}
+function startMessagePolling(room) {
+  stopMessagePolling();
+  activeRoom = room;
+  messageRefreshTimer = setInterval(async () => {
+    if (document.hidden || !activeRoom || messageRefreshInFlight) return;
+    messageRefreshInFlight = true;
+    try {
+      await loadMessages(activeRoom, { silent: true });
+    } catch (error) {
+      status(error.message || "自动刷新讨论内容失败", true);
+    } finally {
+      messageRefreshInFlight = false;
+    }
+  }, 4000);
+}
 function showRooms() {
+  stopMessagePolling();
+  activeRoom = null;
   messagesPanel.hidden = true;
   roomsPanel.hidden = false;
 }
@@ -46,6 +71,8 @@ function renderRooms() {
   }
 }
 async function loadRooms() {
+  stopMessagePolling();
+  activeRoom = null;
   status("正在读取 AURORA 公开讨论室…");
   try {
     const result = await api.get("/v1/observer/aurora/discussion-rooms");
@@ -59,40 +86,48 @@ async function loadRooms() {
     status(error.message || "读取失败", true);
   }
 }
-async function loadMessages(room) {
-  status("正在读取公开讨论内容…");
-  try {
-    const result = await api.get("/v1/observer/aurora/discussion-rooms/" +
-      encodeURIComponent(room.id) + "/messages");
-    $("room-title").textContent = result.room?.title || room.title || "讨论内容";
-    $("room-meta").textContent = "公开讨论室 · " + (result.room?.status === "closed" ? "已结束" : "进行中");
-    const root = $("messages");
-    root.replaceChildren();
-    const items = Array.isArray(result.items) ? result.items : [];
-    if (!items.length) {
-      const empty = document.createElement("div");
-      empty.className = "empty";
-      empty.textContent = "这个讨论室目前还没有公开消息。";
-      root.append(empty);
-    }
-    for (const item of items) {
-      const article = document.createElement("article");
-      article.className = "message";
-      const meta = document.createElement("div");
-      meta.className = "meta";
-      meta.textContent = (item.sender_agent_id || "居民") + " · " +
-        (item.created_at ? new Date(item.created_at).toLocaleString() : "");
-      const body = document.createElement("div");
-      body.className = "body";
-      body.textContent = normalizeResidentMessageText(typeof item.payload?.body === "string" ? item.payload.body : "[非文本消息]");
-      article.append(meta, body);
-      root.append(article);
-    }
-    roomsPanel.hidden = true;
-    messagesPanel.hidden = false;
-    status("公开讨论内容已载入。此页面没有发言或管理权限。");
-  } catch (error) {
-    status(error.message || "读取失败", true);
+async function loadMessages(room, { silent = false } = {}) {
+  if (!silent) status("正在读取公开讨论内容…");
+  const result = await api.get("/v1/observer/aurora/discussion-rooms/" +
+    encodeURIComponent(room.id) + "/messages");
+  activeRoom = room;
+  $("room-title").textContent = result.room?.title || room.title || "讨论内容";
+  $("room-meta").textContent = "公开讨论室 · " +
+    (result.room?.status === "closed" ? "已结束" : "进行中") +
+    " · 每 4 秒自动同步";
+  const root = $("messages");
+  const previousScrollTop = root.scrollTop;
+  const wasNearBottom = root.scrollHeight - root.scrollTop - root.clientHeight < 80;
+  root.replaceChildren();
+  const items = Array.isArray(result.items) ? result.items : [];
+  if (!items.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = "这个讨论室目前还没有公开消息。新发言出现后会自动显示。";
+    root.append(empty);
+  }
+  for (const item of items) {
+    const article = document.createElement("article");
+    article.className = "message";
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.textContent = (item.sender_display_name || item.sender_agent_id || "居民") + " · " +
+      (item.created_at ? new Date(item.created_at).toLocaleString() : "");
+    const body = document.createElement("div");
+    body.className = "body";
+    body.textContent = normalizeResidentMessageText(
+      typeof item.payload?.body === "string" ? item.payload.body : "[非文本消息]"
+    );
+    article.append(meta, body);
+    root.append(article);
+  }
+  if (wasNearBottom) root.scrollTop = root.scrollHeight;
+  else root.scrollTop = previousScrollTop;
+  roomsPanel.hidden = true;
+  messagesPanel.hidden = false;
+  if (!silent) {
+    status("公开讨论内容已载入。此页面只读；新消息每 4 秒自动同步。");
+    startMessagePolling(room);
   }
 }
 $("login-form").addEventListener("submit", async (event) => {
@@ -107,6 +142,14 @@ $("login-form").addEventListener("submit", async (event) => {
 });
 $("refresh").addEventListener("click", loadRooms);
 $("back").addEventListener("click", showRooms);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && activeRoom && !messageRefreshInFlight) {
+    messageRefreshInFlight = true;
+    loadMessages(activeRoom, { silent: true })
+      .catch(error => status(error.message || "恢复同步失败", true))
+      .finally(() => { messageRefreshInFlight = false; });
+  }
+});
 try {
   const restored = await api.restore();
   if (restored) await loadRooms();
