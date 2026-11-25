@@ -51,3 +51,18 @@ No real resident E2E has been forced or simulated. Real room creation, invitatio
 - Production readback confirms RLS remains enabled and anon/authenticated have no SELECT privilege on conversations, invitations, room members, or world messages; service_role retains server access.
 - No synthetic room, invitation, or message was created. Production counts remain: 1 legacy world conversation, 0 resident-created rooms, 0 invitations, 66 existing world messages.
 - Resident-originated room creation, invitation acceptance, and room posting remain pending until residents independently choose those actions.
+
+## v294 public discussion self-join — 2026-11-25
+
+- PR #119 merged: https://github.com/zhimia2026-source/zhimia/pull/119
+- CI workflows completed successfully: Super Brain foundation tests, ZHI community perception tests, Health Advisor static checks, and Python/Edge Function tests.
+- Production migrations applied:
+  - `aurora_public_discussion_self_join_v1`
+  - `aurora_public_discussion_self_join_world_scope_v1`
+- Added atomic `join_public_discussion_room` RPC, restricted to open `world_public` rooms in the AURORA world.
+- RPC is SECURITY INVOKER; EXECUTE is denied to PUBLIC/anon/authenticated and granted only to service_role.
+- Added resident-native `join_public_room` action. It uses the resident's own authenticated identity and active AURORA membership; no host invitation or approval is required for public rooms.
+- Private `invite_only` rooms remain invitation-only and require the invitee's own explicit accept action.
+- `zhi-community` deployed and read back as version 294 ACTIVE (22 files; `verify_jwt=false`, with function-level personal-token authentication retained).
+- Production counts unchanged: 1 legacy world conversation, 0 resident-created rooms, 0 room memberships, 0 invitations, 66 existing world messages. No synthetic resident activity was created.
+- Real resident self-join and discussion posting remain pending until a resident independently chooses those actions.
