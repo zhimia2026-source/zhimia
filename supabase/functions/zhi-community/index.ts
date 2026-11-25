@@ -936,6 +936,7 @@ export function createCommunityHandler(
         const body = await readBody(req);
         const requestId = req.headers.get("idempotency-key")?.trim();
         if (!isText(body.body, 8000) || !requestId || requestId.length > 200) return reply({ error: "invalid_argument", detail: "body_and_idempotency_key_required" }, 400);
+        const messageBody = body.body as string;
         const requestHash = await sha256(residentAgentId + ":" + roomId + ":" + requestId);
         const requestUuid = requestHash.slice(0,8)+"-"+requestHash.slice(8,12)+"-4"+requestHash.slice(13,16)+"-a"+requestHash.slice(17,20)+"-"+requestHash.slice(20,32);
         const { data: existing, error: existingError } = await db.from("zhi_world_messages")
@@ -951,7 +952,7 @@ export function createCommunityHandler(
             .eq("id", expectedMessageId).eq("conversation_id", roomId)
             .eq("sender_agent_id", residentAgentId).eq("request_id", requestUuid).maybeSingle();
           if (persistedMessageError) throw new Error("discussion_room_message_persistence_read_failed");
-          if (!persistedMessage || persistedMessage.payload?.body !== body.body.trim()) {
+          if (!persistedMessage || persistedMessage.payload?.body !== messageBody.trim()) {
             return reply({ error: "message_persistence_unverified" }, 502);
           }
           return reply({
@@ -961,18 +962,18 @@ export function createCommunityHandler(
           }, idempotentReplay ? 200 : 201);
         };
         if (existing) {
-          if (existing.payload?.body !== body.body.trim()) return reply({ error: "conflict", detail: "idempotency_payload_mismatch" }, 409);
+          if (existing.payload?.body !== messageBody.trim()) return reply({ error: "conflict", detail: "idempotency_payload_mismatch" }, 409);
           return await confirmPersistedMessage(existing.id, true);
         }
         const { data: message, error: messageError } = await db.from("zhi_world_messages").insert({
           conversation_id: roomId, sender_user_id: null, sender_agent_id: residentAgentId,
-          request_id: requestUuid, message_kind: "text", payload: { body: body.body.trim() },
+          request_id: requestUuid, message_kind: "text", payload: { body: messageBody.trim() },
         }).select("id,conversation_id,sender_agent_id,message_kind,payload,created_at").single();
         if (messageError?.code === "23505") {
           const { data: replay, error: replayError } = await db.from("zhi_world_messages")
             .select("id,conversation_id,sender_agent_id,message_kind,payload,created_at")
             .eq("conversation_id", roomId).eq("sender_agent_id", residentAgentId).eq("request_id", requestUuid).maybeSingle();
-          if (replayError || !replay || replay.payload?.body !== body.body.trim()) return reply({ error: "conflict", detail: "idempotency_payload_mismatch" }, 409);
+          if (replayError || !replay || replay.payload?.body !== messageBody.trim()) return reply({ error: "conflict", detail: "idempotency_payload_mismatch" }, 409);
           return await confirmPersistedMessage(replay.id, true);
         }
         if (messageError || !message) throw new Error("discussion_room_message_write_failed");
