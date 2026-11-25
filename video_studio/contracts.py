@@ -69,7 +69,7 @@ class VideoPlan:
         if not isinstance(aspect, str) or aspect not in {"9:16", "16:9", "1:1", "4:5"}:
             raise VideoPlanError("unsupported_aspect_ratio")
         fps = raw.get("fps", 30)
-        if isinstance(fps, bool) or fps not in {24, 25, 30, 50, 60}:
+        if isinstance(fps, bool) or not isinstance(fps, int) or fps not in {24, 25, 30, 50, 60}:
             raise VideoPlanError("unsupported_fps")
         resolution = raw.get("resolution", "1080x1920" if aspect == "9:16" else "1920x1080")
         if not isinstance(resolution, str) or resolution not in {"720x1280", "1080x1920", "1280x720", "1920x1080", "1080x1080"}:
