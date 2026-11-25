@@ -10,7 +10,7 @@ on:
       - "tests/test_windows_video_worker.py"
       - ".github/workflows/video-studio-tests.yml"
   push:
-    branches: ["feature/aurora-video-studio-v1"]
+    branches: [main, "feature/aurora-video-studio-v1"]
     paths:
       - "video_studio/**"
       - "windows_worker/**"
