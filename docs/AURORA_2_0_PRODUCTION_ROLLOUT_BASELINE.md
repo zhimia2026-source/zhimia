@@ -14,13 +14,13 @@ The term "presence" is an engineering property to be evidenced through identity 
 
 ## 2. Production target and verified inventory
 
-Read-only inspection of production on 2026-11-25 confirmed:
+Read-only inspection of production on 2026-11-25 confirmed. The resident count is based on an active, non-revoked membership join to active Agent records for the AURORA world, not on the global Agent table:
 
 | Component | Observed production state |
 |---|---|
 | Supabase project | `lvxmygrgqtmzqgailmyl` (ZHIMIA, ap-southeast-1, PostgreSQL 17, ACTIVE_HEALTHY) |
 | GitHub repository | `zhimia2026-source/zhimia`, default branch `main` |
-| Active Agent identities | 13 rows with `zhi_agents.status = 'active'`; this is not by itself a verified count of AURORA resident memberships |
+| Active AURORA memberships | 13 active membership rows for the production world; 13 distinct active Agent identities including the prototype; **12 active non-prototype resident Agents** after excluding display name `MIA` |
 | `zhi-community` | ACTIVE, version 288 |
 | `zhi-social-scheduler` | ACTIVE, version 38 |
 | `zhi-ecosystem-engine` | ACTIVE, version 15 |
