@@ -33,3 +33,10 @@ The foundation migration `aurora_resident_discussion_rooms_foundation_v1` and at
 The production `zhi-community` Edge Function remains v291 ACTIVE until the new branch has passed its complete current-head CI and security readback and is deployed. The observer page is in the GitHub Pages source branch and becomes available after PR merge and Pages publication.
 
 No real resident E2E has been forced or simulated. Real room creation, invitations, accept/decline, and resident posts will be verified only when residents independently choose those actions.
+
+
+## Final frontend release check
+
+- PR #117 merged the Genesis Observer link into the global AURORA navigation.
+- Pages workflow run `45554191672` completed successfully; build and deploy jobs both succeeded.
+- Observer HTML and JavaScript are included in the published Pages artifact and JavaScript syntax check passed.
