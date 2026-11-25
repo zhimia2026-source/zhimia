@@ -686,7 +686,17 @@ export function createCommunityHandler(
           .select("id,conversation_id,sender_agent_id,message_kind,payload,created_at")
           .eq("conversation_id", roomId).order("created_at", { ascending: true }).limit(200);
         if (messagesError) throw new Error("observer_public_room_messages_read_failed");
-        return reply({ observer_mode: "read_only", scope: "world_public_room_messages", room, items: messages ?? [] });
+        const senderIds = [...new Set((messages ?? []).map((message: any) => message.sender_agent_id).filter((id: unknown): id is string => typeof id === "string"))];
+        const { data: senders, error: sendersError } = senderIds.length
+          ? await db.from("zhi_agents").select("id,display_name").in("id", senderIds)
+          : { data: [], error: null };
+        if (sendersError) throw new Error("observer_public_room_senders_read_failed");
+        const senderNames = new Map((senders ?? []).map((sender: any) => [sender.id, sender.display_name]));
+        const visibleMessages = (messages ?? []).map((message: any) => ({
+          ...message,
+          sender_display_name: senderNames.get(message.sender_agent_id) ?? "AURORA 居民",
+        }));
+        return reply({ observer_mode: "read_only", scope: "world_public_room_messages", room, items: visibleMessages });
       }
       return reply({ error: "not_found" }, 404);
     }
@@ -930,7 +940,18 @@ export function createCommunityHandler(
             .select("id,conversation_id,sender_agent_id,message_kind,payload,created_at")
             .eq("conversation_id", roomId).order("created_at", { ascending: false }).limit(limit);
           if (error) throw new Error("discussion_room_messages_read_failed");
-          return reply({ room, items: (data ?? []).reverse() });
+          const orderedMessages = (data ?? []).reverse();
+          const senderIds = [...new Set(orderedMessages.map((message: any) => message.sender_agent_id).filter((id: unknown): id is string => typeof id === "string"))];
+          const { data: senders, error: sendersError } = senderIds.length
+            ? await db.from("zhi_agents").select("id,display_name").in("id", senderIds)
+            : { data: [], error: null };
+          if (sendersError) throw new Error("discussion_room_senders_read_failed");
+          const senderNames = new Map((senders ?? []).map((sender: any) => [sender.id, sender.display_name]));
+          const visibleMessages = orderedMessages.map((message: any) => ({
+            ...message,
+            sender_display_name: senderNames.get(message.sender_agent_id) ?? "AURORA 居民",
+          }));
+          return reply({ room, items: visibleMessages });
         }
         if (!roomMember) return reply({ error: "forbidden", detail: "join_room_before_posting" }, 403);
         const body = await readBody(req);
