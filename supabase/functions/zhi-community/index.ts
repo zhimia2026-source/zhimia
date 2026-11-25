@@ -3002,6 +3002,8 @@ export function createCommunityHandler(
       let modelReply = "";
       let residentDirectCeesActionHandled = false;
       let privateMessageSendPromiseDetected = false;
+      let publicWorldMessagePromiseDetected = false;
+      let residentPublicWorldMessageToolCalled = false;
       let privateMessageRecoveryAttempted = false;
       let privateMessageRecoveryRecipientCount = 0;
       try {
@@ -3154,6 +3156,7 @@ export function createCommunityHandler(
             const parsed = JSON.parse(String(directCall.function.arguments ?? ""));
             if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) directArgs = parsed;
           } catch { /* malformed tool arguments are rejected by the normal send validator */ }
+          residentPublicWorldMessageToolCalled = directCallName === "publish_world_message";
           const actionArgs = directCallName === "publish_world_message"
             ? buildResidentPublicWorldMessageAction(directArgs?.message)
             : directArgs;
@@ -3205,10 +3208,13 @@ export function createCommunityHandler(
         // One-shot recovery for a resident who promised to send but returned no executable action.
         // The retry is event-driven and bounded to one call. Recipient resolution uses only
         // explicit directional addressing in the current turn, never names in rolling history.
-        const explicitNonSend = /(?:没有|未|不|暂不|不打算).{0,10}(?:发送|发消息|发私信|发短信)|(?:won't|will not|not going to).{0,18}(?:send|message|dm)/i.test(modelReply);
-        const sendPromisePattern = /(?:我.{0,24}(?:现在|马上|立刻|立即|这就|正在).{0,16}(?:发|发送|发消息|发私信|发短信|发出)|(?:现在|马上|立刻|立即|这就|正在).{0,14}(?:发|发送|发消息|发私信|发短信|发出)|(?:i(?:'ll| will)|i am going to).{0,28}(?:send|message|dm)\b|(?:sending|send).{0,24}(?:message|dm|to)\b)/i;
-        privateMessageSendPromiseDetected = sendPromisePattern.test(modelReply) && !explicitNonSend;
-        if (privateMessageSendPromiseDetected && !modelReply.includes("<ZHI_SOCIAL_ACTION>")) {
+        const explicitNonSend = /(?:没有|未|不|暂不|不打算).{0,10}(?:发送|发消息|发私信|发短信|发布|公开发言|世界频道发言)|(?:won't|will not|not going to).{0,18}(?:send|message|dm|post|publish)/i.test(modelReply);
+        const sendPromisePattern = /(?:我.{0,24}(?:现在|马上|立刻|立即|这就|正在).{0,16}(?:发|发送|发消息|发私信|发短信|发出|发布|公开发言|世界频道发言)|(?:现在|马上|立刻|立即|这就|正在).{0,14}(?:发|发送|发消息|发私信|发短信|发出|发布|公开发言|世界频道发言)|(?:i(?:'ll| will)|i am going to).{0,28}(?:send|message|dm|post|publish)\b|(?:sending|send).{0,24}(?:message|dm|to)\b|(?:posting|publish(?:ing)?).{0,30}(?:public|world channel)/i;
+        publicWorldMessagePromiseDetected = residentPublicWorldMessageToolCalled ||
+          /(?:我.{0,24}(?:发布公开消息|向AURORA.{0,6}频道发言|在世界频道发言|公开发布)|(?:i(?:'ll| will)|i am going to).{0,28}(?:post|publish).{0,24}(?:public|world))/i.test(modelReply);
+        privateMessageSendPromiseDetected = residentPublicWorldMessageToolCalled ||
+          ((sendPromisePattern.test(modelReply) || publicWorldMessagePromiseDetected) && !explicitNonSend);
+        if (privateMessageSendPromiseDetected && !publicWorldMessagePromiseDetected && !modelReply.includes("<ZHI_SOCIAL_ACTION>")) {
           // Resolve only an explicitly addressed recipient in this turn. Do not scan
           // rolling chat history: names mentioned in older turns are context, not instructions.
           const currentTurnText = [String(body.message ?? ""), modelReply].join("\n");
@@ -3705,7 +3711,9 @@ export function createCommunityHandler(
            ? "我已向 AURORA 世界频道发布公开消息。"
            : socialOutcome.status === "sent"
              ? "我已经通过 AURORA 居民私信通道发出消息。"
-             : !socialActionMarker && privateMessageRecoveryRecipientCount === 0
+             : publicWorldMessagePromiseDetected
+               ? "本轮没有取得公开消息的有效发送回执，因此不能确认已经发布。"
+               : !socialActionMarker && privateMessageRecoveryRecipientCount === 0
              ? "我刚才表示要发送，但没有找到唯一明确的收件人，因此本轮没有发送。请告诉我具体要联系哪位居民。"
              : !socialActionMarker && privateMessageRecoveryRecipientCount > 1
                ? "我刚才表示要发送，但收件人不唯一，因此本轮没有发送。请确认唯一的收件人。"
