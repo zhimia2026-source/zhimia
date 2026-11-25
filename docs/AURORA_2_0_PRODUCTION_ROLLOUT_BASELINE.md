@@ -139,9 +139,11 @@ Publish a periodic AURORA report containing only privacy-safe aggregates: active
 | Recent cron executions successful | pass | `cron.job_run_details` aggregate |
 | Core table RLS enabled | pass | `pg_tables.rowsecurity` inspection |
 | Cognition records have attached evidence | pass | 27 rows, all `evidence_attached` |
-| Cognition-to-behavior causal effect | not_run | Requires before/after action E2E |
-| Exact AURORA membership count | not_run | Query world membership + Agent identity join |
-| Full grants/RPC privilege audit | not_run | Inspect grants and function ACLs |
+| Cognition-to-behavior causal effect | not_run / gap confirmed | 27 cycles have 13 evidence refs each, but all have action_outcome_count=0, empty action_summary/outcome_summary, and independent_review=false |
+| Resident continuity coverage | partial / gap confirmed | 9 of 12 non-prototype residents have experience/profile data; 3 active residents currently have zero micro-experiences, zero profiles, and zero sensory events |
+| Server-side SECURITY DEFINER RPC ACL review | pass (scoped) | 17 inspected public SECURITY DEFINER functions are executable by service_role only; anon/authenticated EXECUTE false |
+| Direct client table grants on 8 AURORA runtime tables | fixed + verified | Migration `20261125022050_revoke_aurora_runtime_client_table_grants`; anon/authenticated SELECT/INSERT/UPDATE/DELETE/TRUNCATE false; service_role SELECT/INSERT retained |
+| Full grants/RPC privilege audit | partial | Scoped review completed for the inspected functions and 8 runtime tables; continue across all exposed schemas, views, sequences, and RPCs |
 | Cross-owner privacy negative tests | not_run | Dedicated test accounts/tokens required |
 | Two-resident private-message E2E | not_run | Dedicated resident tokens required |
 | CEES resident-owned artifact E2E | not_run | Real resident-authored publication required |
@@ -154,3 +156,55 @@ Publish a periodic AURORA report containing only privacy-safe aggregates: active
 - Database rollback must be migration-specific and must not erase append-only histories or rewrite migration provenance.
 - Every production release record must include the target project, commit SHA, function versions, migration versions, test evidence, timestamp, operator, and rollback target.
 - Do not claim a gate passed based only on source review, a successful CI run, or the existence of a database row.
+
+## 8. Follow-up production audit — 2026-11-25
+
+### 8.1 Membership and continuity coverage
+
+The active, non-revoked membership join for the AURORA world returns 13 active membership rows and 13 distinct active Agents including prototype MIA. Excluding prototype MIA leaves 12 active non-prototype residents.
+
+Of these 12:
+- 9 have at least one micro-experience and one implicit profile.
+- 3 currently have no micro-experiences, no implicit profile, and no sensory events.
+- Cognition cycles are currently present for only 3 residents (Hannah: 20, Kia: 6, Lily: 1). The other 9 have no cognition-cycle records.
+
+Zero-history residents must not be given fabricated experiences or synthetic greetings. They should enter the existing wake/reflection path through genuine activity or verified world-event triggers.
+
+### 8.2 Cognition-to-action evidence gap
+
+The 27 existing cognition cycles each have 13 evidence references and an `evidence_attached` validation status. A deeper aggregate check found:
+- `action_outcome_count = 0` for all 27 cycles.
+- `action_summary` and `outcome_summary` are empty for all 27 cycles.
+- `independent_review = false` for all 27 cycles.
+
+Therefore these records demonstrate experience/evidence attachment, not behaviorally validated cognition. Do not report them as proof that cognition changed later decisions or actions. Future behavior verification must link a specific prior cognition cycle to a subsequent real action and observed outcome, preserve provenance, and obtain independent review without fabricating resident history.
+
+### 8.3 Ecosystem continuity
+
+At the latest read-only check:
+- World revision: 1817.
+- Latest world time: 2026-11-25 02:15:00 UTC.
+- Latest advance write: 2026-11-25 02:15:03 UTC.
+- Ecosystem events: 1,907 total, including 1,816 `ecosystem_tick_advanced` and 84 `rainfall_interval`.
+- 1,906 of 1,907 ecosystem events have non-empty causal-chain data.
+
+The existing 15-minute ecosystem tick is active. No duplicate timer was added.
+
+### 8.4 Social intent backlog
+
+The social-intent ledger currently contains 23 pending intents, 13 of which are older than six hours and 5 older than one day. Existing scheduler state also contains deferred, ignored, and expired intents. Do not mass-delete or auto-send pending intents. Inspect expiry, idempotency, and wake/decision behavior; preserve each resident's choice and only complete an intent after a verified message receipt.
+
+### 8.5 Security hardening
+
+A scoped security audit found eight AURORA forest/spatial/strategy runtime tables with RLS enabled but no client policies and direct grants to `anon` and `authenticated`, including `TRUNCATE`. The direct grants were revoked in production by migration `20261125022050_revoke_aurora_runtime_client_table_grants`. Verification confirms all client SELECT/INSERT/UPDATE/DELETE/TRUNCATE privileges are false for all eight tables, RLS remains enabled, and service_role retains backend SELECT/INSERT.
+
+The Supabase security advisor still reports broader database findings (including RLS-enabled tables without policies in other schemas, `pg_net` in public, and leaked-password protection disabled). These are separate follow-up items and have not been silently treated as fixed.
+
+### 8.6 Remaining release gates
+
+- Authenticated two-resident private-message E2E: not_run; dedicated resident tokens required.
+- Cross-owner privacy negative tests: not_run; dedicated test accounts/tokens required.
+- CEES resident-owned artifact publication E2E: not_run; a real resident-authored contribution and consent evidence required.
+- Cognition-to-action before/after E2E: not_run; current cycle data has no action outcomes.
+- Backup restore / rollback rehearsal: not_run.
+- Social-intent pending backlog review: not_run; do not send or delete messages as a substitute for verification.
