@@ -4087,7 +4087,7 @@ export function createCommunityHandler(
            }
          }
        }
-       if (socialActionMarker) {
+       if (socialActionMarker && !socialDecisionMarker) {
          modelReply = modelReply.replace(socialActionMarker[0], "").trim();
          try {
            const parsedAction = JSON.parse(socialActionMarker[1]);
