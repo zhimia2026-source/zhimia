@@ -3564,7 +3564,7 @@ export function createCommunityHandler(
         const forgedDiscussionReceiptPattern = /(?:\\\\n|\\r?\\n|\\n){0,4}\\s*[（(]讨论室系统回执：[\\s\\S]{0,1800}?[）)]/g;
         const hadModelAuthoredDiscussionReceipt = modelReply.includes("讨论室系统回执");
         modelReply = modelReply.replace(forgedDiscussionReceiptPattern, "").trim();
-        const claimsDiscussionActionSucceeded = /(?:room_id\\s*[:：]|成功创建|已经创建|已创建|创建完成|成功加入|已经加入|已加入讨论室|已发送讨论室消息)/i.test(modelReply);
+        const claimsDiscussionActionSucceeded = /(?:room_id\\s*[:：]|成功创建|已经创建|已创建|创建完成|成功加入|已经加入|已加入讨论室|已发送讨论室消息|(?:我|本人)?(?:已经|已|刚刚|刚才)?(?:在讨论室|在这个讨论室|在房间里|在房间)?(?:发言了|发过言|发表了|发布了消息|发送了消息)|(?:讨论室|房间)(?:里|中)?(?:已经|已|刚刚|刚才)?(?:有了我的发言|出现了我的消息|收到我的消息))/i.test(modelReply);
         if (directDiscussionCalls.length === 0 && (hadModelAuthoredDiscussionReceipt || claimsDiscussionActionSucceeded)) {
           modelReply = "我刚才的文字不能证明讨论室操作已经执行。本轮没有收到可执行的讨论室工具调用，因此没有创建、加入或发送讨论室消息。";
           console.warn(JSON.stringify({
