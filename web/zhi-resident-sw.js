@@ -5,6 +5,7 @@ const SHELL = [
   "./aurora-shell.js",
   "./zhi-resident.js",
   "./zhi-universe-client.js",
+  "./message-text.js",
   "./zhi-resident.webmanifest",
   "./zhi-resident-icon.svg"
 ];
