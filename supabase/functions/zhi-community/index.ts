@@ -724,7 +724,7 @@ export function createCommunityHandler(
       if (discussionRoomRoot && parts.length === 4 && req.method === "POST") {
         const body = await readBody(req);
         if (!isText(body.title, 180) || (body.description !== undefined && (typeof body.description !== "string" || body.description.length > 4000)) ||
-            !["world_public","invite_only"].includes(String(body.room_visibility ?? "invite_only"))) {
+            !["world_public","invite_only"].includes(String(body.room_visibility ?? "world_public"))) {
           return reply({ error: "invalid_argument", detail: "invalid_room_fields" }, 400);
         }
         const idempotencyKey = req.headers.get("idempotency-key")?.trim() ?? "";
@@ -733,7 +733,7 @@ export function createCommunityHandler(
           p_world_id: AURORA_DISCUSSION_WORLD_ID, p_owner_user_id: actor.userId,
           p_owner_agent_id: residentAgentId, p_title: body.title.trim(),
           p_description: typeof body.description === "string" ? body.description.trim() : "",
-          p_room_visibility: String(body.room_visibility ?? "invite_only"),
+          p_room_visibility: String(body.room_visibility ?? "world_public"),
           p_idempotency_key: idempotencyKey,
         });
         if (error) {
@@ -771,7 +771,7 @@ export function createCommunityHandler(
         const { data, error } = await db.from("zhi_world_conversation_invitations")
           .select("id,conversation_id,world_id,inviter_agent_id,status,created_at,expires_at")
           .eq("target_user_id", actor.userId).eq("target_agent_id", residentAgentId)
-          .in("status", ["pending","accepted","declined"]).order("created_at", { ascending: false }).limit(50);
+          .in("status", ["pending","accepted","declined"]).or("status.neq.pending,expires_at.gt." + new Date().toISOString()).order("created_at", { ascending: false }).limit(50);
         if (error) throw new Error("discussion_invitation_inbox_read_failed");
         return reply({ items: data ?? [] });
       }
@@ -3346,14 +3346,14 @@ export function createCommunityHandler(
                   type: "function",
                   function: {
                     name: "manage_discussion_room",
-                    description: "Use only when you independently choose a discussion-room action. You may create or discover rooms, invite an exact resident, inspect your invitations, accept or decline an invitation, read or post in a room, leave, or close your own room. An invitation never joins its target; only that resident's own accept action joins. Never post private conversations or private memories. You may also choose no action.",
+                    description: "Use only when you independently choose a discussion-room action. You may create or discover rooms, invite an exact resident, inspect your invitations, accept or decline an invitation, read or post in a room, leave, or close your own room. New rooms are world_public by default so residents can discover and join them; choose invite_only only when you intentionally want a private room. An invitation never joins its target; only that resident's own accept action joins. Never post private conversations or private memories. You may also choose no action.",
                     parameters: {
                       type: "object", additionalProperties: false,
                       properties: {
                         action: { type: "string", enum: ["create_room","list_rooms","invite_resident","list_invitations","respond_invitation","read_messages","post_message","leave_room","close_room"] },
                         title: { type: "string", minLength: 1, maxLength: 180 },
                         description: { type: "string", maxLength: 4000 },
-                        room_visibility: { type: "string", enum: ["world_public","invite_only"] },
+                        room_visibility: { type: "string", enum: ["world_public","invite_only"], description: "Defaults to world_public; choose invite_only only for a deliberately private, invitation-only room." },
                         room_id: { type: "string" },
                         target_agent_id: { type: "string" },
                         invitation_id: { type: "string" },
@@ -3462,7 +3462,7 @@ export function createCommunityHandler(
             switch (action) {
               case "create_room":
                 route = "/v1/agents/" + agentId + "/discussion-rooms";
-                payload = { title: parsed.title, description: parsed.description ?? "", room_visibility: parsed.room_visibility ?? "invite_only" };
+                payload = { title: parsed.title, description: parsed.description ?? "", room_visibility: parsed.room_visibility ?? "world_public" };
                 break;
               case "list_rooms":
                 route = "/v1/agents/" + agentId + "/discussion-rooms"; method = "GET"; break;
