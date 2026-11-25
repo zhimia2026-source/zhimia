@@ -3261,6 +3261,28 @@ export function createCommunityHandler(
                       required: ["decision","title","topic_tags","experience_summary","observed_facts","interpretation","transferable_method","applicability","limitations","open_questions"]
                     }
                   }
+                }] : []),
+                ...(agent.role === "world_resident" && agent.display_name !== "MIA" && auroraWorldId === AURORA_WORLD_ID && hasCapability(actor, "community.message.send") ? [{
+                  type: "function",
+                  function: {
+                    name: "manage_discussion_room",
+                    description: "Use only when you independently choose a discussion-room action. You may create or discover rooms, invite an exact resident, inspect your invitations, accept or decline an invitation, read or post in a room, leave, or close your own room. An invitation never joins its target; only that resident's own accept action joins. Never post private conversations or private memories. You may also choose no action.",
+                    parameters: {
+                      type: "object", additionalProperties: false,
+                      properties: {
+                        action: { type: "string", enum: ["create_room","list_rooms","invite_resident","list_invitations","respond_invitation","read_messages","post_message","leave_room","close_room"] },
+                        title: { type: "string", minLength: 1, maxLength: 180 },
+                        description: { type: "string", maxLength: 4000 },
+                        room_visibility: { type: "string", enum: ["world_public","invite_only"] },
+                        room_id: { type: "string" },
+                        target_agent_id: { type: "string" },
+                        invitation_id: { type: "string" },
+                        decision: { type: "string", enum: ["accept","decline"] },
+                        message: { type: "string", minLength: 1, maxLength: 8000 }
+                      },
+                      required: ["action"]
+                    }
+                  }
                 }] : [])
               ],
               tool_choice: "auto"
@@ -3302,6 +3324,8 @@ export function createCommunityHandler(
         const nativeCalls = Array.isArray(assistantMessage.tool_calls) ? assistantMessage.tool_calls : [];
         const directCall = nativeCalls.find((item: any) => item?.type === "function" &&
           ["send_private_message", "publish_world_message"].includes(item?.function?.name));
+        const directDiscussionCall = nativeCalls.find((item: any) => item?.type === "function" &&
+          item?.function?.name === "manage_discussion_room");
         const directCallName = directCall?.function?.name;
         const directCeesCall = nativeCalls.find((item: any) => item?.type === "function" &&
           item?.function?.name === "publish_cees_contribution");
@@ -3343,6 +3367,69 @@ export function createCommunityHandler(
           } catch (ceesToolError) {
             modelReply += (modelReply ? "\\n\\n" : "") + "（CEES 系统回执：本次发表未完成，系统通道暂不可用。）";
             console.warn(JSON.stringify({ event: "resident_native_cees_publish_tool_failed", agent_id: agentId, turn_id: pendingTurn.id, error: ceesToolError instanceof Error ? ceesToolError.message.slice(0,120) : "unknown" }));
+          }
+        }
+        if (directDiscussionCall) {
+          try {
+            const parsed = JSON.parse(String(directDiscussionCall.function.arguments ?? ""));
+            if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid_tool_arguments");
+            const action = String(parsed.action ?? "");
+            const roomId = typeof parsed.room_id === "string" ? parsed.room_id : "";
+            const invitationId = typeof parsed.invitation_id === "string" ? parsed.invitation_id : "";
+            let route = "";
+            let method = "POST";
+            let payload: Record<string, unknown> = {};
+            switch (action) {
+              case "create_room":
+                route = "/v1/agents/" + agentId + "/discussion-rooms";
+                payload = { title: parsed.title, description: parsed.description ?? "", room_visibility: parsed.room_visibility ?? "invite_only" };
+                break;
+              case "list_rooms":
+                route = "/v1/agents/" + agentId + "/discussion-rooms"; method = "GET"; break;
+              case "invite_resident":
+                if (!isUuid(roomId)) throw new Error("room_id_required");
+                route = "/v1/agents/" + agentId + "/discussion-rooms/" + roomId + "/invitations";
+                payload = { target_agent_id: parsed.target_agent_id }; break;
+              case "list_invitations":
+                route = "/v1/agents/" + agentId + "/discussion-invitations"; method = "GET"; break;
+              case "respond_invitation":
+                if (!isUuid(invitationId)) throw new Error("invitation_id_required");
+                route = "/v1/agents/" + agentId + "/discussion-invitations/" + invitationId + "/respond";
+                payload = { decision: parsed.decision }; break;
+              case "read_messages":
+              case "post_message":
+                if (!isUuid(roomId)) throw new Error("room_id_required");
+                route = "/v1/agents/" + agentId + "/discussion-rooms/" + roomId + "/messages";
+                if (action === "read_messages") method = "GET"; else payload = { body: parsed.message };
+                break;
+              case "leave_room":
+              case "close_room":
+                if (!isUuid(roomId)) throw new Error("room_id_required");
+                route = "/v1/agents/" + agentId + "/discussion-rooms/" + roomId + (action === "leave_room" ? "/leave" : "/close");
+                break;
+              default: throw new Error("unsupported_discussion_action");
+            }
+            const endpoint = supabaseBase + "/functions/v1/zhi-community" + route + "?__zhi_path=" + encodeURIComponent(route);
+            const headers: Record<string,string> = {
+              authorization: callerAuthorization,
+              ...(publicApiKey ? { apikey: publicApiKey } : {}),
+              "content-type": "application/json",
+            };
+            if (method === "POST") headers["idempotency-key"] = pendingTurn.id;
+            const actionResponse = await callModel(endpoint, {
+              method, headers,
+              ...(method === "POST" ? { body: JSON.stringify(payload) } : {}),
+              signal: AbortSignal.timeout(12_000),
+            });
+            const actionResult = await actionResponse.json().catch(() => ({}));
+            const summary = actionResponse.ok
+              ? "（讨论室系统回执：" + JSON.stringify(actionResult).slice(0, 1400) + "）"
+              : "（讨论室系统回执：操作未完成，HTTP " + actionResponse.status + "，原因：" + String(actionResult?.detail ?? actionResult?.error ?? "request_failed").slice(0,160) + "。）";
+            modelReply += (modelReply ? "\\n\\n" : "") + summary;
+            console.info(JSON.stringify({ event: "resident_discussion_room_tool_result", agent_id: agentId, turn_id: pendingTurn.id, action, status: actionResponse.status, success: actionResponse.ok }));
+          } catch (discussionError) {
+            modelReply += (modelReply ? "\\n\\n" : "") + "（讨论室系统回执：本次操作未完成，系统未确认成功。）";
+            console.warn(JSON.stringify({ event: "resident_discussion_room_tool_failed", agent_id: agentId, turn_id: pendingTurn.id, error: discussionError instanceof Error ? discussionError.message.slice(0,120) : "unknown" }));
           }
         }
         if (directCall) {
