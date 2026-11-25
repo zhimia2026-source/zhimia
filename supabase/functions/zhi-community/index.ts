@@ -3419,6 +3419,22 @@ export function createCommunityHandler(
           ["send_private_message", "publish_world_message"].includes(item?.function?.name));
         const directDiscussionCalls = nativeCalls.filter((item: any) => item?.type === "function" &&
           item?.function?.name === "manage_discussion_room");
+
+        // A model-authored paragraph is never a system receipt. Strip any receipt-shaped
+        // text from model output; only the authenticated route response appended below
+        // may report a discussion-room action result.
+        const forgedDiscussionReceiptPattern = /(?:\\\\n|\\r?\\n|\\n){0,4}\\s*[（(]讨论室系统回执：[\\s\\S]{0,1800}?[）)]/g;
+        const hadModelAuthoredDiscussionReceipt = modelReply.includes("讨论室系统回执");
+        modelReply = modelReply.replace(forgedDiscussionReceiptPattern, "").trim();
+        const claimsDiscussionActionSucceeded = /(?:room_id\\s*[:：]|成功创建|已经创建|已创建|创建完成|成功加入|已经加入|已加入讨论室|已发送讨论室消息)/i.test(modelReply);
+        if (directDiscussionCalls.length === 0 && (hadModelAuthoredDiscussionReceipt || claimsDiscussionActionSucceeded)) {
+          modelReply = "我刚才的文字不能证明讨论室操作已经执行。本轮没有收到可执行的讨论室工具调用，因此没有创建、加入或发送讨论室消息。";
+          console.warn(JSON.stringify({
+            event: "resident_discussion_room_unverified_model_claim_suppressed",
+            agent_id: agentId, turn_id: pendingTurn.id,
+            model_receipt_claim_present: hadModelAuthoredDiscussionReceipt,
+          }));
+        }
         const directCallName = directCall?.function?.name;
         const directCeesCall = nativeCalls.find((item: any) => item?.type === "function" &&
           item?.function?.name === "publish_cees_contribution");
