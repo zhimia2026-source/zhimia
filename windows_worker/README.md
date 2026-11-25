@@ -28,7 +28,7 @@ python windows_worker/aurora_video_worker.py diagnose
 python windows_worker/aurora_video_worker.py inspect-ui
 ```
 
-3. Optional media inventory:
+3. Run a combined, read-only preflight for a resident edit plan and workspace:
 
 ```powershell
 python windows_worker/aurora_video_worker.py scan-assets --workspace "$HOME\Videos\AURORA_Workspace"
