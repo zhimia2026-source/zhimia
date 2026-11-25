@@ -655,6 +655,42 @@ export function createCommunityHandler(
       await authenticateMiaFederationAgent(db, req, path);
     if (!actor) return reply({ error: "invalid_token" }, 401);
 
+    // Genesis Observer: creator-bound, read-only access to world-public discussion rooms only.
+    const observerRoomsPath = parts[0] === "v1" && parts[1] === "observer" &&
+      parts[2] === "aurora" && parts[3] === "discussion-rooms";
+    if (observerRoomsPath) {
+      if (req.method !== "GET") return reply({ error: "read_only_observer" }, 403);
+      const observerWorldId = "50b06c01-060d-49fa-8988-8f38c13406d7";
+      const { data: world, error: worldError } = await db.from("zhi_worlds")
+        .select("id,creator_user_id,status").eq("id", observerWorldId).maybeSingle();
+      if (worldError) throw new Error("observer_world_scope_read_failed");
+      if (!world || world.creator_user_id !== actor.userId) return reply({ error: "forbidden", detail: "genesis_creator_identity_required" }, 403);
+      if (parts.length === 4) {
+        const { data, error } = await db.from("zhi_world_conversations")
+          .select("id,title,description,created_by_agent_id,room_visibility,status,created_at,updated_at")
+          .eq("world_id", observerWorldId).eq("room_visibility", "world_public")
+          .in("status", ["open","closed"]).order("created_at", { ascending: false }).limit(100);
+        if (error) throw new Error("observer_public_rooms_read_failed");
+        return reply({ observer_mode: "read_only", scope: "world_public_discussion_rooms", items: data ?? [] });
+      }
+      if (parts.length === 6 && parts[5] === "messages") {
+        const roomId = parts[4];
+        if (!isUuid(roomId)) return reply({ error: "invalid_argument" }, 400);
+        const { data: room, error: roomError } = await db.from("zhi_world_conversations")
+          .select("id,title,description,room_visibility,status,created_at,updated_at")
+          .eq("id", roomId).eq("world_id", observerWorldId).eq("room_visibility", "world_public")
+          .in("status", ["open","closed"]).maybeSingle();
+        if (roomError) throw new Error("observer_public_room_read_failed");
+        if (!room) return reply({ error: "not_found" }, 404);
+        const { data: messages, error: messagesError } = await db.from("zhi_world_messages")
+          .select("id,conversation_id,sender_agent_id,message_kind,payload,created_at")
+          .eq("conversation_id", roomId).order("created_at", { ascending: true }).limit(200);
+        if (messagesError) throw new Error("observer_public_room_messages_read_failed");
+        return reply({ observer_mode: "read_only", scope: "world_public_room_messages", room, items: messages ?? [] });
+      }
+      return reply({ error: "not_found" }, 404);
+    }
+
     // Resident-led discussion rooms. Every request is bound to the authenticated
     // token owner, the exact resident agent, and that agent's active AURORA membership.
     const discussionRoomRoot = parts[0] === "v1" && parts[1] === "agents" &&
