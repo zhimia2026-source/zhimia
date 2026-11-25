@@ -3528,7 +3528,7 @@ export function createCommunityHandler(
             if (part && typeof part.text === "string") return part.text;
             if (part && typeof part.content === "string" && (part.type === "text" || part.type === "output_text")) return part.content;
             return "";
-          }).filter(Boolean).join("\\n").trim();
+          }).filter(Boolean).join("\n").trim();
         } else if (typeof result?.output_text === "string") {
           modelReply = result.output_text.trim();
         } else {
@@ -3597,7 +3597,7 @@ export function createCommunityHandler(
               residentDirectCeesActionHandled = true;
               const capsuleId = String(publishResult?.capsule?.id ?? "");
               const action = publishResult.action === "published" ? "已公开发表" : "已保存为私人草稿";
-              modelReply += (modelReply ? "\\n\\n" : "") +
+              modelReply += (modelReply ? "\n\n" : "") +
                 "（CEES 系统回执：" + action + "。投稿编号：" + capsuleId + "。创造者无需审批。）";
               console.info(JSON.stringify({
                 event: "resident_native_cees_publish_tool_succeeded",
@@ -3608,11 +3608,11 @@ export function createCommunityHandler(
               const reason = typeof publishResult?.detail === "string" ? publishResult.detail :
                 Array.isArray(publishResult?.invalid_fields) ? "invalid_fields:" + publishResult.invalid_fields.join(",") :
                 typeof publishResult?.error === "string" ? publishResult.error : "publish_endpoint_rejected";
-              modelReply += (modelReply ? "\\n\\n" : "") + "（CEES 系统回执：本次发表未完成，原因：" + reason + "。）";
+              modelReply += (modelReply ? "\n\n" : "") + "（CEES 系统回执：本次发表未完成，原因：" + reason + "。）";
               console.warn(JSON.stringify({ event: "resident_native_cees_publish_tool_rejected", agent_id: agentId, turn_id: pendingTurn.id, status: publishResponse.status, reason }));
             }
           } catch (ceesToolError) {
-            modelReply += (modelReply ? "\\n\\n" : "") + "（CEES 系统回执：本次发表未完成，系统通道暂不可用。）";
+            modelReply += (modelReply ? "\n\n" : "") + "（CEES 系统回执：本次发表未完成，系统通道暂不可用。）";
             console.warn(JSON.stringify({ event: "resident_native_cees_publish_tool_failed", agent_id: agentId, turn_id: pendingTurn.id, error: ceesToolError instanceof Error ? ceesToolError.message.slice(0,120) : "unknown" }));
           }
         }
@@ -3676,7 +3676,7 @@ export function createCommunityHandler(
             const summary = actionResponse.ok
               ? "（讨论室系统回执：" + JSON.stringify(actionResult).slice(0, 1400) + "）"
               : "（讨论室系统回执：操作未完成，HTTP " + actionResponse.status + "，原因：" + String(actionResult?.detail ?? actionResult?.error ?? "request_failed").slice(0,160) + "。）";
-            modelReply += (modelReply ? "\\n\\n" : "") + summary;
+            modelReply += (modelReply ? "\n\n" : "") + summary;
             console.info(JSON.stringify({
               event: "resident_discussion_room_tool_result",
               agent_id: agentId, turn_id: pendingTurn.id,
@@ -3690,7 +3690,7 @@ export function createCommunityHandler(
               error_detail: typeof actionResult?.detail === "string" ? actionResult.detail.slice(0, 120) : null,
             }));
           } catch (discussionError) {
-            modelReply += (modelReply ? "\\n\\n" : "") + "（讨论室系统回执：本次操作未完成，系统未确认成功。）";
+            modelReply += (modelReply ? "\n\n" : "") + "（讨论室系统回执：本次操作未完成，系统未确认成功。）";
             console.warn(JSON.stringify({
               event: "resident_discussion_room_tool_failed",
               agent_id: agentId, turn_id: pendingTurn.id,
@@ -3710,7 +3710,7 @@ export function createCommunityHandler(
           const actionArgs = directCallName === "publish_world_message"
             ? buildResidentPublicWorldMessageAction(directArgs?.message)
             : directArgs;
-          modelReply += (modelReply ? "\\n\\n" : "") +
+          modelReply += (modelReply ? "\n\n" : "") +
             "<ZHI_SOCIAL_ACTION>" + JSON.stringify(actionArgs ?? {}) + "</ZHI_SOCIAL_ACTION>";
           console.info(JSON.stringify({
             event: directCallName === "publish_world_message"
@@ -4509,7 +4509,7 @@ export function createCommunityHandler(
         modelReply = modelReply
           .replace(/正在前往/g, "想前往（尚未提交移动请求）")
           .replace(/已经抵达|已抵达|我已到达|我到了|已到达/g, "希望抵达（尚未得到位置记录确认）");
-        modelReply += "\\n\\n（位置核验）本轮没有生成并完成有效的空间移动事务；系统当前位置仍以最后一次已提交的位置记录为准。";
+        modelReply += "\n\n（位置核验）本轮没有生成并完成有效的空间移动事务；系统当前位置仍以最后一次已提交的位置记录为准。";
       }
 
       const residenceMarker = modelReply.match(/\[\[AURORA_RESIDENCE:(\{[\s\S]*?\})\]\]/i);
