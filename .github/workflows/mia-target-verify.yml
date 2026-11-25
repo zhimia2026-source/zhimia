@@ -1,0 +1,24 @@
+name: Mia target verifier smoke test
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: mia-target-verifier-smoke
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: migration/mia-archive-transfer
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run read-only authenticated verifier
+        env:
+          ZHIMA_SUPABASE_URL: ${{ secrets.ZHIMA_SUPABASE_URL }}
+          ZHIMA_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.ZHIMA_SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/mia-target-verify.mjs
