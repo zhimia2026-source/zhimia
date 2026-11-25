@@ -22,7 +22,7 @@ begin
       and m.world_id=p_world_id and m.principal_user_id=p_owner_user_id
       and m.status='active' and m.revoked_at is null
       and (m.expires_at is null or m.expires_at > now())
-      and m.capabilities @> '["message:send"]'::jsonb
+      and m.capabilities @> ARRAY['message:send']::text[]
   ) then
     raise exception using errcode='42501', message='active_resident_membership_required';
   end if;
@@ -45,7 +45,7 @@ language plpgsql security definer set search_path = public, auth
 as $$
 declare v_room public.zhi_world_conversations%rowtype;
 declare v_target public.zhi_agents%rowtype;
-declare v_invitation public.zhi_world_conversation_invitations%rowtype;
+ v_invitation public.zhi_world_conversation_invitations%rowtype;
 begin
   select * into v_room from public.zhi_world_conversations
     where id=p_room_id and status='open' for update;
@@ -68,7 +68,7 @@ begin
       where m.world_id=v_room.world_id and m.agent_id=v_target.id
         and m.principal_user_id=v_target.owner_user_id and m.status='active'
         and m.revoked_at is null and (m.expires_at is null or m.expires_at>now())
-        and m.capabilities @> '["message:read"]'::jsonb) then
+        and m.capabilities @> ARRAY['message:read']::text[]) then
     raise exception using errcode='42501', message='target_active_world_membership_required';
   end if;
   if exists(select 1 from public.zhi_world_conversation_members
