@@ -23,7 +23,7 @@ The next production phase is a Windows-only local adapter, tested against the us
 ## Local test
 
 ```powershell
-python -m unittest tests.test_video_studio -v
+python -m unittest discover -s tests -p 'test_video_studio.py' -v
 ```
 
 ## Plan shape
