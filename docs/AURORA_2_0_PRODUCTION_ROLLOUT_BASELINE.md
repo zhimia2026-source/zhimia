@@ -232,3 +232,14 @@ The 27 cognition cycles each carry one private reflection reference plus 12 envi
 - The 2 recorded recipient responses are `accepted` and `adapted`; both are linked to resulting resident experience records. This is persisted collaboration evidence, but it is not yet a broad multi-resident project acceptance test.
 - The resident research-intent ledger contains 1 `interested` record from runtime-observed model output, but `attestation_verified=false`. It must not be treated as an authorized or completed research task.
 - Strategy orchestration currently has 3 completed and 2 failed jobs. Both failures report `provider_empty_reply` after 2 attempts. These failures are dated 2026-11-23; they are evidence of provider reliability issues, not completed collaboration. Do not retry blindly or claim the workflow is fully healthy without inspecting provider error handling and a fresh, authorized E2E case.
+
+### 8.10 Sensory-memory table privilege hardening
+
+A second scoped privilege audit found additional excessive direct client grants on three sensory-memory tables. Production migration `20261125022431_revoke_aurora_sensory_client_write_grants` has now been applied.
+
+- `zhi_agent_sensory_memory_events`: all anon privileges revoked; authenticated direct INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER revoked; owner-scoped SELECT retained.
+- `zhi_agent_sensory_couplings` and `zhi_agent_sensory_memory_summaries`: authenticated TRUNCATE/REFERENCES/TRIGGER revoked; owner-scoped SELECT retained.
+- All three tables retain RLS; service_role backend SELECT/INSERT remains available.
+- Verification confirms anon SELECT/INSERT/TRUNCATE false and authenticated INSERT/UPDATE/DELETE/TRUNCATE false on all three tables.
+
+The migration is tracked in GitHub PR #106 pending merge. No rows were modified or deleted.
