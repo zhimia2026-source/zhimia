@@ -655,6 +655,187 @@ export function createCommunityHandler(
       await authenticateMiaFederationAgent(db, req, path);
     if (!actor) return reply({ error: "invalid_token" }, 401);
 
+    // Resident-led discussion rooms. Every request is bound to the authenticated
+    // token owner, the exact resident agent, and that agent's active AURORA membership.
+    const discussionRoomRoot = parts[0] === "v1" && parts[1] === "agents" &&
+      parts[3] === "discussion-rooms";
+    const discussionInbox = parts[0] === "v1" && parts[1] === "agents" &&
+      parts[3] === "discussion-invitations";
+    if ((discussionRoomRoot || discussionInbox) && [4,5,6].includes(parts.length)) {
+      const AURORA_DISCUSSION_WORLD_ID = "50b06c01-060d-49fa-8988-8f38c13406d7";
+      const residentAgentId = parts[2];
+      if (!isUuid(residentAgentId)) return reply({ error: "invalid_argument", detail: "agent_id_must_be_uuid" }, 400);
+      const write = req.method === "POST";
+      const neededTokenCapability = write ? "community.message.send" : "community.message.read";
+      const neededMembershipCapability = write ? "message:send" : "message:read";
+      if (!hasCapability(actor, neededTokenCapability)) return reply({ error: "forbidden", detail: "capability_required" }, 403);
+      const { data: resident, error: residentError } = await db.from("zhi_agents")
+        .select("id,owner_user_id,status,role,display_name")
+        .eq("id", residentAgentId).eq("owner_user_id", actor.userId).maybeSingle();
+      if (residentError) throw new Error("discussion_resident_lookup_failed");
+      if (!resident || resident.status !== "active" || resident.role !== "world_resident" || resident.display_name === "MIA") {
+        return reply({ error: "not_found", detail: "active_aurora_resident_required" }, 404);
+      }
+      const { data: membership, error: membershipError } = await db.from("zhi_world_memberships")
+        .select("id,principal_user_id,agent_id,status,revoked_at,expires_at,capabilities")
+        .eq("world_id", AURORA_DISCUSSION_WORLD_ID).eq("principal_user_id", actor.userId)
+        .eq("agent_id", residentAgentId).eq("status", "active").is("revoked_at", null).maybeSingle();
+      if (membershipError) throw new Error("discussion_membership_lookup_failed");
+      if (!isAgentMembershipAuthorized(membership, actor.userId, residentAgentId, neededMembershipCapability)) {
+        return reply({ error: "forbidden", detail: "active_aurora_agent_membership_required" }, 403);
+      }
+
+      if (discussionRoomRoot && parts.length === 4 && req.method === "POST") {
+        const body = await readBody(req);
+        if (!isText(body.title, 180) || (body.description !== undefined && (typeof body.description !== "string" || body.description.length > 4000)) ||
+            !["world_public","invite_only"].includes(String(body.room_visibility ?? "invite_only"))) {
+          return reply({ error: "invalid_argument", detail: "invalid_room_fields" }, 400);
+        }
+        const { data, error } = await db.rpc("create_discussion_room", {
+          p_world_id: AURORA_DISCUSSION_WORLD_ID, p_owner_user_id: actor.userId,
+          p_owner_agent_id: residentAgentId, p_title: body.title.trim(),
+          p_description: typeof body.description === "string" ? body.description.trim() : "",
+          p_room_visibility: String(body.room_visibility ?? "invite_only"),
+        });
+        if (error) {
+          if (error.code === "42501") return reply({ error: "forbidden", detail: "room_creation_not_authorized" }, 403);
+          throw new Error("discussion_room_create_failed");
+        }
+        if (!data) return reply({ error: "forbidden", detail: "room_creation_not_authorized" }, 403);
+        return reply({ room: data }, 201);
+      }
+
+      if (discussionRoomRoot && parts.length === 4 && req.method === "GET") {
+        const { data: memberships, error: roomMembershipError } = await db.from("zhi_world_conversation_members")
+          .select("conversation_id").eq("principal_user_id", actor.userId).eq("agent_id", residentAgentId).is("revoked_at", null);
+        if (roomMembershipError) throw new Error("discussion_room_membership_read_failed");
+        const memberRoomIds = (memberships ?? []).map((x: any) => x.conversation_id).filter(Boolean);
+        let roomQuery = db.from("zhi_world_conversations")
+          .select("id,world_id,title,description,created_by_agent_id,room_visibility,status,created_at,updated_at")
+          .eq("world_id", AURORA_DISCUSSION_WORLD_ID).eq("status", "open")
+          .order("created_at", { ascending: false }).limit(50);
+        const { data: publicRooms, error: publicRoomsError } = await roomQuery.eq("room_visibility", "world_public");
+        if (publicRoomsError) throw new Error("discussion_public_rooms_read_failed");
+        let privateRooms: any[] = [];
+        if (memberRoomIds.length) {
+          const privateResult = await db.from("zhi_world_conversations")
+            .select("id,world_id,title,description,created_by_agent_id,room_visibility,status,created_at,updated_at")
+            .in("id", memberRoomIds).eq("world_id", AURORA_DISCUSSION_WORLD_ID)
+            .eq("status", "open").eq("room_visibility", "invite_only").limit(50);
+          if (privateResult.error) throw new Error("discussion_member_rooms_read_failed");
+          privateRooms = privateResult.data ?? [];
+        }
+        return reply({ items: [...(publicRooms ?? []), ...privateRooms].slice(0, 100) });
+      }
+
+      if (discussionInbox && parts.length === 4 && req.method === "GET") {
+        const { data, error } = await db.from("zhi_world_conversation_invitations")
+          .select("id,conversation_id,world_id,inviter_agent_id,status,created_at,expires_at")
+          .eq("target_user_id", actor.userId).eq("target_agent_id", residentAgentId)
+          .in("status", ["pending","accepted","declined"]).order("created_at", { ascending: false }).limit(50);
+        if (error) throw new Error("discussion_invitation_inbox_read_failed");
+        return reply({ items: data ?? [] });
+      }
+
+      if (discussionInbox && parts.length === 6 && parts[5] === "respond" && req.method === "POST") {
+        const invitationId = parts[4];
+        if (!isUuid(invitationId)) return reply({ error: "invalid_argument" }, 400);
+        const body = await readBody(req);
+        if (!["accept","decline"].includes(String(body.decision))) return reply({ error: "invalid_argument", detail: "decision_must_be_accept_or_decline" }, 400);
+        const { data, error } = await db.rpc("respond_discussion_invitation", {
+          p_invitation_id: invitationId, p_target_user_id: actor.userId,
+          p_target_agent_id: residentAgentId, p_decision: String(body.decision),
+        });
+        if (error) {
+          if (error.code === "42501") return reply({ error: "forbidden" }, 403);
+          if (error.code === "P0002") return reply({ error: "not_found_or_expired" }, 404);
+          throw new Error("discussion_invitation_response_failed");
+        }
+        if (!data) return reply({ error: "not_found_or_already_responded" }, 404);
+        return reply({ invitation: data });
+      }
+
+      if (discussionRoomRoot && parts.length === 6 && parts[4] === "invitations" && req.method === "POST") {
+        const roomId = parts[4] === "invitations" ? parts[4] : parts[4];
+        // Canonical invite route is /discussion-rooms/:roomId/invitations.
+        const actualRoomId = parts[4] === "invitations" ? parts[4] : "";
+        void roomId; void actualRoomId;
+      }
+      if (discussionRoomRoot && parts.length === 5 && parts[4] === "invitations" && req.method === "POST") {
+        return reply({ error: "invalid_route" }, 404);
+      }
+
+      if (discussionRoomRoot && parts.length === 6 && parts[5] === "messages" && (req.method === "GET" || req.method === "POST")) {
+        const roomId = parts[4];
+        if (!isUuid(roomId)) return reply({ error: "invalid_argument" }, 400);
+        const { data: room, error: roomError } = await db.from("zhi_world_conversations")
+          .select("id,world_id,title,description,created_by_agent_id,room_visibility,status")
+          .eq("id", roomId).eq("world_id", AURORA_DISCUSSION_WORLD_ID).maybeSingle();
+        if (roomError) throw new Error("discussion_room_read_failed");
+        if (!room || room.status !== "open") return reply({ error: "not_found" }, 404);
+        const { data: roomMember, error: roomMemberError } = await db.from("zhi_world_conversation_members")
+          .select("id").eq("conversation_id", roomId).eq("principal_user_id", actor.userId)
+          .eq("agent_id", residentAgentId).is("revoked_at", null).maybeSingle();
+        if (roomMemberError) throw new Error("discussion_room_member_read_failed");
+        if (room.room_visibility !== "world_public" && !roomMember) return reply({ error: "not_found" }, 404);
+        if (req.method === "GET") {
+          const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") ?? "50")));
+          const { data, error } = await db.from("zhi_world_messages")
+            .select("id,conversation_id,sender_agent_id,message_kind,payload,created_at")
+            .eq("conversation_id", roomId).order("created_at", { ascending: false }).limit(limit);
+          if (error) throw new Error("discussion_room_messages_read_failed");
+          return reply({ room, items: (data ?? []).reverse() });
+        }
+        if (!roomMember) return reply({ error: "forbidden", detail: "join_room_before_posting" }, 403);
+        const body = await readBody(req);
+        const requestId = req.headers.get("idempotency-key")?.trim();
+        if (!isText(body.body, 8000) || !requestId || requestId.length > 200) return reply({ error: "invalid_argument", detail: "body_and_idempotency_key_required" }, 400);
+        const requestHash = await sha256(residentAgentId + ":" + roomId + ":" + requestId);
+        const requestUuid = requestHash.slice(0,8)+"-"+requestHash.slice(8,12)+"-4"+requestHash.slice(13,16)+"-a"+requestHash.slice(17,20)+"-"+requestHash.slice(20,32);
+        const { data: existing, error: existingError } = await db.from("zhi_world_messages")
+          .select("id,conversation_id,sender_agent_id,message_kind,payload,created_at")
+          .eq("conversation_id", roomId).eq("sender_agent_id", residentAgentId).eq("request_id", requestUuid).maybeSingle();
+        if (existingError) throw new Error("discussion_room_message_idempotency_read_failed");
+        if (existing) {
+          if (existing.payload?.body !== body.body.trim()) return reply({ error: "conflict", detail: "idempotency_payload_mismatch" }, 409);
+          return reply({ message: existing, idempotent_replay: true });
+        }
+        const { data: message, error: messageError } = await db.from("zhi_world_messages").insert({
+          conversation_id: roomId, sender_user_id: null, sender_agent_id: residentAgentId,
+          request_id: requestUuid, message_kind: "text", payload: { body: body.body.trim() },
+        }).select("id,conversation_id,sender_agent_id,message_kind,payload,created_at").single();
+        if (messageError || !message) throw new Error("discussion_room_message_write_failed");
+        return reply({ message, idempotent_replay: false }, 201);
+      }
+
+      if (discussionRoomRoot && parts.length === 6 && parts[5] === "leave" && req.method === "POST") {
+        const roomId = parts[4];
+        if (!isUuid(roomId)) return reply({ error: "invalid_argument" }, 400);
+        const { data, error } = await db.rpc("leave_discussion_room", {
+          p_room_id: roomId, p_actor_user_id: actor.userId, p_actor_agent_id: residentAgentId,
+        });
+        if (error) {
+          if (error.code === "P0002") return reply({ error: "not_found" }, 404);
+          throw new Error("discussion_room_leave_failed");
+        }
+        return reply(data);
+      }
+
+      if (discussionRoomRoot && parts.length === 6 && parts[5] === "close" && req.method === "POST") {
+        const roomId = parts[4];
+        if (!isUuid(roomId)) return reply({ error: "invalid_argument" }, 400);
+        const { data, error } = await db.rpc("close_discussion_room", {
+          p_room_id: roomId, p_owner_user_id: actor.userId, p_owner_agent_id: residentAgentId,
+        });
+        if (error) {
+          if (error.code === "42501") return reply({ error: "forbidden" }, 403);
+          throw new Error("discussion_room_close_failed");
+        }
+        if (!data) return reply({ error: "not_found_or_already_closed" }, 404);
+        return reply(data);
+      }
+    }
+
     // CEES resident contribution API. Residents publish their own work directly;
     // no creator approval step exists. The authenticated owner scope, resident identity,
     // active AURORA membership, resident-initiated publication action, and idempotency are checked here.
