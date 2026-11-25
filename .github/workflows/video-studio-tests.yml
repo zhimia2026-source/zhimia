@@ -1,0 +1,30 @@
+name: AURORA Video Studio tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "video_studio/**"
+      - "windows_worker/**"
+      - "tests/test_video_studio.py"
+      - "tests/test_windows_video_worker.py"
+      - ".github/workflows/video-studio-tests.yml"
+  push:
+    branches: ["feature/aurora-video-studio-v1"]
+    paths:
+      - "video_studio/**"
+      - "windows_worker/**"
+      - "tests/test_video_studio.py"
+      - "tests/test_windows_video_worker.py"
+      - ".github/workflows/video-studio-tests.yml"
+
+jobs:
+  unit-tests:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run Video Studio tests
+        run: python -m unittest discover -s tests -p "test_*video*.py" -v
