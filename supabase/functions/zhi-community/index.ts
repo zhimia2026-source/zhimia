@@ -4825,15 +4825,19 @@ export function createCommunityHandler(
                   ? (cognitionFeedback.events as Array<Record<string, unknown>>).slice(0, 12) : [];
                 const cognitionActionEvidence = buildCognitionActionEvidence(verifiedActionOutcomes);
                 const cognitionActionOutcomes = cognitionActionEvidence.outcomes;
+                const cognitionEnvironmentRefs = cognitionEvents.flatMap((event) => typeof event.id === "string"
+                  ? [{ kind: "aurora_environment_event", id: event.id,
+                       event_kind: typeof event.event_kind === "string" ? event.event_kind : "unknown",
+                       state_revision: typeof event.state_revision === "number" ? event.state_revision : null }]
+                  : []);
+                const cognitionActionEvidenceRefs = cognitionActionEvidence.evidence_refs.slice(
+                  0, Math.max(0, 20 - 1 - cognitionEnvironmentRefs.length),
+                );
                 const cognitionEvidenceRefs = [
                   { kind: "private_experience", id: String(savedReflection.id) },
-                  ...cognitionEvents.flatMap((event) => typeof event.id === "string"
-                    ? [{ kind: "aurora_environment_event", id: event.id,
-                         event_kind: typeof event.event_kind === "string" ? event.event_kind : "unknown",
-                         state_revision: typeof event.state_revision === "number" ? event.state_revision : null }]
-                    : []),
-                  ...cognitionActionEvidence.evidence_refs,
-                ].slice(0, 20);
+                  ...cognitionEnvironmentRefs,
+                  ...cognitionActionEvidenceRefs,
+                ];
                 const cognitionActionTrace = reflection.affect_decision_trace &&
                   typeof reflection.affect_decision_trace === "object"
                   ? reflection.affect_decision_trace : null;
@@ -4881,7 +4885,7 @@ export function createCommunityHandler(
                     source_experience_id: savedReflection.id,
                     environment_event_count: cognitionEvents.length,
                     action_outcome_count: cognitionActionEvidence.counts.observed_count,
-                    action_evidence_ref_count: cognitionActionEvidence.evidence_refs.length,
+                    action_evidence_ref_count: cognitionActionEvidenceRefs.length,
                     confirmed_action_count: cognitionActionEvidence.counts.confirmed_action_count,
                     pending_followup_count: cognitionActionEvidence.counts.pending_followup_count,
                     not_executed_or_failed_count: cognitionActionEvidence.counts.not_executed_or_failed_count,
