@@ -3209,7 +3209,7 @@ export function createCommunityHandler(
         // The retry is event-driven and bounded to one call. Recipient resolution uses only
         // explicit directional addressing in the current turn, never names in rolling history.
         const explicitNonSend = /(?:没有|未|不|暂不|不打算).{0,10}(?:发送|发消息|发私信|发短信|发布|公开发言|世界频道发言)|(?:won't|will not|not going to).{0,18}(?:send|message|dm|post|publish)/i.test(modelReply);
-        const sendPromisePattern = /(?:我.{0,24}(?:现在|马上|立刻|立即|这就|正在).{0,16}(?:发|发送|发消息|发私信|发短信|发出|发布|公开发言|世界频道发言)|(?:现在|马上|立刻|立即|这就|正在).{0,14}(?:发|发送|发消息|发私信|发短信|发出|发布|公开发言|世界频道发言)|(?:i(?:'ll| will)|i am going to).{0,28}(?:send|message|dm|post|publish)\b|(?:sending|send).{0,24}(?:message|dm|to)\b|(?:posting|publish(?:ing)?).{0,30}(?:public|world channel)/i;
+        const sendPromisePattern = /(?:我.{0,24}(?:现在|马上|立刻|立即|这就|正在).{0,16}(?:发|发送|发消息|发私信|发短信|发出|发布|公开发言|世界频道发言)|(?:现在|马上|立刻|立即|这就|正在).{0,14}(?:发|发送|发消息|发私信|发短信|发出|发布|公开发言|世界频道发言)|(?:i(?:'ll| will)|i am going to).{0,28}(?:send|message|dm|post|publish)\b|(?:sending|send).{0,24}(?:message|dm|to)\b|(?:posting|publish(?:ing)?).{0,30}(?:public|world channel))/i;
         publicWorldMessagePromiseDetected = residentPublicWorldMessageToolCalled ||
           /(?:我.{0,24}(?:发布公开消息|向AURORA.{0,6}频道发言|在世界频道发言|公开发布)|(?:i(?:'ll| will)|i am going to).{0,28}(?:post|publish).{0,24}(?:public|world))/i.test(modelReply);
         privateMessageSendPromiseDetected = residentPublicWorldMessageToolCalled ||
