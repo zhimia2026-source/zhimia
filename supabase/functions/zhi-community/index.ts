@@ -3393,6 +3393,26 @@ export function createCommunityHandler(
       let residentPublicWorldMessageToolCalled = false;
       let privateMessageRecoveryAttempted = false;
       let privateMessageRecoveryRecipientCount = 0;
+      const residentDiscussionToolEligible = agent.role === "world_resident" && agent.display_name !== "MIA" && auroraWorldId === AURORA_WORLD_ID && hasCapability(actor, "community.message.send");
+      const residentToolingEnabled = socialReady || residentDiscussionToolEligible;
+      const offeredNativeToolNames = [
+        ...(socialReady ? ["send_private_message", "publish_world_message"] : []),
+        ...(residentDiscussionToolEligible ? ["publish_cees_contribution", "manage_discussion_room"] : []),
+      ];
+      console.info(JSON.stringify({
+        event: "resident_model_tooling_request",
+        agent_id: agentId, turn_id: pendingTurn.id, provider_model: providerModel,
+        tooling_enabled: residentToolingEnabled,
+        offered_tool_names: offeredNativeToolNames,
+        discussion_tool_offered: residentDiscussionToolEligible,
+        social_tools_offered: socialReady,
+        discussion_eligibility: {
+          world_resident: agent.role === "world_resident",
+          excluded_prototype_mia: agent.display_name === "MIA",
+          aurora_world: auroraWorldId === AURORA_WORLD_ID,
+          send_token_capability: hasCapability(actor, "community.message.send"),
+        },
+      }));
       try {
         const upstream = await callModel(providerUrl, {
           method: "POST",
@@ -3514,6 +3534,20 @@ export function createCommunityHandler(
           modelReply = "";
         }
         const nativeCalls = Array.isArray(assistantMessage.tool_calls) ? assistantMessage.tool_calls : [];
+        const returnedNativeToolNames = nativeCalls.map((item: any) =>
+          item?.type === "function" && typeof item?.function?.name === "string"
+            ? item.function.name.slice(0, 100) : "unknown_tool"
+        );
+        console.info(JSON.stringify({
+          event: "resident_model_tooling_response",
+          agent_id: agentId, turn_id: pendingTurn.id, provider_model: providerModel,
+          response_id: typeof result?.id === "string" ? result.id.slice(0, 100) : null,
+          finish_reason: typeof result?.choices?.[0]?.finish_reason === "string" ? result.choices[0].finish_reason : null,
+          tool_call_count: nativeCalls.length,
+          returned_tool_names: returnedNativeToolNames,
+          discussion_tool_call_count: nativeCalls.filter((item: any) => item?.type === "function" && item?.function?.name === "manage_discussion_room").length,
+          refusal_present: typeof assistantMessage.refusal === "string" && assistantMessage.refusal.length > 0,
+        }));
         const directCall = nativeCalls.find((item: any) => item?.type === "function" &&
           ["send_private_message", "publish_world_message"].includes(item?.function?.name));
         const directDiscussionCalls = nativeCalls.filter((item: any) => item?.type === "function" &&
@@ -3638,10 +3672,27 @@ export function createCommunityHandler(
               ? "（讨论室系统回执：" + JSON.stringify(actionResult).slice(0, 1400) + "）"
               : "（讨论室系统回执：操作未完成，HTTP " + actionResponse.status + "，原因：" + String(actionResult?.detail ?? actionResult?.error ?? "request_failed").slice(0,160) + "。）";
             modelReply += (modelReply ? "\\n\\n" : "") + summary;
-            console.info(JSON.stringify({ event: "resident_discussion_room_tool_result", agent_id: agentId, turn_id: pendingTurn.id, action, action_index: discussionCallIndex, status: actionResponse.status, success: actionResponse.ok }));
+            console.info(JSON.stringify({
+              event: "resident_discussion_room_tool_result",
+              agent_id: agentId, turn_id: pendingTurn.id,
+              action, action_index: discussionCallIndex,
+              tool_call_id_present: typeof directDiscussionCall.id === "string",
+              status: actionResponse.status, success: actionResponse.ok,
+              persistence_verified: actionResult?.persistence_verified === true,
+              message_id_present: typeof actionResult?.message?.id === "string",
+              room_id_present: typeof actionResult?.room?.id === "string" || typeof actionResult?.membership?.room?.id === "string",
+              error_code: typeof actionResult?.error === "string" ? actionResult.error.slice(0, 100) : null,
+              error_detail: typeof actionResult?.detail === "string" ? actionResult.detail.slice(0, 120) : null,
+            }));
           } catch (discussionError) {
             modelReply += (modelReply ? "\\n\\n" : "") + "（讨论室系统回执：本次操作未完成，系统未确认成功。）";
-            console.warn(JSON.stringify({ event: "resident_discussion_room_tool_failed", agent_id: agentId, turn_id: pendingTurn.id, action_index: discussionCallIndex, error: discussionError instanceof Error ? discussionError.message.slice(0,120) : "unknown" }));
+            console.warn(JSON.stringify({
+              event: "resident_discussion_room_tool_failed",
+              agent_id: agentId, turn_id: pendingTurn.id,
+              action_index: discussionCallIndex,
+              tool_call_id_present: typeof directDiscussionCall?.id === "string",
+              error: discussionError instanceof Error ? discussionError.message.slice(0,120) : "unknown",
+            }));
           }
         }
         if (directCall) {
