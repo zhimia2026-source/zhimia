@@ -70,6 +70,22 @@ class VideoStudioTests(unittest.TestCase):
         with self.assertRaisesRegex(VideoPlanError, "asset_file_missing"):
             compile_edit_decision_list(raw, self.root)
 
+    def test_malformed_unhashable_values_are_rejected_cleanly(self):
+        raw = self.plan()
+        raw["aspect_ratio"] = []
+        with self.assertRaisesRegex(VideoPlanError, "unsupported_aspect_ratio"):
+            VideoPlan.parse(raw)
+        raw = self.plan()
+        raw["clips"][0]["role"] = []
+        with self.assertRaisesRegex(VideoPlanError, "invalid_clip_role"):
+            VideoPlan.parse(raw)
+
+    def test_non_finite_timestamps_are_rejected(self):
+        raw = self.plan()
+        raw["clips"][0]["timeline_start"] = float("nan")
+        with self.assertRaisesRegex(VideoPlanError, "clip_times_must_be_finite"):
+            VideoPlan.parse(raw)
+
 
 if __name__ == "__main__":
     unittest.main()
