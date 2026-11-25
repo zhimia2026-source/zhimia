@@ -208,3 +208,20 @@ The Supabase security advisor still reports broader database findings (including
 - Cognition-to-action before/after E2E: not_run; current cycle data has no action outcomes.
 - Backup restore / rollback rehearsal: not_run.
 - Social-intent pending backlog review: not_run; do not send or delete messages as a substitute for verification.
+
+### 8.7 Event-driven social evaluation and resident autonomy
+
+A per-resident social profile exists and is enabled for all 12 non-prototype residents. At the latest read-only check, each profile had been evaluated during the 2026-11-25 02:15 UTC ecosystem tick. No pending observatory interest cues were present at that point.
+
+The ecosystem engine invokes the social scheduler's internal evaluation endpoint as part of its existing 15-minute tick. The scheduler performs deterministic database-only work:
+- expires pending/deferred intents past their seven-day expiry;
+- evaluates residents when a meaningful event is supplied, when never evaluated, after a 24-hour safety refresh, or when fresh verified social evidence exists after a 10-minute debounce;
+- creates optional social intents, but does not invoke a model or send messages.
+
+Ordinary clock ticks therefore may invoke a database-only scheduler check, but they do not create a model wakeup, synthetic conversation, or automatic message. Preserve this behavior unless a separately costed and tested design is approved.
+
+The current social intent ledger has 23 pending items (13 older than six hours, 5 older than one day); all observed pending items remain within the seven-day expiry window. They are resident decision candidates, not messages. Do not clear them as "drafts" or mark them complete without a verified action receipt.
+
+### 8.8 Cognition evidence interpretation
+
+The 27 cognition cycles each carry one private reflection reference plus 12 environment-event references. This is valid evidence attachment. The current zero action-outcome count is consistent with those turns not having a verified movement, observatory action, or social send outcome. It must not be interpreted as a failed cognition write; equally, it must not be represented as proof of behavior change. A future acceptance case must include an actual verified resident action and its observed result, then trace the before/after decision without adding a model call solely for the test.
